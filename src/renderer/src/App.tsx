@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { CloseEditorDialog } from './components/CloseEditorDialog'
-import { FileExplorer } from './components/FileExplorer'
+import { RightPanel } from './components/RightPanel'
 import { useEditors } from './editor-store'
 import { Sidebar } from './components/Sidebar'
 import { useExplorer } from './explorer-store'
@@ -24,6 +24,7 @@ export function App() {
         case 'close-terminal': {
           const tab = app.activeProjectId ? app.tabs[app.activeTabByProject[app.activeProjectId] ?? ''] : undefined
           if (tab?.kind === 'editor') return useEditors.getState().requestClose(tab.id)
+          if (tab?.kind === 'diff') return app.closeTab(tab.id)
           return app.closeActivePane()
         }
         case 'next-terminal':
@@ -50,7 +51,7 @@ export function App() {
     <div className="flex h-full">
       <Sidebar />
       <Workspace />
-      {explorerOpen && activeProject && <FileExplorer key={activeProject.id} project={activeProject} />}
+      {explorerOpen && activeProject && <RightPanel key={activeProject.id} project={activeProject} />}
       <CloseEditorDialog />
     </div>
   )

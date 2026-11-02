@@ -39,6 +39,14 @@ const api: CapitaineApi = {
     copyText: (text) => ipcRenderer.send('clipboard:write', text),
     pathForFile: (file) => webUtils.getPathForFile(file)
   },
+  git: {
+    status: (projectId) => ipcRenderer.invoke('git:status', projectId),
+    stage: (projectId, paths) => ipcRenderer.invoke('git:stage', projectId, paths),
+    unstage: (projectId, paths) => ipcRenderer.invoke('git:unstage', projectId, paths),
+    stashes: (projectId) => ipcRenderer.invoke('git:stashes', projectId),
+    stashFiles: (projectId, ref) => ipcRenderer.invoke('git:stash-files', projectId, ref),
+    show: (projectId, side) => ipcRenderer.invoke('git:show', projectId, side)
+  },
   focusWindow: () => ipcRenderer.send('window:focus'),
   confirmClose: () => ipcRenderer.send('window:close-confirmed'),
   cancelClose: () => ipcRenderer.send('window:close-cancelled'),

@@ -24,6 +24,11 @@ writeFileSync(join(gitDemo, 'dist/bundle.js'), '//\n')
 git('init', '-q')
 git('add', '.')
 git('commit', '-qm', 'init')
+// A stash, then a staged file, for the git panel.
+writeFileSync(join(gitDemo, 'src/app.ts'), 'export const stashed = 1\n')
+git('stash', 'push', '-q', '-m', 'wip refacto')
+writeFileSync(join(gitDemo, 'staged.txt'), 'prêt à commiter\n')
+git('add', 'staged.txt')
 writeFileSync(join(gitDemo, 'tracked.txt'), 'v2\n')
 writeFileSync(join(gitDemo, 'new.txt'), 'untracked\n')
 writeFileSync(join(userData, 'projects.json'), JSON.stringify({
@@ -242,10 +247,53 @@ await page.click('button:has-text("Annuler")')
 await page.keyboard.press('Control+z')
 editorChecks.undoClearsDirty = await waitFor(async () => !(await dirtyTab()))
 console.log('  editor:', 'undoClearsDirty', editorChecks.undoClearsDirty)
+// Git panel: changes / staged / stash, diffs, staging.
+const gitChecks = {}
+const gitPanel = page.locator('[aria-label="Changements git"]')
+const gitRow = (name) => gitPanel.locator('[role=button]', { hasText: name }).first()
+const diffText = () =>
+  page.evaluate(() => {
+    const view = document.querySelector('[data-diff-tab]:not(.invisible) .monaco-diff-editor')
+    return view ? view.innerText.replace(/\u00a0/g, ' ') : null
+  })
+await page.click('[role=tab]:has-text("Git")')
+gitChecks.sections = await waitFor(async () => {
+  const text = await gitPanel.innerText().catch(() => '')
+  return /Indexés/i.test(text) && text.includes('staged.txt') && /Modifications/i.test(text) && text.includes('tracked.txt') && text.includes('new.txt')
+})
+gitChecks.branch = await waitFor(async () => /master|main/.test(await gitPanel.innerText()))
+gitChecks.badge = await waitFor(async () => /\d/.test(await page.locator('[role=tab]:has-text("Git")').innerText()))
+await gitRow('tracked.txt').click()
+gitChecks.diffOpens = await waitFor(async () => {
+  const text = await diffText()
+  return !!text && text.includes('v1') && text.includes('agent, encore')
+}, 20000)
+// Hover-only buttons: dispatch the click (headless pointer hover isn't reliable).
+await gitRow('tracked.txt').locator('[title="Indexer"]').dispatchEvent('click')
+gitChecks.stageMovesFile = await waitFor(async () => {
+  const text = await gitPanel.innerText()
+  const staged = text.slice(text.search(/Indexés/i), text.search(/Modifications/i))
+  return staged.includes('tracked.txt')
+})
+gitChecks.diffNoticesMove = await waitFor(() => page.$('text=plus dans cette zone').then(Boolean))
+await gitPanel.locator('[title="Tout désindexer"]').dispatchEvent('click')
+gitChecks.unstageAll = await waitFor(async () => !/Indexés/i.test(await gitPanel.innerText()))
+gitChecks.stashListed = await waitFor(async () => (await gitPanel.innerText()).includes('wip refacto'))
+await gitRow('wip refacto').click()
+gitChecks.stashFiles = await waitFor(async () => (await gitPanel.locator('[title^="src/app.ts"]').count()) > 0)
+await gitPanel.locator('[title^="src/app.ts"]').click()
+gitChecks.stashDiff = await waitFor(async () => (await diffText())?.includes('stashed'), 20000)
+await shot('08-git')
+console.log('git checks:', gitChecks)
+
 // destroy() skips beforeunload: a leftover unsaved buffer must never hang the test run.
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.destroy()))
 await app.close()
 console.log('editor checks:', editorChecks)
+if (Object.values(gitChecks).includes(false)) {
+  console.error('FAIL: git panel')
+  process.exit(1)
+}
 if (Object.values(editorChecks).includes(false)) {
   console.error('FAIL: editor')
   process.exit(1)

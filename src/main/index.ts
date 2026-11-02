@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import type { PtyCreateOptions } from '../shared/types'
 import { DirectoryWatchers, gitStatus, isInside, listDirectory, readTextFile, writeTextFile } from './file-system'
 import { installAppMenu } from './menu'
+import { repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './source-control'
+import type { DiffSide } from '../shared/types'
 import { ProjectStore } from './project-store'
 import { PtyManager } from './pty-manager'
 import icon from '../../resources/icon.png?asset'
@@ -124,6 +126,24 @@ function registerIpc(): void {
   ipcMain.on('files:reveal', (_e, projectId: string, path: string) => {
     if (projectPath(projectId, path)) shell.showItemInFolder(path)
   })
+  // Git: the repo is always derived from the project here, never taken from the renderer.
+  const repoOf = async (projectId: string): Promise<string> => {
+    const root = projectPath(projectId)
+    const repo = root ? await repoRootOf(root) : null
+    if (!repo) throw new Error('Ce projet n’est pas un dépôt git')
+    return repo
+  }
+  const repoPaths = (paths: unknown): string[] => (Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : [])
+  ipcMain.handle('git:status', (_e, projectId: string) => {
+    const root = projectPath(projectId)
+    return root ? repoStatus(root) : null
+  })
+  ipcMain.handle('git:stage', async (_e, projectId: string, paths: unknown) => stagePaths(await repoOf(projectId), repoPaths(paths)))
+  ipcMain.handle('git:unstage', async (_e, projectId: string, paths: unknown) => unstagePaths(await repoOf(projectId), repoPaths(paths)))
+  ipcMain.handle('git:stashes', async (_e, projectId: string) => stashList(await repoOf(projectId)))
+  ipcMain.handle('git:stash-files', async (_e, projectId: string, ref: string) => stashFiles(await repoOf(projectId), String(ref)))
+  ipcMain.handle('git:show', async (_e, projectId: string, side: DiffSide) => showBlob(await repoOf(projectId), side))
+
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
 
   ipcMain.handle('pty:create', (event, options: PtyCreateOptions) => ptys.create(event.sender, options))

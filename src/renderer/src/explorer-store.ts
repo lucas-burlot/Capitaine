@@ -2,9 +2,14 @@ import { create } from 'zustand'
 import type { DirEntry, GitFileStatus, GitStatus } from '@shared/types'
 
 const OPEN_KEY = 'capitaine.explorerOpen'
+const VIEW_KEY = 'capitaine.rightPanelView'
+
+export type RightPanelView = 'files' | 'git'
 
 interface ExplorerState {
   open: boolean
+  /** Which view the right panel shows. */
+  view: RightPanelView
   /** Expanded directories (absolute paths) per project. The root is always shown. */
   expanded: Record<string, string[]>
   /** Directory listings by absolute path. */
@@ -14,6 +19,8 @@ interface ExplorerState {
   git: Record<string, GitStatus | null>
 
   toggleOpen(): void
+  /** Shows the panel on that view (opening it if hidden). */
+  showView(view: RightPanelView): void
   loadDir(projectId: string, dir: string): Promise<void>
   toggleDir(projectId: string, dir: string): void
   collapseAll(projectId: string, root: string): void
@@ -48,8 +55,17 @@ function initialOpen(): boolean {
   }
 }
 
+function initialView(): RightPanelView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'git' ? 'git' : 'files'
+  } catch {
+    return 'files'
+  }
+}
+
 export const useExplorer = create<ExplorerState>((set, get) => ({
   open: initialOpen(),
+  view: initialView(),
   expanded: {},
   children: {},
   errors: {},
@@ -60,6 +76,12 @@ export const useExplorer = create<ExplorerState>((set, get) => ({
     const open = !get().open
     localStorage.setItem(OPEN_KEY, open ? '1' : '0')
     set({ open })
+  },
+
+  showView(view) {
+    localStorage.setItem(VIEW_KEY, view)
+    localStorage.setItem(OPEN_KEY, '1')
+    set({ view, open: true })
   },
 
   async loadDir(projectId, dir) {

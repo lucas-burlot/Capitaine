@@ -77,7 +77,15 @@ monaco.editor.defineTheme('capitaine', {
     'scrollbarSlider.background': '#2a2e3780',
     'scrollbarSlider.hoverBackground': '#3a3f4fa0',
     'scrollbarSlider.activeBackground': '#4a5060c0',
-    'minimap.background': '#0e0f13'
+    'minimap.background': '#0e0f13',
+    // Diffs: soft line tint, stronger on the exact characters that changed.
+    'diffEditor.insertedLineBackground': '#3fb95018',
+    'diffEditor.removedLineBackground': '#f8514918',
+    'diffEditor.insertedTextBackground': '#3fb95040',
+    'diffEditor.removedTextBackground': '#f8514940',
+    'diffEditorGutter.insertedLineBackground': '#3fb95028',
+    'diffEditorGutter.removedLineBackground': '#f8514928',
+    'diffEditor.diagonalFill': '#262a3280'
   }
 })
 

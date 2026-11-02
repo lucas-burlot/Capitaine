@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useRef, useState } from 'react'
-import { Columns2, FolderPlus, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
+import { Columns2, FolderPlus, GitCompare, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import { useEditors } from '../editor-store'
 import { useExplorer } from '../explorer-store'
 import { startDrag } from '../drag'
@@ -15,6 +15,7 @@ const FULL: Rect = { left: 0, top: 0, width: 1, height: 1 }
 
 // Monaco is several MB: it only loads once a file is opened.
 const EditorView = lazy(() => import('./EditorView'))
+const DiffView = lazy(() => import('./DiffView'))
 
 export function Workspace() {
   const projects = useApp((s) => s.projects)
@@ -69,6 +70,13 @@ export function Workspace() {
           .map((tab) => (
             <Suspense key={tab.id} fallback={null}>
               <EditorView tabId={tab.id} projectId={tab.projectId} path={tab.filePath!} visible={tab.id === activeTabId} />
+            </Suspense>
+          ))}
+        {Object.values(tabs)
+          .filter((tab) => tab.kind === 'diff' && tab.diff)
+          .map((tab) => (
+            <Suspense key={tab.id} fallback={null}>
+              <DiffView tabId={tab.id} projectId={tab.projectId} diff={tab.diff!} visible={tab.id === activeTabId} />
             </Suspense>
           ))}
         {!project && <NoProject />}
@@ -139,7 +147,13 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
       <div className="flex min-w-0 shrink-0 flex-col justify-center self-stretch pl-4" title={path}>
         <span className="max-w-56 truncate text-[13px] font-medium text-fg">{title}</span>
       </div>
-      <div className="no-drag flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto">
+      <div
+        className="scrollbar-none no-drag flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto"
+        onWheel={(e) => {
+          // Vertical wheel scrolls the tab strip sideways.
+          if (e.deltaY && !e.deltaX) e.currentTarget.scrollLeft += e.deltaY
+        }}
+      >
         {order.map((id) => {
           const tab = tabs[id]
           return tab ? <TabButton key={id} tab={tab} active={id === activeId} /> : null
@@ -186,7 +200,8 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
 
 function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
   const isEditor = tab.kind === 'editor'
-  const ids = isEditor ? [] : paneIds(tab.layout)
+  const isDiff = tab.kind === 'diff'
+  const ids = tab.kind === 'terminal' ? paneIds(tab.layout) : []
   const dirty = useEditors((s) => isEditor && !!s.meta[tab.id]?.dirty)
   const label = useApp((s) => tabLabel(s, tab))
   const agent = useApp((s) => mostUrgentAgent(s.agents, ids))
@@ -216,17 +231,19 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
       }}
       onClick={() => selectTab(tab.id)}
       onDoubleClick={() => {
-        if (isEditor) return
+        if (tab.kind !== 'terminal') return
         setDraft(label)
         setEditing(true)
       }}
-      title={isEditor ? (tab.filePath ?? label) : label}
+      title={isEditor ? (tab.filePath ?? label) : isDiff ? `Diff · ${tab.diff?.path ?? label}` : label}
       className={`group flex h-8 max-w-56 min-w-28 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-[12px] ${
         active ? 'border-line bg-bg text-fg' : 'border-transparent text-muted hover:bg-panel-2 hover:text-fg'
       }`}
     >
       {isEditor ? (
         <EntryIcon entry={{ name: label, isDirectory: false }} />
+      ) : isDiff ? (
+        <GitCompare size={13} className="shrink-0 text-violet-300/80" />
       ) : agent ? (
         <AgentStatusIcon state={agent.state} kind={agent.kind} />
       ) : (

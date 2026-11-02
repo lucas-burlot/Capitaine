@@ -6,29 +6,41 @@ import {
   ExternalLink,
   FilePen,
   FolderSearch,
-  PanelRightClose,
   RefreshCw,
   TextCursorInput
 } from 'lucide-react'
 import type { DirEntry, GitFileStatus, Project } from '@shared/types'
 import { fileStatus, folderHasChanges, useExplorer } from '../explorer-store'
-import { isMac, shortcutLabel } from '../platform'
+import { isMac } from '../platform'
 import { pathsForTerminal } from '../shell-quote'
 import { useApp } from '../store'
 import { focusedTerminalId, pasteIntoTerminal } from '../terminal-registry'
 import { EntryIcon } from './FileIcon'
-import { ResizeHandle, usePanelWidth } from './ResizeHandle'
 
 /** Drag payload understood by terminals: a JSON array of absolute paths. */
 export const PATHS_MIME = 'application/x-capitaine-paths'
 
 const GIT_POLL_MS = 4000
 
+/** Header buttons of the files view (rendered by the right panel). */
+export function FileExplorerActions({ project }: { project: Project }) {
+  const { refreshAll, collapseAll } = useExplorer.getState()
+  return (
+    <>
+      <IconButton title="Rafraîchir" onClick={() => refreshAll(project.id, project.path)}>
+        <RefreshCw size={13} />
+      </IconButton>
+      <IconButton title="Tout replier" onClick={() => collapseAll(project.id, project.path)}>
+        <ChevronsDownUp size={13} />
+      </IconButton>
+    </>
+  )
+}
+
 export function FileExplorer({ project }: { project: Project }) {
-  const panel = usePanelWidth({ storageKey: 'capitaine.explorerWidth', defaultWidth: 260, min: 180, max: 640 })
   const rootEntries = useExplorer((s) => s.children[project.path])
   const rootError = useExplorer((s) => s.errors[project.path])
-  const { loadDir, refreshGit, refreshAll, collapseAll, toggleOpen } = useExplorer.getState()
+  const { loadDir, refreshGit } = useExplorer.getState()
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
 
   useEffect(() => {
@@ -42,23 +54,7 @@ export function FileExplorer({ project }: { project: Project }) {
   }, [project.id, project.path, loadDir, refreshGit])
 
   return (
-    <section className="relative flex shrink-0 flex-col border-l border-line bg-panel" style={{ width: panel.width }}>
-      <ResizeHandle panel={panel} edge="left" />
-      <header className={`drag-region flex shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-3 ${isMac ? 'h-12' : 'h-10'}`}>
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-wider text-muted uppercase">
-          Explorateur
-        </span>
-        <IconButton title="Rafraîchir" onClick={() => refreshAll(project.id, project.path)}>
-          <RefreshCw size={13} />
-        </IconButton>
-        <IconButton title="Tout replier" onClick={() => collapseAll(project.id, project.path)}>
-          <ChevronsDownUp size={13} />
-        </IconButton>
-        <IconButton title={`Masquer l’explorateur (${shortcutLabel('toggleExplorer')})`} onClick={toggleOpen}>
-          <PanelRightClose size={13} />
-        </IconButton>
-      </header>
-
+    <>
       <div className="min-h-0 flex-1 overflow-auto py-1" role="tree" aria-label={`Fichiers de ${project.name}`}>
         <div className="truncate px-3 pb-1 text-[11px] font-medium text-faint" title={project.path}>
           {project.name}
@@ -71,7 +67,7 @@ export function FileExplorer({ project }: { project: Project }) {
       </div>
 
       {menu && <EntryMenu project={project} {...menu} onClose={() => setMenu(null)} />}
-    </section>
+    </>
   )
 }
 
@@ -272,7 +268,7 @@ function Item(props: { icon: React.ReactNode; label: string; hint?: string; disa
   )
 }
 
-function IconButton({ title, onClick, children }: { title: string; onClick(): void; children: React.ReactNode }) {
+export function IconButton({ title, onClick, children }: { title: string; onClick(): void; children: React.ReactNode }) {
   return (
     <button title={title} onClick={onClick} className="no-drag rounded p-1 text-muted hover:bg-panel-2 hover:text-fg">
       {children}

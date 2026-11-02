@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Project } from '@shared/types'
+import type { DiffSide, Project } from '@shared/types'
 import { applyAgentReport, stripStatusGlyph, type AgentReport, type AgentSession, type AgentState } from './agent-status'
 import { pane, paneIds, removePane, resizeSplit, splitPane, type LayoutNode, type SplitDirection } from './layout'
 
@@ -17,13 +17,27 @@ export interface TerminalPane {
   exitCode: number | null
 }
 
-/** A tab holds one or more terminals arranged side by side / stacked, or one file editor. */
+/** What a diff tab compares. Sides that don't exist (new or deleted file) show as empty. */
+export interface DiffTarget {
+  /** Identity: reopening the same diff brings its tab back. */
+  key: string
+  area: 'unstaged' | 'staged' | 'conflict' | 'stash'
+  /** Repo-relative path. */
+  path: string
+  repoRoot: string
+  stashRef: string | null
+  original: DiffSide
+  modified: DiffSide
+}
+
+/** A tab holds terminals arranged side by side / stacked, one file editor, or one diff. */
 export interface Tab {
   id: string
   projectId: string
-  kind: 'terminal' | 'editor'
+  kind: 'terminal' | 'editor' | 'diff'
   /** Absolute path of the edited file (editor tabs only). */
   filePath: string | null
+  diff?: DiffTarget
   /** Terminal layout. An editor tab keeps a single placeholder pane named after itself. */
   layout: LayoutNode
   /** The pane that has keyboard focus inside this tab. */
@@ -54,6 +68,8 @@ interface AppState {
   newTab(projectId?: string): void
   /** Opens a file in an editor tab, or brings its existing tab forward. */
   openFile(projectId: string, path: string): void
+  /** Opens a diff tab, or brings the one showing the same change forward. */
+  openDiff(projectId: string, diff: DiffTarget): void
   /** Closes unconditionally; unsaved-changes prompts happen before (editor-store). */
   closeTab(tabId: string): void
   selectTab(tabId: string): void
@@ -91,8 +107,19 @@ export function fileName(path: string): string {
   return path.split(/[\\/]/).pop() || path
 }
 
+const DIFF_AREA_LABEL: Record<DiffTarget['area'], string> = {
+  unstaged: 'modifs',
+  staged: 'indexé',
+  conflict: 'conflit',
+  stash: 'stash'
+}
+
 export function tabLabel(state: Pick<AppState, 'terminals'>, tab: Tab): string {
   if (tab.kind === 'editor' && tab.filePath) return tab.customTitle || fileName(tab.filePath)
+  if (tab.kind === 'diff' && tab.diff) {
+    const area = tab.diff.stashRef ?? DIFF_AREA_LABEL[tab.diff.area]
+    return tab.customTitle || `${fileName(tab.diff.path)} · ${area}`
+  }
   const active = state.terminals[tab.activePaneId]
   return tab.customTitle || (active ? terminalLabel(active) : 'Terminal')
 }
@@ -243,32 +270,17 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   openFile(projectId, path) {
-    const state = get()
-    const existing = (state.tabOrder[projectId] ?? []).find((id) => state.tabs[id]?.filePath === path)
-    if (state.activeProjectId !== projectId) state.selectProject(projectId)
-    if (existing) {
-      get().selectTab(existing)
-      return
-    }
-    set((s) => {
-      const tabId = crypto.randomUUID()
-      const tab: Tab = { id: tabId, projectId, kind: 'editor', filePath: path, layout: pane(tabId), activePaneId: tabId, customTitle: null }
-      // New editor tabs land right after the current tab, like in most editors.
-      const order = s.tabOrder[projectId] ?? []
-      const at = order.indexOf(s.activeTabByProject[projectId] ?? '')
-      const nextOrder = at === -1 ? [...order, tabId] : [...order.slice(0, at + 1), tabId, ...order.slice(at + 1)]
-      return {
-        tabs: { ...s.tabs, [tabId]: tab },
-        tabOrder: { ...s.tabOrder, [projectId]: nextOrder },
-        activeTabByProject: { ...s.activeTabByProject, [projectId]: tabId }
-      }
-    })
+    openDocumentTab(projectId, (tab) => tab.kind === 'editor' && tab.filePath === path, { kind: 'editor', filePath: path })
+  },
+
+  openDiff(projectId, diff) {
+    openDocumentTab(projectId, (tab) => tab.kind === 'diff' && tab.diff?.key === diff.key, { kind: 'diff', filePath: null, diff })
   },
 
   closeTab(tabId) {
     const tab = get().tabs[tabId]
     if (!tab) return
-    if (tab.kind === 'editor') {
+    if (tab.kind !== 'terminal') {
       set((state) => removeTab(state, tabId))
       return
     }
@@ -306,8 +318,8 @@ export const useApp = create<AppState>((set, get) => ({
   splitActivePane(direction) {
     const { activeProjectId, activeTabByProject } = get()
     const tabId = activeProjectId ? activeTabByProject[activeProjectId] : null
-    // Editors don't split (yet): a split request from one opens a terminal tab instead.
-    if (!activeProjectId || !tabId || get().tabs[tabId]?.kind === 'editor') {
+    // Editors and diffs don't split (yet): a split request from one opens a terminal tab instead.
+    if (!activeProjectId || !tabId || get().tabs[tabId]?.kind !== 'terminal') {
       get().newTab()
       return
     }
@@ -450,6 +462,32 @@ export const useApp = create<AppState>((set, get) => ({
     get().focusPane(terminalId)
   }
 }))
+
+/** Editor and diff tabs: reuse a matching tab, or insert a new one right after the current tab. */
+function openDocumentTab(projectId: string, matches: (tab: Tab) => boolean, fields: Pick<Tab, 'kind' | 'filePath' | 'diff'>) {
+  const state = useApp.getState()
+  if (state.activeProjectId !== projectId) state.selectProject(projectId)
+  const existing = (state.tabOrder[projectId] ?? []).find((id) => {
+    const tab = state.tabs[id]
+    return tab && matches(tab)
+  })
+  if (existing) {
+    useApp.getState().selectTab(existing)
+    return
+  }
+  useApp.setState((s) => {
+    const tabId = crypto.randomUUID()
+    const tab: Tab = { id: tabId, projectId, ...fields, layout: pane(tabId), activePaneId: tabId, customTitle: null }
+    const order = s.tabOrder[projectId] ?? []
+    const at = order.indexOf(s.activeTabByProject[projectId] ?? '')
+    const nextOrder = at === -1 ? [...order, tabId] : [...order.slice(0, at + 1), tabId, ...order.slice(at + 1)]
+    return {
+      tabs: { ...s.tabs, [tabId]: tab },
+      tabOrder: { ...s.tabOrder, [projectId]: nextOrder },
+      activeTabByProject: { ...s.activeTabByProject, [projectId]: tabId }
+    }
+  })
+}
 
 /** True when the terminal is on screen (its tab is the active one of the active project). */
 export function isTerminalVisible(state: AppState, terminalId: string): boolean {

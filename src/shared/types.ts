@@ -40,6 +40,60 @@ export interface GitStatus {
   files: Record<string, GitFileStatus>
 }
 
+export type GitChangeKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'copied' | 'type-changed' | 'untracked' | 'conflict'
+
+export interface GitChange {
+  /** Repo-relative, `/`-separated. */
+  path: string
+  origPath?: string
+  kind: GitChangeKind
+  /** Line counts; null for binary or untracked files. */
+  added: number | null
+  removed: number | null
+}
+
+export interface RepoStatus {
+  repoRoot: string
+  /** Null when HEAD is detached. */
+  branch: string | null
+  detached: boolean
+  upstream: string | null
+  ahead: number
+  behind: number
+  staged: GitChange[]
+  unstaged: GitChange[]
+  conflicts: GitChange[]
+  /** More changes than the lists show. */
+  truncated: boolean
+  stashCount: number
+}
+
+export interface GitStash {
+  /** `stash@{n}` */
+  ref: string
+  hash: string
+  createdAt: number
+  branch: string | null
+  message: string
+}
+
+export interface GitStashFile {
+  path: string
+  origPath?: string
+  kind: GitChangeKind
+  /** Kept in the stash's untracked-files commit (`git stash -u`). */
+  untracked: boolean
+}
+
+/** Where one side of a diff comes from. Paths are repo-relative. */
+export type DiffSide =
+  | { source: 'worktree'; path: string }
+  | { source: 'head'; path: string }
+  | { source: 'index'; path: string }
+  | { source: 'stash'; ref: string; part: 'base' | 'stash' | 'untracked'; path: string }
+
+export type BlobContent = { kind: 'text'; content: string } | { kind: 'missing' } | { kind: 'binary' }
+
 export type MenuCommand =
   | 'new-terminal'
   | 'close-terminal'
@@ -88,6 +142,14 @@ export interface CapitaineApi {
     copyText(text: string): void
     /** Absolute path of a file dropped from the OS (Electron hides `File.path`). */
     pathForFile(file: File): string
+  }
+  git: {
+    status(projectId: string): Promise<RepoStatus | null>
+    stage(projectId: string, paths: string[]): Promise<void>
+    unstage(projectId: string, paths: string[]): Promise<void>
+    stashes(projectId: string): Promise<GitStash[]>
+    stashFiles(projectId: string, ref: string): Promise<GitStashFile[]>
+    show(projectId: string, side: DiffSide): Promise<BlobContent>
   }
   focusWindow(): void
   /** The renderer settled unsaved changes; finish the close (or quit) it had vetoed. */
