@@ -32,12 +32,16 @@ const api: CapitaineApi = {
     unwatch: (dir) => ipcRenderer.send('files:unwatch', dir),
     onChanged: (listener) => subscribe<[string]>('fs:changed', listener),
     gitStatus: (projectId) => ipcRenderer.invoke('files:git-status', projectId),
+    read: (projectId, path) => ipcRenderer.invoke('files:read', projectId, path),
+    write: (projectId, path, content) => ipcRenderer.invoke('files:write', projectId, path, content),
     open: (projectId, path) => ipcRenderer.invoke('files:open', projectId, path),
     reveal: (projectId, path) => ipcRenderer.send('files:reveal', projectId, path),
     copyText: (text) => ipcRenderer.send('clipboard:write', text),
     pathForFile: (file) => webUtils.getPathForFile(file)
   },
   focusWindow: () => ipcRenderer.send('window:focus'),
+  confirmClose: () => ipcRenderer.send('window:close-confirmed'),
+  cancelClose: () => ipcRenderer.send('window:close-cancelled'),
   onMenuCommand: (listener) => subscribe<[MenuCommand]>('menu:command', listener)
 }
 

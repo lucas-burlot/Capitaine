@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
+import { CloseEditorDialog } from './components/CloseEditorDialog'
 import { FileExplorer } from './components/FileExplorer'
+import { useEditors } from './editor-store'
 import { Sidebar } from './components/Sidebar'
 import { useExplorer } from './explorer-store'
 import { Workspace } from './components/Workspace'
@@ -19,8 +21,11 @@ export function App() {
       switch (command) {
         case 'new-terminal':
           return app.newTab()
-        case 'close-terminal':
+        case 'close-terminal': {
+          const tab = app.activeProjectId ? app.tabs[app.activeTabByProject[app.activeProjectId] ?? ''] : undefined
+          if (tab?.kind === 'editor') return useEditors.getState().requestClose(tab.id)
           return app.closeActivePane()
+        }
         case 'next-terminal':
           return app.cycleTab(1)
         case 'prev-terminal':
@@ -46,6 +51,7 @@ export function App() {
       <Sidebar />
       <Workspace />
       {explorerOpen && activeProject && <FileExplorer key={activeProject.id} project={activeProject} />}
+      <CloseEditorDialog />
     </div>
   )
 }

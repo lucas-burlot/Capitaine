@@ -181,7 +181,75 @@ await page.click('[role=treeitem]:has-text("app.ts")', { button: 'right' })
 await page.click('text=Copier le chemin relatif')
 explorerChecks.copyRelative = (await app.evaluate(({ clipboard }) => clipboard.readText())) === 'src/app.ts'
 await shot('06-explorer')
+
+// In-app editor: open by double-click, edit, save, outside changes, unsaved-changes prompts.
+const editorChecks = {}
+const editorText = () =>
+  page.evaluate(() => {
+    const view = document.querySelector('[data-editor-tab]:not(.invisible) .view-lines')
+    return view ? view.innerText.replace(/\u00a0/g, ' ') : null
+  })
+const waitFor = async (fn, timeout = 8000) => {
+  for (const deadline = Date.now() + timeout; Date.now() < deadline; await page.waitForTimeout(150)) if (await fn()) return true
+  return false
+}
+const dirtyTab = () => page.$('main header [title^="Modifications non enregistrées"]').then(Boolean)
+const tracked = join(gitDemo, 'tracked.txt')
+await page.dblclick('[role=treeitem]:has-text("tracked.txt")')
+editorChecks.opens = await waitFor(async () => (await editorText())?.includes('v2'), 20000)
+console.log('  editor:', 'opens', editorChecks.opens)
+await page.click('[data-editor-tab]:not(.invisible) .view-lines')
+await page.keyboard.press('Control+End')
+await page.keyboard.type('édité', { delay: 10 })
+editorChecks.dirtyDot = await waitFor(dirtyTab)
+console.log('  editor:', 'dirtyDot', editorChecks.dirtyDot)
+await page.keyboard.press('Control+s')
+editorChecks.savedToDisk = await waitFor(() => readFileSync(tracked, 'utf8') === 'v2\nédité')
+console.log('  editor:', 'savedToDisk', editorChecks.savedToDisk)
+editorChecks.cleanAfterSave = await waitFor(async () => !(await dirtyTab()))
+console.log('  editor:', 'cleanAfterSave', editorChecks.cleanAfterSave)
+
+writeFileSync(tracked, 'écrit par un agent\n')
+editorChecks.reloadsOutsideChange = await waitFor(async () => (await editorText())?.includes('écrit par un agent'))
+console.log('  editor:', 'reloadsOutsideChange', editorChecks.reloadsOutsideChange)
+
+await page.keyboard.type('X', { delay: 10 })
+writeFileSync(tracked, 'agent, encore\n')
+editorChecks.conflictBanner = await waitFor(() => page.$('text=Garder la mienne').then(Boolean))
+console.log('  editor:', 'conflictBanner', editorChecks.conflictBanner)
+await shot('07-editor-conflict')
+await page.click('text=Garder la mienne')
+
+await page.click('main header [title^="Modifications non enregistrées"]')
+editorChecks.closePrompt = await waitFor(() => page.$('text=Ne pas enregistrer').then(Boolean))
+console.log('  editor:', 'closePrompt', editorChecks.closePrompt)
+await page.click('text=Ne pas enregistrer')
+editorChecks.tabClosed = await waitFor(async () => !(await page.$('[data-editor-tab]')))
+console.log('  editor:', 'tabClosed', editorChecks.tabClosed)
+editorChecks.diskUntouched = readFileSync(tracked, 'utf8') === 'agent, encore\n'
+console.log('  editor:', 'diskUntouched', editorChecks.diskUntouched)
+
+// Closing the window with an unsaved file is vetoed until you decide.
+await page.dblclick('[role=treeitem]:has-text("tracked.txt")')
+await waitFor(async () => (await editorText())?.includes('agent'), 20000)
+await page.click('[data-editor-tab]:not(.invisible) .view-lines')
+await page.keyboard.type('Y', { delay: 10 })
+await waitFor(dirtyTab)
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
+editorChecks.windowCloseVetoed = await waitFor(() => page.$('text=La fenêtre va se fermer').then(Boolean))
+console.log('  editor:', 'windowCloseVetoed', editorChecks.windowCloseVetoed)
+await page.click('button:has-text("Annuler")')
+await page.keyboard.press('Control+z')
+editorChecks.undoClearsDirty = await waitFor(async () => !(await dirtyTab()))
+console.log('  editor:', 'undoClearsDirty', editorChecks.undoClearsDirty)
+// destroy() skips beforeunload: a leftover unsaved buffer must never hang the test run.
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.destroy()))
 await app.close()
+console.log('editor checks:', editorChecks)
+if (Object.values(editorChecks).includes(false)) {
+  console.error('FAIL: editor')
+  process.exit(1)
+}
 console.log('explorer checks:', explorerChecks)
 if (Object.values(explorerChecks).includes(false)) {
   console.error('FAIL: file explorer')

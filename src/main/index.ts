@@ -1,13 +1,15 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import type { PtyCreateOptions } from '../shared/types'
-import { DirectoryWatchers, gitStatus, isInside, listDirectory } from './file-system'
+import { DirectoryWatchers, gitStatus, isInside, listDirectory, readTextFile, writeTextFile } from './file-system'
 import { installAppMenu } from './menu'
 import { ProjectStore } from './project-store'
 import { PtyManager } from './pty-manager'
 import icon from '../../resources/icon.png?asset'
 
 const isDev = !app.isPackaged
+// Set while a quit is in progress, so a close the renderer vetoed (unsaved files) can resume it.
+let quitRequested = false
 const ptys = new PtyManager()
 const watchers = new DirectoryWatchers()
 let projects: ProjectStore
@@ -106,6 +108,14 @@ function registerIpc(): void {
     const root = projectPath(projectId)
     return root ? gitStatus(root) : null
   })
+  ipcMain.handle('files:read', (_e, projectId: string, path: string) => {
+    if (!projectPath(projectId, path)) throw new Error('Chemin hors du projet')
+    return readTextFile(path)
+  })
+  ipcMain.handle('files:write', (_e, projectId: string, path: string, content: string) => {
+    if (!projectPath(projectId, path)) throw new Error('Chemin hors du projet')
+    return writeTextFile(path, String(content))
+  })
   ipcMain.handle('files:open', async (_e, projectId: string, path: string) => {
     if (!projectPath(projectId, path)) return
     const error = await shell.openPath(path)
@@ -120,6 +130,13 @@ function registerIpc(): void {
   ipcMain.on('pty:write', (_e, id: string, data: string) => ptys.write(id, data))
   ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => ptys.resize(id, cols, rows))
   ipcMain.on('pty:kill', (_e, id: string) => ptys.kill(id))
+  ipcMain.on('window:close-confirmed', (event) => {
+    if (quitRequested) app.quit()
+    else BrowserWindow.fromWebContents(event.sender)?.close()
+  })
+  ipcMain.on('window:close-cancelled', () => {
+    quitRequested = false
+  })
   ipcMain.on('window:focus', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
@@ -146,4 +163,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => ptys.killAll())
+app.on('before-quit', () => {
+  quitRequested = true
+})
+
+// Only once every window agreed to close (no unsaved files left) do the shells go.
+app.on('will-quit', () => ptys.killAll())

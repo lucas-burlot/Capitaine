@@ -1,15 +1,20 @@
-import { useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Columns2, FolderPlus, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
+import { useEditors } from '../editor-store'
 import { useExplorer } from '../explorer-store'
 import { startDrag } from '../drag'
 import { computeLayout, dragSizes, nodeAt, paneIds, type Divider, type Rect } from '../layout'
 import { isMac, shortcutLabel } from '../platform'
 import { mostUrgentAgent, tabLabel, useApp, type Tab } from '../store'
 import { AgentStatusIcon } from './AgentStatus'
+import { EntryIcon } from './FileIcon'
 import { TerminalView } from './TerminalView'
 import logo from '../../../../resources/icon.svg'
 
 const FULL: Rect = { left: 0, top: 0, width: 1, height: 1 }
+
+// Monaco is several MB: it only loads once a file is opened.
+const EditorView = lazy(() => import('./EditorView'))
 
 export function Workspace() {
   const projects = useApp((s) => s.projects)
@@ -59,6 +64,13 @@ export function Workspace() {
             ?.dividers.map((divider) => (
               <SplitDivider key={`${divider.path.join('.')}:${divider.index}`} tab={activeTab} divider={divider} stackRef={stackRef} />
             ))}
+        {Object.values(tabs)
+          .filter((tab) => tab.kind === 'editor' && tab.filePath)
+          .map((tab) => (
+            <Suspense key={tab.id} fallback={null}>
+              <EditorView tabId={tab.id} projectId={tab.projectId} path={tab.filePath!} visible={tab.id === activeTabId} />
+            </Suspense>
+          ))}
         {!project && <NoProject />}
         {project && !activeTab && <NoTerminal />}
       </div>
@@ -116,6 +128,7 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
   const order = useApp((s) => s.tabOrder[projectId]) ?? []
   const tabs = useApp((s) => s.tabs)
   const activeId = useApp((s) => s.activeTabByProject[projectId])
+  const activeIsTerminal = useApp((s) => s.tabs[s.activeTabByProject[projectId] ?? '']?.kind === 'terminal')
   const newTab = useApp((s) => s.newTab)
   const splitActivePane = useApp((s) => s.splitActivePane)
   const explorerOpen = useExplorer((s) => s.open)
@@ -140,7 +153,7 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
         </button>
       </div>
       <div className="no-drag mb-1.5 flex shrink-0 items-center gap-0.5">
-        {activeId && (
+        {activeIsTerminal && (
           <>
             <button
               className="rounded p-1 text-muted hover:bg-panel-2 hover:text-fg"
@@ -172,13 +185,17 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
 }
 
 function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
-  const ids = paneIds(tab.layout)
+  const isEditor = tab.kind === 'editor'
+  const ids = isEditor ? [] : paneIds(tab.layout)
+  const dirty = useEditors((s) => isEditor && !!s.meta[tab.id]?.dirty)
   const label = useApp((s) => tabLabel(s, tab))
   const agent = useApp((s) => mostUrgentAgent(s.agents, ids))
   const unread = useApp((s) => ids.some((id) => s.terminals[id]?.unread))
   const exited = useApp((s) => s.terminals[tab.activePaneId]?.exitCode != null)
   const selectTab = useApp((s) => s.selectTab)
-  const closeTab = useApp((s) => s.closeTab)
+  const closeTerminalTab = useApp((s) => s.closeTab)
+  // Editor tabs go through the unsaved-changes prompt.
+  const closeTab = (tabId: string) => (isEditor ? useEditors.getState().requestClose(tabId) : closeTerminalTab(tabId))
   const renameTab = useApp((s) => s.renameTab)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -199,15 +216,18 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
       }}
       onClick={() => selectTab(tab.id)}
       onDoubleClick={() => {
+        if (isEditor) return
         setDraft(label)
         setEditing(true)
       }}
-      title={label}
+      title={isEditor ? (tab.filePath ?? label) : label}
       className={`group flex h-8 max-w-56 min-w-28 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-[12px] ${
         active ? 'border-line bg-bg text-fg' : 'border-transparent text-muted hover:bg-panel-2 hover:text-fg'
       }`}
     >
-      {agent ? (
+      {isEditor ? (
+        <EntryIcon entry={{ name: label, isDirectory: false }} />
+      ) : agent ? (
         <AgentStatusIcon state={agent.state} kind={agent.kind} />
       ) : (
         <SquareTerminal size={13} className={exited ? 'text-red-400' : active ? 'text-accent' : ''} />
@@ -236,14 +256,30 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
       )}
       {unread && !active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
       <button
-        className={`shrink-0 rounded p-0.5 text-faint hover:bg-line hover:text-fg ${active ? '' : 'opacity-0 group-hover:opacity-100'}`}
-        title={ids.length > 1 ? `Fermer l’onglet (${ids.length} terminaux)` : `Fermer (${shortcutLabel('closeTerminal')})`}
+        className={`group/close relative shrink-0 rounded p-0.5 text-faint hover:bg-line hover:text-fg ${active || dirty ? '' : 'opacity-0 group-hover:opacity-100'}`}
+        title={
+          dirty
+            ? 'Modifications non enregistrées · fermer'
+            : ids.length > 1
+              ? `Fermer l’onglet (${ids.length} terminaux)`
+              : `Fermer (${shortcutLabel('closeTerminal')})`
+        }
         onClick={(e) => {
           e.stopPropagation()
           closeTab(tab.id)
         }}
       >
-        <X size={12} />
+        {/* Unsaved: a dot that turns into × on hover, like VS Code. */}
+        {dirty ? (
+          <>
+            <span className="block h-3 w-3 p-[3px] group-hover/close:hidden">
+              <span className="block h-full w-full rounded-full bg-fg" />
+            </span>
+            <X size={12} className="hidden group-hover/close:block" />
+          </>
+        ) : (
+          <X size={12} />
+        )}
       </button>
     </div>
   )

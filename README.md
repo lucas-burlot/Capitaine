@@ -14,7 +14,15 @@ Version 0.1 : gestion de projets + terminaux par projet. macOS, Windows et Linux
   - arborescence chargée à la demande et rafraîchie toute seule quand un fichier change ;
   - **statut git** : modifié (M, orange), nouveau (U/A, vert), renommé, en conflit, et fichiers ignorés estompés. Un point sur un dossier replié indique un changement à l'intérieur. Pratique pour voir ce que Claude a touché ;
   - **glisser un fichier dans un terminal** (depuis l'explorateur ou depuis le bureau) insère son chemin, correctement échappé : idéal pour le donner à Claude ;
-  - clic droit : ouvrir avec l'application par défaut (aussi au double-clic), insérer le chemin dans le terminal actif, copier le chemin / le chemin relatif, afficher dans le gestionnaire de fichiers.
+  - **double-clic** : ouvre le fichier dans l'éditeur intégré (voir ci-dessous) ;
+  - clic droit : ouvrir dans l'éditeur, ouvrir avec l'application par défaut, insérer le chemin dans le terminal actif, copier le chemin / le chemin relatif, afficher dans le gestionnaire de fichiers.
+- **Éditeur de fichiers intégré** (Monaco, le moteur de VS Code, embarqué : marche hors ligne) :
+  - s'ouvre dans un onglet à côté des terminaux ; rouvrir un fichier déjà ouvert ramène son onglet ;
+  - coloration syntaxique selon l'extension, thème assorti à l'app ;
+  - **⌘S / Ctrl+S** enregistre (seulement quand l'éditeur a le focus, pour laisser Ctrl+S aux terminaux) ;
+  - modifications non enregistrées : **●** sur l'onglet ; fermer l'onglet ou la fenêtre demande *Enregistrer / Ne pas enregistrer / Annuler* ;
+  - **fichier modifié sur le disque** (par un agent, par exemple) : rechargement automatique si tu n'as rien modifié (Ctrl+Z ramène la version précédente) ; sinon un bandeau te laisse *prendre la version du disque* ou *garder la tienne* ;
+  - fichiers binaires ou de plus de 5 Mo : message et bouton pour les ouvrir dans l'application du système.
 - **Barre latérale redimensionnable** : glisse son bord droit (double-clic pour revenir à la largeur par défaut). La largeur est mémorisée.
 - Titre d'onglet fourni par le shell (celui du panneau actif), renommable (double-clic). Clic molette = fermer.
 - Liens cliquables dans le terminal, rendu WebGL.
@@ -106,6 +114,8 @@ src/
     agent-notifications.ts  notifications système
     explorer-store.ts  état de l'explorateur (dossiers dépliés, listings, statut git)
     terminal-registry.ts  insertion de texte dans un terminal (glisser-déposer, menu)
+    editor-store.ts  état des onglets éditeur (modifié, conflit) et confirmations de fermeture
+    editor/          Monaco (chargé à la demande) et sessions d'édition (lecture, sauvegarde, changements externes)
     layout.ts        arbre de division d'un onglet (split, fermeture, tailles, calcul des positions)
     pty-bus.ts       un seul listener IPC, routé vers chaque terminal
     components/      Sidebar, Workspace (onglets), TerminalView (xterm)
@@ -117,4 +127,4 @@ src/
 - Glisser un onglet dans un autre pour les mettre côte à côte
 - Lancer un agent (Claude Code, Codex…) en un clic dans un terminal
 - Worktrees git par tâche, comme Orca
-- Éditeur de fichiers / diff (ouvrir un fichier de l'explorateur dans l'app)
+- Diff des changements faits par un agent, éditeur dans un split à côté d'un terminal

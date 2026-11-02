@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process'
 import { watch, type FSWatcher } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import type { WebContents } from 'electron'
-import type { DirEntry, GitFileStatus, GitStatus } from '../shared/types'
+import type { DirEntry, FileContent, GitFileStatus, GitStatus } from '../shared/types'
 
 /** True when `target` is `root` itself or somewhere beneath it. */
 export function isInside(root: string, target: string): boolean {
@@ -33,6 +33,28 @@ export async function listDirectory(root: string, dir: string): Promise<DirEntry
       })
   )
   return entries.sort((a, b) => (a.isDirectory === b.isDirectory ? collator.compare(a.name, b.name) : a.isDirectory ? -1 : 1))
+}
+
+/** Beyond this the editor would crawl; the file opens in the OS app instead. */
+const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
+
+export async function readTextFile(path: string): Promise<FileContent> {
+  const info = await stat(path).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+  if (!info) return { kind: 'missing' }
+  if (info.size > MAX_EDITABLE_BYTES) return { kind: 'too-large', size: info.size }
+  const buffer = await readFile(path)
+  // Same heuristic as git: a NUL byte early on means binary.
+  if (buffer.subarray(0, 8000).includes(0)) return { kind: 'binary', size: info.size }
+  return { kind: 'text', content: buffer.toString('utf8'), mtimeMs: info.mtimeMs }
+}
+
+/** Writes in place (keeps the inode, permissions and any open watchers). */
+export async function writeTextFile(path: string, content: string): Promise<number> {
+  await writeFile(path, content, 'utf8')
+  return (await stat(path)).mtimeMs
 }
 
 const WATCH_DEBOUNCE_MS = 150

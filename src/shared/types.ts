@@ -27,6 +27,12 @@ export interface DirEntry {
   isSymlink: boolean
 }
 
+export type FileContent =
+  | { kind: 'text'; content: string; mtimeMs: number }
+  | { kind: 'binary'; size: number }
+  | { kind: 'too-large'; size: number }
+  | { kind: 'missing' }
+
 export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'ignored' | 'conflict'
 
 export interface GitStatus {
@@ -73,6 +79,9 @@ export interface CapitaineApi {
     unwatch(dir: string): void
     onChanged(listener: (dir: string) => void): () => void
     gitStatus(projectId: string): Promise<GitStatus | null>
+    read(projectId: string, path: string): Promise<FileContent>
+    /** Resolves with the new modification time. */
+    write(projectId: string, path: string, content: string): Promise<number>
     /** Opens with the OS default application. */
     open(projectId: string, path: string): Promise<void>
     reveal(projectId: string, path: string): void
@@ -81,5 +90,8 @@ export interface CapitaineApi {
     pathForFile(file: File): string
   }
   focusWindow(): void
+  /** The renderer settled unsaved changes; finish the close (or quit) it had vetoed. */
+  confirmClose(): void
+  cancelClose(): void
   onMenuCommand(listener: (command: MenuCommand) => void): () => void
 }

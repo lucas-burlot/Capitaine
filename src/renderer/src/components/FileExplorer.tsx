@@ -4,13 +4,7 @@ import {
   ChevronsDownUp,
   Copy,
   ExternalLink,
-  File,
-  FileCode,
-  FileCog,
-  FileImage,
-  FileText,
-  Folder,
-  FolderOpen,
+  FilePen,
   FolderSearch,
   PanelRightClose,
   RefreshCw,
@@ -22,6 +16,7 @@ import { isMac, shortcutLabel } from '../platform'
 import { pathsForTerminal } from '../shell-quote'
 import { useApp } from '../store'
 import { focusedTerminalId, pasteIntoTerminal } from '../terminal-registry'
+import { EntryIcon } from './FileIcon'
 import { ResizeHandle, usePanelWidth } from './ResizeHandle'
 
 /** Drag payload understood by terminals: a JSON array of absolute paths. */
@@ -101,10 +96,6 @@ function TreeNode({ entry, projectId, depth, onContextMenu }: NodeProps) {
     if (expanded && !children && !error) void loadDir(projectId, entry.path)
   }, [expanded, children, error, loadDir, projectId, entry.path])
 
-  const open = () => {
-    if (entry.isDirectory) toggleDir(projectId, entry.path)
-    else void window.capitaine.files.open(projectId, entry.path).catch(() => {})
-  }
 
   return (
     <>
@@ -122,7 +113,7 @@ function TreeNode({ entry, projectId, depth, onContextMenu }: NodeProps) {
           select(projectId, entry.path)
           if (entry.isDirectory) toggleDir(projectId, entry.path)
         }}
-        onDoubleClick={() => !entry.isDirectory && open()}
+        onDoubleClick={() => !entry.isDirectory && useApp.getState().openFile(projectId, entry.path)}
         onContextMenu={(e) => {
           e.preventDefault()
           select(projectId, entry.path)
@@ -201,24 +192,6 @@ function statusDot(status: GitFileStatus): string {
   return 'bg-amber-400'
 }
 
-const CODE_EXT = /\.(c|cc|cpp|cs|css|go|h|hpp|html|java|jsx?|kt|lua|mjs|cjs|php|py|rb|rs|scss|sh|sql|svelte|swift|tsx?|vue|zsh|bash)$/i
-const CONFIG_EXT = /(\.(json|jsonc|ya?ml|toml|ini|xml|env|lock|conf)$)|(^\.[\w.-]+rc$)|(^\.env)/i
-const TEXT_EXT = /\.(md|mdx|txt|rst|log|csv)$/i
-const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp|ico|icns|bmp|avif)$/i
-
-function EntryIcon({ entry, expanded }: { entry: DirEntry; expanded: boolean }) {
-  const cls = 'shrink-0'
-  if (entry.isDirectory) {
-    const Icon = expanded ? FolderOpen : Folder
-    return <Icon size={14} className={`${cls} text-accent/80`} />
-  }
-  if (CODE_EXT.test(entry.name)) return <FileCode size={14} className={`${cls} text-sky-300/80`} />
-  if (CONFIG_EXT.test(entry.name)) return <FileCog size={14} className={`${cls} text-violet-300/80`} />
-  if (TEXT_EXT.test(entry.name)) return <FileText size={14} className={`${cls} text-slate-300/80`} />
-  if (IMAGE_EXT.test(entry.name)) return <FileImage size={14} className={`${cls} text-emerald-300/80`} />
-  return <File size={14} className={`${cls} text-faint`} />
-}
-
 function EntryMenu({ project, x, y, entry, onClose }: { project: Project; x: number; y: number; entry: DirEntry; onClose(): void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ x, y })
@@ -256,7 +229,14 @@ function EntryMenu({ project, x, y, entry, onClose }: { project: Project; x: num
       style={{ left: pos.x, top: pos.y }}
     >
       {!entry.isDirectory && (
-        <Item icon={<ExternalLink size={13} />} label="Ouvrir avec l’application par défaut" onClick={act(() => void window.capitaine.files.open(project.id, entry.path).catch(() => {}))} />
+        <>
+          <Item icon={<FilePen size={13} />} label="Ouvrir dans l’éditeur" onClick={act(() => useApp.getState().openFile(project.id, entry.path))} />
+          <Item
+            icon={<ExternalLink size={13} />}
+            label="Ouvrir avec l’application par défaut"
+            onClick={act(() => void window.capitaine.files.open(project.id, entry.path).catch(() => {}))}
+          />
+        </>
       )}
       <Item
         icon={<TextCursorInput size={13} />}

@@ -17,10 +17,14 @@ export interface TerminalPane {
   exitCode: number | null
 }
 
-/** A tab holds one or more terminals arranged side by side / stacked. */
+/** A tab holds one or more terminals arranged side by side / stacked, or one file editor. */
 export interface Tab {
   id: string
   projectId: string
+  kind: 'terminal' | 'editor'
+  /** Absolute path of the edited file (editor tabs only). */
+  filePath: string | null
+  /** Terminal layout. An editor tab keeps a single placeholder pane named after itself. */
   layout: LayoutNode
   /** The pane that has keyboard focus inside this tab. */
   activePaneId: string
@@ -48,6 +52,9 @@ interface AppState {
   selectProject(id: string): void
 
   newTab(projectId?: string): void
+  /** Opens a file in an editor tab, or brings its existing tab forward. */
+  openFile(projectId: string, path: string): void
+  /** Closes unconditionally; unsaved-changes prompts happen before (editor-store). */
   closeTab(tabId: string): void
   selectTab(tabId: string): void
   cycleTab(direction: 1 | -1): void
@@ -80,7 +87,12 @@ export function terminalLabel(terminal: TerminalPane): string {
   return terminal.customTitle || (terminal.shellTitle && cleanShellTitle(terminal.shellTitle)) || `Terminal ${terminal.number}`
 }
 
+export function fileName(path: string): string {
+  return path.split(/[\\/]/).pop() || path
+}
+
 export function tabLabel(state: Pick<AppState, 'terminals'>, tab: Tab): string {
+  if (tab.kind === 'editor' && tab.filePath) return tab.customTitle || fileName(tab.filePath)
   const active = state.terminals[tab.activePaneId]
   return tab.customTitle || (active ? terminalLabel(active) : 'Terminal')
 }
@@ -116,6 +128,24 @@ function newPane(state: AppState, projectId: string, tabId: string): { terminal:
     exitCode: null
   }
   return { terminal, nextNumber: number + 1 }
+}
+
+/** State patch removing a tab and focusing its neighbour when it was the active one. */
+function removeTab(state: AppState, tabId: string): Partial<AppState> {
+  const tab = state.tabs[tabId]
+  if (!tab) return {}
+  const { projectId } = tab
+  const order = state.tabOrder[projectId] ?? []
+  const index = order.indexOf(tabId)
+  const nextOrder = order.filter((id) => id !== tabId)
+  const wasActive = state.activeTabByProject[projectId] === tabId
+  return {
+    tabs: without(state.tabs, [tabId]),
+    tabOrder: { ...state.tabOrder, [projectId]: nextOrder },
+    activeTabByProject: wasActive
+      ? { ...state.activeTabByProject, [projectId]: nextOrder[Math.min(index, nextOrder.length - 1)] ?? null }
+      : state.activeTabByProject
+  }
 }
 
 function clearUnread(terminals: Record<string, TerminalPane>, ids: string[]): Record<string, TerminalPane> {
@@ -192,7 +222,15 @@ export const useApp = create<AppState>((set, get) => ({
     set((state) => {
       const tabId = crypto.randomUUID()
       const { terminal, nextNumber } = newPane(state, target, tabId)
-      const tab: Tab = { id: tabId, projectId: target, layout: pane(terminal.id), activePaneId: terminal.id, customTitle: null }
+      const tab: Tab = {
+        id: tabId,
+        projectId: target,
+        kind: 'terminal',
+        filePath: null,
+        layout: pane(terminal.id),
+        activePaneId: terminal.id,
+        customTitle: null
+      }
       return {
         terminals: { ...state.terminals, [terminal.id]: terminal },
         terminalOrder: { ...state.terminalOrder, [target]: [...(state.terminalOrder[target] ?? []), terminal.id] },
@@ -204,9 +242,36 @@ export const useApp = create<AppState>((set, get) => ({
     })
   },
 
+  openFile(projectId, path) {
+    const state = get()
+    const existing = (state.tabOrder[projectId] ?? []).find((id) => state.tabs[id]?.filePath === path)
+    if (state.activeProjectId !== projectId) state.selectProject(projectId)
+    if (existing) {
+      get().selectTab(existing)
+      return
+    }
+    set((s) => {
+      const tabId = crypto.randomUUID()
+      const tab: Tab = { id: tabId, projectId, kind: 'editor', filePath: path, layout: pane(tabId), activePaneId: tabId, customTitle: null }
+      // New editor tabs land right after the current tab, like in most editors.
+      const order = s.tabOrder[projectId] ?? []
+      const at = order.indexOf(s.activeTabByProject[projectId] ?? '')
+      const nextOrder = at === -1 ? [...order, tabId] : [...order.slice(0, at + 1), tabId, ...order.slice(at + 1)]
+      return {
+        tabs: { ...s.tabs, [tabId]: tab },
+        tabOrder: { ...s.tabOrder, [projectId]: nextOrder },
+        activeTabByProject: { ...s.activeTabByProject, [projectId]: tabId }
+      }
+    })
+  },
+
   closeTab(tabId) {
     const tab = get().tabs[tabId]
     if (!tab) return
+    if (tab.kind === 'editor') {
+      set((state) => removeTab(state, tabId))
+      return
+    }
     for (const id of paneIds(tab.layout)) get().closeTerminal(id)
   },
 
@@ -241,7 +306,8 @@ export const useApp = create<AppState>((set, get) => ({
   splitActivePane(direction) {
     const { activeProjectId, activeTabByProject } = get()
     const tabId = activeProjectId ? activeTabByProject[activeProjectId] : null
-    if (!activeProjectId || !tabId) {
+    // Editors don't split (yet): a split request from one opens a terminal tab instead.
+    if (!activeProjectId || !tabId || get().tabs[tabId]?.kind === 'editor') {
       get().newTab()
       return
     }
@@ -299,7 +365,7 @@ export const useApp = create<AppState>((set, get) => ({
   closeActivePane() {
     const { activeProjectId, activeTabByProject, tabs } = get()
     const tab = activeProjectId ? tabs[activeTabByProject[activeProjectId] ?? ''] : undefined
-    if (tab) get().closeTerminal(tab.activePaneId)
+    if (tab?.kind === 'terminal') get().closeTerminal(tab.activePaneId)
   },
 
   closeTerminal(terminalId) {
@@ -325,18 +391,7 @@ export const useApp = create<AppState>((set, get) => ({
         return { ...base, tabs: { ...state.tabs, [tabId]: { ...tab, layout, activePaneId } } }
       }
 
-      const order = state.tabOrder[projectId] ?? []
-      const index = order.indexOf(tabId)
-      const nextOrder = order.filter((id) => id !== tabId)
-      const wasActive = state.activeTabByProject[projectId] === tabId
-      return {
-        ...base,
-        tabs: without(state.tabs, [tabId]),
-        tabOrder: { ...state.tabOrder, [projectId]: nextOrder },
-        activeTabByProject: wasActive
-          ? { ...state.activeTabByProject, [projectId]: nextOrder[Math.min(index, nextOrder.length - 1)] ?? null }
-          : state.activeTabByProject
-      }
+      return { ...base, ...removeTab(state, tabId) }
     })
   },
 
