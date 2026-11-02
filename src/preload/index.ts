@@ -1,0 +1,44 @@
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
+import type { CapitaineApi, MenuCommand } from '../shared/types'
+
+function subscribe<Args extends unknown[]>(channel: string, listener: (...args: Args) => void): () => void {
+  const handler = (_event: IpcRendererEvent, ...args: unknown[]) => listener(...(args as Args))
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
+
+const api: CapitaineApi = {
+  platform: process.platform,
+  projects: {
+    list: () => ipcRenderer.invoke('projects:list'),
+    add: () => ipcRenderer.invoke('projects:add'),
+    rename: (id, name) => ipcRenderer.invoke('projects:rename', id, name),
+    remove: (id) => ipcRenderer.invoke('projects:remove', id),
+    reorder: (ids) => ipcRenderer.invoke('projects:reorder', ids),
+    reveal: (id) => ipcRenderer.invoke('projects:reveal', id)
+  },
+  pty: {
+    create: (options) => ipcRenderer.invoke('pty:create', options),
+    write: (id, data) => ipcRenderer.send('pty:write', id, data),
+    resize: (id, cols, rows) => ipcRenderer.send('pty:resize', id, cols, rows),
+    kill: (id) => ipcRenderer.send('pty:kill', id),
+    onData: (listener) => subscribe<[string, string]>('pty:data', listener),
+    onExit: (listener) => subscribe<[string, number]>('pty:exit', listener),
+    onProcess: (listener) => subscribe<[string, string]>('pty:process', listener)
+  },
+  files: {
+    list: (projectId, dir) => ipcRenderer.invoke('files:list', projectId, dir),
+    watch: (projectId, dir) => ipcRenderer.send('files:watch', projectId, dir),
+    unwatch: (dir) => ipcRenderer.send('files:unwatch', dir),
+    onChanged: (listener) => subscribe<[string]>('fs:changed', listener),
+    gitStatus: (projectId) => ipcRenderer.invoke('files:git-status', projectId),
+    open: (projectId, path) => ipcRenderer.invoke('files:open', projectId, path),
+    reveal: (projectId, path) => ipcRenderer.send('files:reveal', projectId, path),
+    copyText: (text) => ipcRenderer.send('clipboard:write', text),
+    pathForFile: (file) => webUtils.getPathForFile(file)
+  },
+  focusWindow: () => ipcRenderer.send('window:focus'),
+  onMenuCommand: (listener) => subscribe<[MenuCommand]>('menu:command', listener)
+}
+
+contextBridge.exposeInMainWorld('capitaine', api)

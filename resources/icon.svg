@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f3a5f"/>
+      <stop offset="1" stop-color="#0c1726"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#4f7bb0" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#4f7bb0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="crown" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9e0ea"/>
+    </linearGradient>
+    <linearGradient id="band" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16253b"/>
+      <stop offset="1" stop-color="#0b1422"/>
+    </linearGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a3442"/>
+      <stop offset="0.35" stop-color="#0d1118"/>
+      <stop offset="1" stop-color="#05070b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6d98f"/>
+      <stop offset="0.55" stop-color="#e2b04f"/>
+      <stop offset="1" stop-color="#b9842a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded-square tile (macOS grid: 824px content, 100px margin) -->
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#glow)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="184.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+
+  <!-- Shadow under the cap -->
+  <ellipse cx="512" cy="782" rx="250" ry="34" fill="#000" opacity="0.35"/>
+
+  <!-- Crown: wide white top tapering into the band -->
+  <path d="M190 430 C190 300 834 300 834 430 C834 470 790 500 726 560 L716 612 Q512 640 308 612 L298 560 C234 500 190 470 190 430 Z" fill="url(#crown)"/>
+  <!-- Crown top seam / shading -->
+  <path d="M232 436 C300 470 724 470 792 436" fill="none" stroke="#b8c3d3" stroke-width="8" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Band -->
+  <path d="M306 600 Q512 630 718 600 L718 690 Q512 722 306 690 Z" fill="url(#band)"/>
+  <!-- Gold cord across the band -->
+  <path d="M316 622 Q512 652 708 622" fill="none" stroke="url(#gold)" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="320" cy="623" r="13" fill="url(#gold)"/>
+  <circle cx="704" cy="623" r="13" fill="url(#gold)"/>
+
+  <!-- Visor -->
+  <path d="M288 680 Q512 726 736 680 Q722 778 512 786 Q302 778 288 680 Z" fill="url(#visor)"/>
+  <path d="M330 706 Q512 742 694 706" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Badge: gold laurels + anchor -->
+  <g transform="translate(512 512)">
+    <circle r="92" fill="url(#gold)"/>
+    <circle r="78" fill="#13233d"/>
+    <!-- Solid fill: a gradient on a perfectly straight stroke has an empty bounding box and renders nothing. -->
+    <g fill="none" stroke="#efc565" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="0" cy="-46" r="14"/>
+      <line x1="0" y1="-32" x2="0" y2="56"/>
+      <line x1="-30" y1="-14" x2="30" y2="-14"/>
+      <path d="M-48 16 Q-44 54 0 56 Q44 54 48 16"/>
+      <path d="M-60 28 L-48 12 L-34 28"/>
+      <path d="M60 28 L48 12 L34 28"/>
+    </g>
+  </g>
+</svg>

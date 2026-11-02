@@ -1,0 +1,85 @@
+export interface Project {
+  id: string
+  name: string
+  path: string
+  createdAt: number
+}
+
+export interface PtyCreateOptions {
+  cwd: string
+  cols: number
+  rows: number
+}
+
+export interface PtyCreateResult {
+  id: string
+  /** Foreground process name at spawn, i.e. the shell (`zsh`, `bash`…). */
+  shell: string
+}
+
+export interface DirEntry {
+  name: string
+  /** Absolute path. */
+  path: string
+  /** Path from the project root, always `/`-separated. */
+  relPath: string
+  isDirectory: boolean
+  isSymlink: boolean
+}
+
+export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'ignored' | 'conflict'
+
+export interface GitStatus {
+  /** Keyed by project-relative `/` path; directories reported whole end with `/`. */
+  files: Record<string, GitFileStatus>
+}
+
+export type MenuCommand =
+  | 'new-terminal'
+  | 'close-terminal'
+  | 'next-terminal'
+  | 'prev-terminal'
+  | 'split-right'
+  | 'split-down'
+  | 'next-pane'
+  | 'prev-pane'
+  | 'add-project'
+  | 'toggle-explorer'
+
+/** API exposed to the renderer by the preload script as `window.capitaine`. */
+export interface CapitaineApi {
+  platform: NodeJS.Platform
+  projects: {
+    list(): Promise<Project[]>
+    add(): Promise<Project | null>
+    rename(id: string, name: string): Promise<Project[]>
+    remove(id: string): Promise<Project[]>
+    reorder(ids: string[]): Promise<Project[]>
+    reveal(id: string): Promise<void>
+  }
+  pty: {
+    create(options: PtyCreateOptions): Promise<PtyCreateResult>
+    write(id: string, data: string): void
+    resize(id: string, cols: number, rows: number): void
+    kill(id: string): void
+    onData(listener: (id: string, data: string) => void): () => void
+    onExit(listener: (id: string, exitCode: number) => void): () => void
+    /** Fires when the terminal's foreground process changes (macOS/Linux only). */
+    onProcess(listener: (id: string, processName: string) => void): () => void
+  }
+  files: {
+    list(projectId: string, dir: string): Promise<DirEntry[]>
+    watch(projectId: string, dir: string): void
+    unwatch(dir: string): void
+    onChanged(listener: (dir: string) => void): () => void
+    gitStatus(projectId: string): Promise<GitStatus | null>
+    /** Opens with the OS default application. */
+    open(projectId: string, path: string): Promise<void>
+    reveal(projectId: string, path: string): void
+    copyText(text: string): void
+    /** Absolute path of a file dropped from the OS (Electron hides `File.path`). */
+    pathForFile(file: File): string
+  }
+  focusWindow(): void
+  onMenuCommand(listener: (command: MenuCommand) => void): () => void
+}
