@@ -35,6 +35,9 @@ linux:
   # deb: recommended on Ubuntu (its install sets up Chromium's sandbox); AppImage: other distros.
   target: [deb, AppImage]
   category: Development
+  # One PNG per standard size (rendered from resources/icon.svg): GNOME's hicolor theme has no
+  # 1024x1024 directory, so a lone 1024px icon is ignored and the app shows a generic gear.
+  icon: resources/icons
   executableName: capitaine
   maintainer: Lucas Burlot <lucas-burlot@users.noreply.github.com>
   synopsis: IDE IA-first pour piloter des agents Claude Code

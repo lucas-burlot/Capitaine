@@ -47,5 +47,6 @@
     "typescript": "~5.9",
     "vite": "^8.3.5",
     "zustand": "^5.0.16"
-  }
+  },
+  "desktopName": "capitaine.desktop"
 }
