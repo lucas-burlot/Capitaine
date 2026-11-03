@@ -293,6 +293,9 @@ const footer = page.locator('footer[aria-label="Quota Claude"]')
 gitChecks.footerNotLoggedIn = await waitFor(async () => (await footer.innerText()).includes('Non connecté'))
 await footer.locator('[aria-label="Rafraîchir le quota"]').click()
 gitChecks.footerRefresh = await waitFor(async () => (await footer.innerText()).includes('Non connecté'))
+// Updates: in dev the version button says why it can't self-update.
+await footer.locator('[aria-label="Rechercher les mises à jour"]').click()
+gitChecks.updaterDevNotice = await waitFor(async () => (await footer.innerText()).includes('mode développement'))
 console.log('git checks:', gitChecks)
 
 // Orca-style title bar: brand, window buttons, sidebar toggle, shortcuts matched in main.

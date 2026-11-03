@@ -123,6 +123,18 @@ export interface ClaudeUsage {
   fetchedAt: number
 }
 
+export interface UpdateState {
+  /** `unsupported`: dev mode or an install flavour that can't self-update (unpacked dir…). */
+  status: 'idle' | 'unsupported' | 'checking' | 'up-to-date' | 'downloading' | 'ready' | 'error'
+  currentVersion: string
+  /** The newer version being downloaded / ready to install. */
+  version: string | null
+  percent: number | null
+  error: string | null
+  /** The last check was asked by the user (so its outcome is worth showing). */
+  manual: boolean
+}
+
 export type MenuCommand =
   | 'new-terminal'
   | 'close-terminal'
@@ -197,6 +209,14 @@ export interface CapitaineApi {
     onMaximizedChange(listener: (maximized: boolean) => void): () => void
     /** Opens the application menu at a point of the window (the ⋯ button). */
     popupMenu(x: number, y: number): void
+  }
+  updater: {
+    state(): Promise<UpdateState>
+    check(): void
+    /** Restart on the downloaded version. */
+    install(): void
+    openReleases(): void
+    onState(listener: (state: UpdateState) => void): () => void
   }
   focusWindow(): void
   /** The renderer settled unsaved changes; finish the close (or quit) it had vetoed. */

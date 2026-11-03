@@ -13,13 +13,16 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "postinstall": "electron-builder install-app-deps",
-    "dist": "electron-vite build && electron-builder",
-    "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win",
-    "dist:linux": "electron-vite build && electron-builder --linux",
-    "smoke": "node scripts/smoke.mjs"
+    "dist": "electron-vite build && electron-builder --publish never",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
+    "dist:win": "electron-vite build && electron-builder --win --publish never",
+    "dist:linux": "electron-vite build && electron-builder --linux --publish never",
+    "smoke": "node scripts/smoke.mjs",
+    "release:patch": "npm version patch -m \"chore(release): v%s\" && git push --follow-tags",
+    "release:minor": "npm version minor -m \"chore(release): v%s\" && git push --follow-tags"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "node-pty": "^1.1.0"
   },
   "devDependencies": {

@@ -1,0 +1,52 @@
+# Builds Capitaine for Linux, Windows and macOS and publishes a GitHub release when a v* tag is pushed.
+# Installed apps check these releases to update themselves (electron-updater, see electron-builder.yml).
+#   npm run release:patch   → bumps the version, tags vX.Y.Z and pushes: this workflow does the rest.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # One release up front, so the three build jobs upload to it instead of racing to create it.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --title "Capitaine $GITHUB_REF_NAME" --generate-notes --verify-tag
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 22.04: oldest supported glibc, so the Linux build runs on older distros too.
+          - os: ubuntu-22.04
+            target: --linux
+          - os: windows-latest
+            target: --win
+          - os: macos-latest
+            target: --mac --x64 --arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Package and upload to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No signing certificate yet: build unsigned (macOS will need a right-click → Open the first time).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder ${{ matrix.target }} --publish always

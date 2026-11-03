@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, type Input, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import type { MenuCommand } from '../shared/types'
+import { checkForUpdates, openReleasesPage } from './updater'
 
 const isMac = process.platform === 'darwin'
 
@@ -113,8 +114,27 @@ export function installAppMenu(isDev: boolean): void {
     accelerator: accelerator(action),
     click: onFocused(action)
   })
+  const checkUpdates: MenuItemConstructorOptions = { label: 'Rechercher les mises à jour…', click: () => void checkForUpdates(true) }
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' as const },
+              checkUpdates,
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          }
+        ]
+      : []),
     {
       label: 'Fichier',
       submenu: [
@@ -160,7 +180,11 @@ export function installAppMenu(isDev: boolean): void {
         ...(isDev ? [{ type: 'separator' as const }, item('Recharger', 'reload'), item('Outils de développement', 'devtools')] : [])
       ]
     },
-    ...(isMac ? [{ role: 'windowMenu' as const }] : [])
+    ...(isMac ? [{ role: 'windowMenu' as const }] : []),
+    {
+      label: 'Aide',
+      submenu: [checkUpdates, { label: 'Toutes les versions (GitHub)', click: () => openReleasesPage() }, { type: 'separator' }, { label: `Capitaine ${app.getVersion()}`, enabled: false }]
+    }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Gauge, RotateCw, TriangleAlert } from 'lucide-react'
 import type { ClaudeUsage, ClaudeUsageWindow } from '@shared/types'
+import { UpdateStatus } from './UpdateStatus'
 
 /** The usage endpoint is rate limited: refresh rarely on our own, the button is there for "now". */
 const AUTO_REFRESH_MS = 5 * 60_000
@@ -76,6 +77,8 @@ export function UsageFooter() {
       >
         <RotateCw size={12} className={loading ? 'animate-spin' : ''} />
       </button>
+      <span className="h-3.5 w-px shrink-0 bg-line" aria-hidden />
+      <UpdateStatus />
     </footer>
   )
 }

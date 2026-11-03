@@ -10,14 +10,39 @@ files:
 asarUnpack:
   - node_modules/node-pty/**
 npmRebuild: true
+
+# Auto-updates: the app checks the GitHub releases of this repo (public, so no token needed to update).
+# CI publishes them (.github/workflows/release.yml) when a v* tag is pushed.
+publish:
+  provider: github
+  owner: lucas-burlot
+  repo: Capitaine
+  releaseType: release
+
 mac:
+  # zip is what electron-updater downloads on macOS; dmg is for the first install.
   target: [dmg, zip]
   category: public.app-category.developer-tools
+  # Version-free names keep the README's "latest/download" links valid forever.
+  artifactName: Capitaine-mac-${arch}.${ext}
 win:
   target: [nsis]
+  artifactName: Capitaine-win-${arch}.${ext}
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 linux:
-  target: [AppImage, deb]
+  # deb: recommended on Ubuntu (its install sets up Chromium's sandbox); AppImage: other distros.
+  target: [deb, AppImage]
   category: Development
+  executableName: capitaine
+  maintainer: Lucas Burlot <lucas-burlot@users.noreply.github.com>
+  synopsis: IDE IA-first pour piloter des agents Claude Code
+  desktop:
+    entry:
+      StartupWMClass: Capitaine
+deb:
+  packageName: capitaine
+  artifactName: capitaine-linux-${arch}.${ext}
+appImage:
+  artifactName: Capitaine-linux-${arch}.${ext}

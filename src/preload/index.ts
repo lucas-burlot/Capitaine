@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
-import type { CapitaineApi, MenuCommand } from '../shared/types'
+import type { CapitaineApi, MenuCommand, UpdateState } from '../shared/types'
 
 function subscribe<Args extends unknown[]>(channel: string, listener: (...args: Args) => void): () => void {
   const handler = (_event: IpcRendererEvent, ...args: unknown[]) => listener(...(args as Args))
@@ -59,6 +59,13 @@ const api: CapitaineApi = {
     isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
     onMaximizedChange: (listener) => subscribe<[boolean]>('window:maximized', listener),
     popupMenu: (x, y) => ipcRenderer.send('window:popup-menu', x, y)
+  },
+  updater: {
+    state: () => ipcRenderer.invoke('updater:state'),
+    check: () => ipcRenderer.send('updater:check'),
+    install: () => ipcRenderer.send('updater:install'),
+    openReleases: () => ipcRenderer.send('updater:open-releases'),
+    onState: (listener) => subscribe<[UpdateState]>('updater:state', listener)
   },
   focusWindow: () => ipcRenderer.send('window:focus'),
   confirmClose: () => ipcRenderer.send('window:close-confirmed'),
