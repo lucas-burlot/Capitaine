@@ -2,8 +2,9 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import type { PtyCreateOptions } from '../shared/types'
 import { DirectoryWatchers, gitStatus, isInside, listDirectory, readTextFile, writeTextFile } from './file-system'
-import { installAppMenu } from './menu'
-import { repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './source-control'
+import { installAppMenu, installShortcutHandler, popupAppMenu } from './menu'
+import { claudeUsage } from './claude-usage'
+import { branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './source-control'
 import type { DiffSide } from '../shared/types'
 import { ProjectStore } from './project-store'
 import { PtyManager } from './pty-manager'
@@ -27,8 +28,11 @@ function createWindow(): BrowserWindow {
     title: 'Capitaine',
     // macOS takes the icon from the app bundle; Linux/Windows windows need it explicitly.
     ...(process.platform !== 'darwin' ? { icon } : {}),
-    autoHideMenuBar: process.platform !== 'darwin',
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
+    // Custom title bar everywhere, like Orca: macOS keeps its inset traffic lights, Windows hides the
+    // native bar, and Linux (which ignores titleBarStyle) drops the frame. The renderer draws the rest.
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : process.platform === 'win32' ? 'hidden' : undefined,
+    ...(process.platform === 'linux' ? { frame: false } : {}),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -46,6 +50,9 @@ function createWindow(): BrowserWindow {
   })
 
   const contents = win.webContents
+  installShortcutHandler(contents, isDev)
+  win.on('maximize', () => contents.send('window:maximized', true))
+  win.on('unmaximize', () => contents.send('window:maximized', false))
   // Dropping a file outside a terminal would otherwise navigate the window to it (and kill every shell).
   contents.on('will-navigate', (event, url) => {
     if (url !== contents.getURL()) event.preventDefault()
@@ -143,6 +150,11 @@ function registerIpc(): void {
   ipcMain.handle('git:stashes', async (_e, projectId: string) => stashList(await repoOf(projectId)))
   ipcMain.handle('git:stash-files', async (_e, projectId: string, ref: string) => stashFiles(await repoOf(projectId), String(ref)))
   ipcMain.handle('git:show', async (_e, projectId: string, side: DiffSide) => showBlob(await repoOf(projectId), side))
+  ipcMain.handle('git:branch', (_e, projectId: string) => {
+    const root = projectPath(projectId)
+    return root ? branchInfo(root) : null
+  })
+  ipcMain.handle('claude:usage', (_e, force: unknown) => claudeUsage(force === true))
 
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
 
@@ -156,6 +168,21 @@ function registerIpc(): void {
   })
   ipcMain.on('window:close-cancelled', () => {
     quitRequested = false
+  })
+  const senderWindow = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => BrowserWindow.fromWebContents(event.sender)
+  ipcMain.on('window:minimize', (event) => senderWindow(event)?.minimize())
+  ipcMain.on('window:toggle-maximize', (event) => {
+    const win = senderWindow(event)
+    if (!win) return
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+  })
+  // close() (not destroy) so unsaved editors can still veto it.
+  ipcMain.on('window:close', (event) => senderWindow(event)?.close())
+  ipcMain.handle('window:is-maximized', (event) => senderWindow(event)?.isMaximized() ?? false)
+  ipcMain.on('window:popup-menu', (event, x: number, y: number) => {
+    const win = senderWindow(event)
+    if (win) popupAppMenu(win, Number(x) || 0, Number(y) || 0)
   })
   ipcMain.on('window:focus', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)

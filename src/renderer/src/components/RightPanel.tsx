@@ -3,16 +3,25 @@ import { FolderTree, GitBranch, PanelRightClose, RefreshCw } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { useExplorer, type RightPanelView } from '../explorer-store'
 import { useGit } from '../git-store'
-import { isMac, shortcutLabel } from '../platform'
+import { shortcutLabel } from '../platform'
 import { FileExplorer, FileExplorerActions, IconButton } from './FileExplorer'
 import { ResizeHandle, usePanelWidth } from './ResizeHandle'
 import { SourceControlPanel } from './SourceControlPanel'
+import { customTitleBar, titleBarHeightClass, WindowControlsSpacer } from './TitleBar'
 
 const GIT_POLL_MS = 3000
+// With window buttons on the right the spacer provides the gap; otherwise a small right padding.
+const WINDOW_CONTROLS_PAD = customTitleBar ? '' : 'pr-1.5'
 
 /** Right side of the window: the project's files or its git changes. */
 export function RightPanel({ project }: { project: Project }) {
-  const panel = usePanelWidth({ storageKey: 'capitaine.explorerWidth', defaultWidth: 260, min: 180, max: 640 })
+  // Wider floor with a custom title bar: the window buttons sit over this header.
+  const panel = usePanelWidth({
+    storageKey: 'capitaine.explorerWidth',
+    defaultWidth: customTitleBar ? 320 : 260,
+    min: customTitleBar ? 300 : 180,
+    max: 720
+  })
   const view = useExplorer((s) => s.view)
   const toggleOpen = useExplorer((s) => s.toggleOpen)
   useGitPolling(project.id)
@@ -20,11 +29,12 @@ export function RightPanel({ project }: { project: Project }) {
   return (
     <section className="relative flex shrink-0 flex-col border-l border-line bg-panel" style={{ width: panel.width }}>
       <ResizeHandle panel={panel} edge="left" />
-      <header className={`drag-region flex shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-2 ${isMac ? 'h-12' : 'h-10'}`}>
-        <div className="no-drag flex min-w-0 flex-1 items-center gap-0.5" role="tablist">
-          <ViewTab view="files" current={view} icon={<FolderTree size={13} />} label="Fichiers" />
-          <ViewTab view="git" current={view} icon={<GitBranch size={13} />} label="Git" badge={<GitBadge projectId={project.id} />} />
+      <header className={`drag-region flex shrink-0 items-center gap-1 border-b border-line pl-2 ${WINDOW_CONTROLS_PAD} ${titleBarHeightClass}`}>
+        <div className="no-drag flex shrink-0 items-center gap-0.5" role="tablist">
+          <ViewTab view="files" current={view} icon={<FolderTree size={14} />} label="Fichiers" />
+          <ViewTab view="git" current={view} icon={<GitBranch size={14} />} label="Git" badge={<GitBadge projectId={project.id} />} />
         </div>
+        <div className="min-w-[32px] flex-1 self-stretch" data-window-drag />
         {view === 'files' ? (
           <FileExplorerActions project={project} />
         ) : (
@@ -35,6 +45,7 @@ export function RightPanel({ project }: { project: Project }) {
         <IconButton title={`Masquer le panneau (${shortcutLabel('toggleExplorer')})`} onClick={toggleOpen}>
           <PanelRightClose size={13} />
         </IconButton>
+        <WindowControlsSpacer />
       </header>
       {view === 'files' ? <FileExplorer project={project} /> : <SourceControlPanel project={project} />}
     </section>
@@ -44,16 +55,18 @@ export function RightPanel({ project }: { project: Project }) {
 function ViewTab(props: { view: RightPanelView; current: RightPanelView; icon: React.ReactNode; label: string; badge?: React.ReactNode }) {
   const active = props.view === props.current
   return (
+    // Icon tabs, as in Orca's right sidebar; the label lives in the tooltip.
     <button
       role="tab"
       aria-selected={active}
+      aria-label={props.label}
+      title={props.label}
       onClick={() => useExplorer.getState().showView(props.view)}
-      className={`flex items-center gap-1.5 rounded px-2 py-1 text-[11.5px] font-medium ${
-        active ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
+      className={`flex h-7 items-center gap-1 rounded px-1.5 text-[11px] font-medium ${
+        active ? 'bg-panel-2 text-accent' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
       }`}
     >
       {props.icon}
-      {props.label}
       {props.badge}
     </button>
   )

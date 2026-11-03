@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { GitStash, GitStashFile, RepoStatus } from '@shared/types'
+import type { BranchInfo, GitStash, GitStashFile, RepoStatus } from '@shared/types'
 
 interface GitState {
   /** undefined: never loaded; null: not a git repo. */
@@ -12,8 +12,11 @@ interface GitState {
   version: Record<string, number>
   /** Files being staged/unstaged, to disable their buttons meanwhile. */
   busy: Record<string, boolean>
+  /** Sidebar summary for every project; undefined: not read yet, null: not a git repo. */
+  branches: Record<string, BranchInfo | null | undefined>
 
   refresh(projectId: string): Promise<void>
+  refreshBranches(projectIds: string[]): Promise<void>
   loadStashFiles(projectId: string, stash: GitStash): Promise<void>
   stage(projectId: string, paths: string[]): Promise<void>
   unstage(projectId: string, paths: string[]): Promise<void>
@@ -28,6 +31,17 @@ export const useGit = create<GitState>((set, get) => ({
   stashFiles: {},
   version: {},
   busy: {},
+  branches: {},
+
+  async refreshBranches(projectIds) {
+    const results = await Promise.all(
+      projectIds.map((id) => window.capitaine.git.branch(id).then((info) => [id, info] as const, () => [id, null] as const))
+    )
+    set((s) => {
+      const changed = results.some(([id, info]) => JSON.stringify(s.branches[id]) !== JSON.stringify(info))
+      return changed ? { branches: { ...s.branches, ...Object.fromEntries(results) } } : s
+    })
+  },
 
   refresh(projectId) {
     // Coalesce: polling, fs events and button clicks can all ask at once.

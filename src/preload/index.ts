@@ -45,7 +45,20 @@ const api: CapitaineApi = {
     unstage: (projectId, paths) => ipcRenderer.invoke('git:unstage', projectId, paths),
     stashes: (projectId) => ipcRenderer.invoke('git:stashes', projectId),
     stashFiles: (projectId, ref) => ipcRenderer.invoke('git:stash-files', projectId, ref),
-    show: (projectId, side) => ipcRenderer.invoke('git:show', projectId, side)
+    show: (projectId, side) => ipcRenderer.invoke('git:show', projectId, side),
+    branch: (projectId) => ipcRenderer.invoke('git:branch', projectId)
+  },
+  claude: {
+    usage: (force) => ipcRenderer.invoke('claude:usage', force)
+  },
+  window: {
+    customTitleBar: process.platform !== 'darwin',
+    minimize: () => ipcRenderer.send('window:minimize'),
+    toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
+    close: () => ipcRenderer.send('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+    onMaximizedChange: (listener) => subscribe<[boolean]>('window:maximized', listener),
+    popupMenu: (x, y) => ipcRenderer.send('window:popup-menu', x, y)
   },
   focusWindow: () => ipcRenderer.send('window:focus'),
   confirmClose: () => ipcRenderer.send('window:close-confirmed'),

@@ -9,7 +9,8 @@ const labels = {
   splitRight: isMac ? '⌘D' : 'Ctrl+Shift+D',
   splitDown: isMac ? '⌘⇧D' : 'Ctrl+Shift+E',
   nextPane: isMac ? '⌘⌥→' : 'Ctrl+Alt+→',
-  toggleExplorer: isMac ? '⌘B' : 'Ctrl+Shift+B'
+  toggleExplorer: isMac ? '⌘B' : 'Ctrl+Shift+B',
+  toggleSidebar: isMac ? '⌘⇧S' : 'Ctrl+Shift+S'
 }
 
 export function shortcutLabel(action: keyof typeof labels): string {

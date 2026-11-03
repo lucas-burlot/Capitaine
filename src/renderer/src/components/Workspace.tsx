@@ -9,6 +9,7 @@ import { mostUrgentAgent, tabLabel, useApp, type Tab } from '../store'
 import { AgentStatusIcon } from './AgentStatus'
 import { EntryIcon } from './FileIcon'
 import { TerminalView } from './TerminalView'
+import { TitleBarBrand, titleBarHeightClass, WindowControlsSpacer } from './TitleBar'
 import logo from '../../../../resources/icon.svg'
 
 const FULL: Rect = { left: 0, top: 0, width: 1, height: 1 }
@@ -129,7 +130,14 @@ function SplitDivider({ tab, divider, stackRef }: { tab: Tab; divider: Divider; 
 }
 
 function TitleSpacer() {
-  return <div className={`drag-region shrink-0 border-b border-line ${isMac ? 'h-12' : 'h-10'}`} />
+  const sidebarOpen = useExplorer((s) => s.sidebarOpen)
+  return (
+    <div className={`drag-region flex shrink-0 items-center border-b border-line ${titleBarHeightClass}`}>
+      {!sidebarOpen && <TitleBarBrand compact />}
+      <div className="flex-1" />
+      <WindowControlsSpacer />
+    </div>
+  )
 }
 
 function TabBar({ projectId, title, path }: { projectId: string; title: string; path: string }) {
@@ -141,14 +149,20 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
   const splitActivePane = useApp((s) => s.splitActivePane)
   const explorerOpen = useExplorer((s) => s.open)
   const toggleExplorer = useExplorer((s) => s.toggleOpen)
+  const sidebarOpen = useExplorer((s) => s.sidebarOpen)
 
   return (
-    <header className={`drag-region flex shrink-0 items-end gap-3 border-b border-line bg-panel pr-2 ${isMac ? 'h-12' : 'h-10'}`}>
-      <div className="flex min-w-0 shrink-0 flex-col justify-center self-stretch pl-4" title={path}>
+    <header className={`drag-region flex shrink-0 items-end gap-3 border-b border-line bg-panel ${explorerOpen ? 'pr-2' : ''} ${titleBarHeightClass}`}>
+      {!sidebarOpen && (
+        <div className="flex shrink-0 self-stretch">
+          <TitleBarBrand compact />
+        </div>
+      )}
+      <div className={`flex min-w-0 shrink-0 flex-col justify-center self-stretch ${sidebarOpen ? 'pl-4' : ''}`} title={path}>
         <span className="max-w-56 truncate text-[13px] font-medium text-fg">{title}</span>
       </div>
       <div
-        className="scrollbar-none no-drag flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto"
+        className="scrollbar-none no-drag flex min-w-0 shrink items-end gap-0.5 overflow-x-auto"
         onWheel={(e) => {
           // Vertical wheel scrolls the tab strip sideways.
           if (e.deltaY && !e.deltaX) e.currentTarget.scrollLeft += e.deltaY
@@ -166,6 +180,8 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
           <Plus size={15} />
         </button>
       </div>
+      {/* Empty title-bar space: grab here to move the window (the tab strip itself is no-drag). */}
+      <div className="min-w-[96px] flex-1 self-stretch" data-window-drag />
       <div className="no-drag mb-1.5 flex shrink-0 items-center gap-0.5">
         {activeIsTerminal && (
           <>
@@ -194,6 +210,12 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
           {explorerOpen ? <PanelRightClose size={15} /> : <PanelRight size={15} />}
         </button>
       </div>
+      {/* The window buttons sit over the top-most right header: the right panel's when it's open. */}
+      {!explorerOpen && (
+        <div className="self-stretch">
+          <WindowControlsSpacer />
+        </div>
+      )}
     </header>
   )
 }

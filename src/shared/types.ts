@@ -94,6 +94,35 @@ export type DiffSide =
 
 export type BlobContent = { kind: 'text'; content: string } | { kind: 'missing' } | { kind: 'binary' }
 
+/** Lightweight per-project git summary for the sidebar. */
+export interface BranchInfo {
+  branch: string | null
+  detached: boolean
+  upstream: string | null
+  ahead: number
+  behind: number
+  /** Changed + untracked files (ignored excluded). */
+  changes: number
+}
+
+export interface ClaudeUsageWindow {
+  label: string
+  usedPercent: number
+  /** Epoch ms. */
+  resetsAt: number | null
+}
+
+export interface ClaudeUsage {
+  /** `expired`: Claude Code's login needs renewing (run `claude`); `no-credentials`: not logged in. */
+  status: 'ok' | 'no-credentials' | 'expired' | 'rate-limited' | 'error'
+  error: string | null
+  session: ClaudeUsageWindow | null
+  weekly: ClaudeUsageWindow | null
+  weeklyByModel: ClaudeUsageWindow[]
+  extraUsagePercent: number | null
+  fetchedAt: number
+}
+
 export type MenuCommand =
   | 'new-terminal'
   | 'close-terminal'
@@ -105,6 +134,7 @@ export type MenuCommand =
   | 'prev-pane'
   | 'add-project'
   | 'toggle-explorer'
+  | 'toggle-sidebar'
 
 /** API exposed to the renderer by the preload script as `window.capitaine`. */
 export interface CapitaineApi {
@@ -150,6 +180,23 @@ export interface CapitaineApi {
     stashes(projectId: string): Promise<GitStash[]>
     stashFiles(projectId: string, ref: string): Promise<GitStashFile[]>
     show(projectId: string, side: DiffSide): Promise<BlobContent>
+    /** Null when the project isn't in a git repo. */
+    branch(projectId: string): Promise<BranchInfo | null>
+  }
+  claude: {
+    /** `force`: the refresh button (still throttled to protect the rate-limited endpoint). */
+    usage(force: boolean): Promise<ClaudeUsage>
+  }
+  window: {
+    /** Linux/Windows draw their own title bar (logo, menu, window buttons). */
+    customTitleBar: boolean
+    minimize(): void
+    toggleMaximize(): void
+    close(): void
+    isMaximized(): Promise<boolean>
+    onMaximizedChange(listener: (maximized: boolean) => void): () => void
+    /** Opens the application menu at a point of the window (the ⋯ button). */
+    popupMenu(x: number, y: number): void
   }
   focusWindow(): void
   /** The renderer settled unsaved changes; finish the close (or quit) it had vetoed. */

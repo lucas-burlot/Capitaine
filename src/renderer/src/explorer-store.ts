@@ -3,6 +3,7 @@ import type { DirEntry, GitFileStatus, GitStatus } from '@shared/types'
 
 const OPEN_KEY = 'capitaine.explorerOpen'
 const VIEW_KEY = 'capitaine.rightPanelView'
+const SIDEBAR_KEY = 'capitaine.sidebarOpen'
 
 export type RightPanelView = 'files' | 'git'
 
@@ -10,6 +11,9 @@ interface ExplorerState {
   open: boolean
   /** Which view the right panel shows. */
   view: RightPanelView
+  /** Left sidebar (projects) shown or collapsed. */
+  sidebarOpen: boolean
+  toggleSidebar(): void
   /** Expanded directories (absolute paths) per project. The root is always shown. */
   expanded: Record<string, string[]>
   /** Directory listings by absolute path. */
@@ -47,6 +51,23 @@ function unwatchUnder(dir: string) {
   }
 }
 
+function readFlag(key: string, fallback: boolean): boolean {
+  try {
+    const value = localStorage.getItem(key)
+    return value === null ? fallback : value === '1'
+  } catch {
+    return fallback
+  }
+}
+
+function writeFlag(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? '1' : '0')
+  } catch {
+    // Not remembered; still applies for this session.
+  }
+}
+
 function initialOpen(): boolean {
   try {
     return localStorage.getItem(OPEN_KEY) !== '0'
@@ -66,6 +87,13 @@ function initialView(): RightPanelView {
 export const useExplorer = create<ExplorerState>((set, get) => ({
   open: initialOpen(),
   view: initialView(),
+  sidebarOpen: readFlag(SIDEBAR_KEY, true),
+
+  toggleSidebar() {
+    const sidebarOpen = !get().sidebarOpen
+    writeFlag(SIDEBAR_KEY, sidebarOpen)
+    set({ sidebarOpen })
+  },
   expanded: {},
   children: {},
   errors: {},

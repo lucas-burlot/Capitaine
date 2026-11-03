@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative } from 'node:path'
-import type { DiffSide, GitChange, GitChangeKind, GitStash, GitStashFile, RepoStatus } from '../shared/types'
+import type { BranchInfo, DiffSide, GitChange, GitChangeKind, GitStash, GitStashFile, RepoStatus } from '../shared/types'
 
 interface GitResult {
   ok: boolean
@@ -148,6 +148,37 @@ export async function repoStatus(cwd: string): Promise<RepoStatus | null> {
     }
   }
   return result
+}
+
+/** Branch, upstream and change count only: cheap enough to poll for every project. */
+export async function branchInfo(cwd: string): Promise<BranchInfo | null> {
+  const out = await git(cwd, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=normal'])
+  if (!out.ok) return null
+  const info: BranchInfo = { branch: null, detached: false, upstream: null, ahead: 0, behind: 0, changes: 0 }
+  const parts = out.stdout.split('\0')
+  for (let i = 0; i < parts.length; i++) {
+    const record = parts[i]
+    if (!record) continue
+    if (record.startsWith('# branch.head ')) {
+      const head = record.slice('# branch.head '.length)
+      info.detached = head === '(detached)'
+      info.branch = info.detached ? null : head
+    } else if (record.startsWith('# branch.upstream ')) {
+      info.upstream = record.slice('# branch.upstream '.length)
+    } else if (record.startsWith('# branch.ab ')) {
+      const match = /^\+(\d+) -(\d+)$/.exec(record.slice('# branch.ab '.length))
+      if (match) {
+        info.ahead = Number(match[1])
+        info.behind = Number(match[2])
+      }
+    } else if (record[0] === '1' || record[0] === 'u' || record[0] === '?') {
+      info.changes++
+    } else if (record[0] === '2') {
+      info.changes++
+      i++ // the original path of a rename
+    }
+  }
+  return info
 }
 
 export async function stagePaths(repoRoot: string, paths: string[]): Promise<void> {

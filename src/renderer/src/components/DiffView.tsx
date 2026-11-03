@@ -108,7 +108,9 @@ export default function DiffView({ tabId, projectId, diff, visible }: Props) {
   }, [visible])
 
   return (
-    <div className={`absolute inset-0 flex flex-col ${visible ? '' : 'invisible pointer-events-none'}`} data-diff-tab={tabId}>
+    <div className={`absolute inset-0 flex-col ${visible ? 'flex' : 'hidden'}`} data-diff-tab={tabId}
+      // display:none, not visibility: Monaco forces `visibility: visible` on some layers, which would bleed through.
+    >
       <DiffHeader projectId={projectId} diff={diff} sideBySide={sideBySide} onToggleLayout={() => setSideBySide(!sideBySide)} />
       <div ref={containerRef} className={`min-h-0 flex-1 ${loaded.state === 'ready' || loaded.state === 'loading' ? '' : 'hidden'}`} />
       {loaded.state === 'binary' && (

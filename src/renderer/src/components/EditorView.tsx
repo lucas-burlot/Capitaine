@@ -76,7 +76,9 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
   }, [visible])
 
   return (
-    <div className={`absolute inset-0 flex flex-col ${visible ? '' : 'invisible pointer-events-none'}`} data-editor-tab={tabId}>
+    <div className={`absolute inset-0 flex-col ${visible ? 'flex' : 'hidden'}`} data-editor-tab={tabId}
+      // display:none, not visibility: Monaco forces `visibility: visible` on some layers, which would bleed through.
+    >
       <EditorBanner tabId={tabId} />
       {meta?.error && meta.status === 'ready' && (
         <div className="flex shrink-0 items-center gap-2 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[12px] text-red-300">

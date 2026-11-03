@@ -30,6 +30,11 @@ Version 0.1 : gestion de projets + terminaux par projet. macOS, Windows et Linux
   - clic sur un fichier : **diff** dans un onglet (Monaco, côte à côte ou en ligne, régions inchangées repliées), mis à jour quand le fichier change ; double-clic : ouvrir le fichier ; glisser vers un terminal : insérer son chemin ;
   - **liste des stash** (message, branche, date) ; déplier un stash montre ses fichiers, et un clic ouvre le diff du stash.
   - Rafraîchi toutes les 3 s, au retour sur la fenêtre et après chaque changement de fichier.
+- **Branche git dans la barre latérale**, sous chaque projet : nom de la branche, commits ↑ à pousser / ↓ à récupérer, nombre de fichiers modifiés. Clic : ouvre le panneau Git du projet.
+- **Quota Claude dans le footer** : session de 5 h, semaine et quotas hebdomadaires par modèle (barre, %, heure de remise à zéro et temps restant), crédits supplémentaires s'ils sont activés. Bouton ↻ pour rafraîchir ; sinon toutes les 5 min et au retour sur la fenêtre.
+  - Même source que `/usage` de Claude Code : l'API `api.anthropic.com/api/oauth/usage` avec la connexion de Claude Code (trousseau macOS, sinon `~/.claude/.credentials.json`, ou `$CLAUDE_CONFIG_DIR`). Le jeton reste dans le processus principal et n'est jamais renouvelé par Capitaine : s'il a expiré, lance `claude` pour le rafraîchir.
+- **Barre de titre façon Orca** : en haut à gauche la casquette de Capitaine, le nom de l'app et le bouton pour replier la barre latérale. Sur Linux et Windows, la barre de titre du système est remplacée par celle de l'app : bouton ⋯ (menu de l'application) et boutons réduire / agrandir / fermer à droite. Sur macOS, les feux tricolores restent à leur place.
+- **Barre latérale repliable** (bouton à côté du nom, ou raccourci) : la marque passe alors dans la barre d'onglets.
 - **Barre latérale redimensionnable** : glisse son bord droit (double-clic pour revenir à la largeur par défaut). La largeur est mémorisée.
 - Titre d'onglet fourni par le shell (celui du panneau actif), renommable (double-clic). Clic molette = fermer.
 - Liens cliquables dans le terminal, rendu WebGL.
@@ -63,10 +68,11 @@ Comment ça marche : Claude Code (≥ 2.1.295) implémente le [Program Status Pr
 | Onglet suivant      | ⌘⇧]    | Ctrl+Tab         |
 | Onglet précédent    | ⌘⇧[    | Ctrl+Shift+Tab   |
 | Ajouter un projet   | ⌘O     | Ctrl+Shift+O     |
-| Afficher / masquer l'explorateur | ⌘B | Ctrl+Shift+B |
+| Afficher / masquer le panneau de droite | ⌘B | Ctrl+Shift+B |
+| Afficher / masquer la barre latérale | ⌘⇧S | Ctrl+Shift+S |
 | Copier / Coller     | ⌘C / ⌘V | Ctrl+Shift+C / V |
 
-Sur Windows/Linux, `Ctrl+<lettre>` reste au shell (Ctrl+C, Ctrl+W, Ctrl+R…), d'où les `Ctrl+Shift`.
+Sur Windows/Linux, `Ctrl+<lettre>` reste au shell (Ctrl+C, Ctrl+W, Ctrl+R…), d'où les `Ctrl+Shift`. Comme la fenêtre n'a plus de cadre système, ces raccourcis sont interceptés par le processus principal (`before-input-event`) avant d'atteindre la page. En dev : `Ctrl+Shift+R` recharge, `Ctrl+Shift+I` ouvre les outils de développement.
 
 ## Développement
 
@@ -111,8 +117,9 @@ src/
     pty-manager.ts   cycle de vie des shells (node-pty), sortie regroupée par lots
     shell.ts         choix du shell et de l'environnement selon l'OS
     project-store.ts persistance des projets (JSON, écriture atomique)
-    menu.ts          menu natif + raccourcis selon la plateforme
+    menu.ts          menu de l'app, raccourcis par plateforme (interceptés en main hors macOS), menu ⋯
     file-system.ts   listing des dossiers, surveillance des changements, statut git
+    claude-usage.ts  quota Claude (lecture de la connexion Claude Code, appel de l'API d'usage)
     source-control.ts  statut détaillé (porcelain v2), indexation, stash, contenu d'un fichier à une révision
   preload/         pont sécurisé `window.capitaine` (contextIsolation + sandbox)
   shared/types.ts  contrat d'API main ⇄ renderer
@@ -126,6 +133,7 @@ src/
     editor/          Monaco (chargé à la demande) et sessions d'édition (lecture, sauvegarde, changements externes)
     git-store.ts     statut git, stash et indexation côté interface
     diff-targets.ts  ce que compare chaque diff (index, HEAD, disque, stash)
+    components/TitleBar.tsx  marque, menu ⋯, boutons de fenêtre (barre de titre maison)
     layout.ts        arbre de division d'un onglet (split, fermeture, tailles, calcul des positions)
     pty-bus.ts       un seul listener IPC, routé vers chaque terminal
     components/      Sidebar, Workspace (onglets), TerminalView (xterm)

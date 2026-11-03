@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { CloseEditorDialog } from './components/CloseEditorDialog'
 import { RightPanel } from './components/RightPanel'
+import { UsageFooter } from './components/UsageFooter'
+import { WindowControls } from './components/TitleBar'
 import { useEditors } from './editor-store'
 import { Sidebar } from './components/Sidebar'
 import { useExplorer } from './explorer-store'
@@ -10,6 +12,7 @@ import { useApp } from './store'
 
 export function App() {
   const explorerOpen = useExplorer((s) => s.open)
+  const sidebarOpen = useExplorer((s) => s.sidebarOpen)
   const activeProject = useApp((s) => s.projects.find((p) => p.id === s.activeProjectId))
 
   useEffect(() => startAgentNotifications(), [])
@@ -41,6 +44,8 @@ export function App() {
           return app.cyclePane(-1)
         case 'toggle-explorer':
           return useExplorer.getState().toggleOpen()
+        case 'toggle-sidebar':
+          return useExplorer.getState().toggleSidebar()
         case 'add-project':
           return void app.addProject()
       }
@@ -48,10 +53,14 @@ export function App() {
   }, [])
 
   return (
-    <div className="flex h-full">
-      <Sidebar />
-      <Workspace />
-      {explorerOpen && activeProject && <RightPanel key={activeProject.id} project={activeProject} />}
+    <div className="flex h-full flex-col">
+      <div className="flex min-h-0 flex-1">
+        {sidebarOpen && <Sidebar />}
+        <Workspace />
+        {explorerOpen && activeProject && <RightPanel key={activeProject.id} project={activeProject} />}
+      </div>
+      <UsageFooter />
+      <WindowControls />
       <CloseEditorDialog />
     </div>
   )

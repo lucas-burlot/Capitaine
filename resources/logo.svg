@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="170 280 684 540" width="684" height="540">
+  <!-- Title-bar glyph: the app icon's captain cap without the tile, readable at 16px on dark chrome. -->
+  <!-- Crown -->
+  <path d="M190 430 C190 300 834 300 834 430 C834 470 790 500 726 560 L716 612 Q512 640 308 612 L298 560 C234 500 190 470 190 430 Z" fill="#e8ebf1"/>
+  <!-- Band -->
+  <path d="M306 600 Q512 630 718 600 L718 690 Q512 722 306 690 Z" fill="#7d8799"/>
+  <!-- Gold cord -->
+  <path d="M316 626 Q512 656 708 626" fill="none" stroke="#e2b04f" stroke-width="22" stroke-linecap="round"/>
+  <!-- Visor -->
+  <path d="M288 680 Q512 726 736 680 Q722 790 512 800 Q302 790 288 680 Z" fill="#5c6577"/>
+  <!-- Badge -->
+  <circle cx="512" cy="505" r="78" fill="#e2b04f"/>
+  <g fill="none" stroke="#1b2537" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="512" cy="466" r="12"/>
+    <line x1="512" y1="478" x2="512" y2="550"/>
+    <line x1="487" y1="494" x2="537" y2="494"/>
+    <path d="M472 522 Q476 552 512 554 Q548 552 552 522"/>
+  </g>
+</svg>

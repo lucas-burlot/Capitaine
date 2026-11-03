@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { FolderOpen, FolderPlus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, FolderOpen, FolderPlus, GitBranch, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { isMac, shortcutLabel } from '../platform'
+import { useExplorer } from '../explorer-store'
+import { useGit } from '../git-store'
 import { useApp } from '../store'
 import { AgentStatusIcon, AgentSummary, ProjectAgentList } from './AgentStatus'
 import { ResizeHandle, usePanelWidth } from './ResizeHandle'
+import { TitleBarBrand, titleBarHeightClass } from './TitleBar'
 
 export function Sidebar() {
   const panel = usePanelWidth({ storageKey: 'capitaine.sidebarWidth', defaultWidth: 240, min: 180, max: 560 })
@@ -12,6 +15,7 @@ export function Sidebar() {
   const addProject = useApp((s) => s.addProject)
   const reorderProjects = useApp((s) => s.reorderProjects)
   const [dragId, setDragId] = useState<string | null>(null)
+  useBranchPolling(projects.map((p) => p.id).join('\n'))
 
   const dropOn = (targetId: string) => {
     if (!dragId || dragId === targetId) return
@@ -23,10 +27,13 @@ export function Sidebar() {
   return (
     <aside className="relative flex shrink-0 flex-col border-r border-line bg-panel" style={{ width: panel.width }}>
       <ResizeHandle panel={panel} />
-      <div className={`drag-region flex items-center justify-between px-3 ${isMac ? 'h-12 pl-20' : 'h-10'}`}>
+      <div className={`drag-region flex shrink-0 items-center ${titleBarHeightClass}`}>
+        <TitleBarBrand />
+      </div>
+      <div className="flex h-8 shrink-0 items-center justify-between pr-2 pl-3">
         <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">Projets</span>
         <button
-          className="no-drag rounded p-1 text-muted hover:bg-panel-2 hover:text-fg"
+          className="rounded p-1 text-muted hover:bg-panel-2 hover:text-fg"
           title={`Ajouter un projet (${shortcutLabel('addProject')})`}
           onClick={() => void addProject()}
         >
@@ -53,6 +60,64 @@ export function Sidebar() {
       </nav>
       <AgentSummary />
     </aside>
+  )
+}
+
+const BRANCH_POLL_MS = 10_000
+
+/** Branch summaries for every project: on a timer, on window focus, and right after the active repo moves. */
+function useBranchPolling(projectIdsKey: string) {
+  const activeVersion = useGit((s) => s.version[useApp.getState().activeProjectId ?? ''] ?? 0)
+  useEffect(() => {
+    const ids = projectIdsKey ? projectIdsKey.split('\n') : []
+    if (ids.length === 0) return
+    const refresh = () => void useGit.getState().refreshBranches(ids)
+    refresh()
+    const timer = setInterval(() => document.hasFocus() && refresh(), BRANCH_POLL_MS)
+    window.addEventListener('focus', refresh)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [projectIdsKey, activeVersion])
+}
+
+function BranchLine({ projectId }: { projectId: string }) {
+  const info = useGit((s) => s.branches[projectId])
+  if (!info) return null
+  const label = info.branch ?? 'HEAD détachée'
+  const tooltip = [
+    `Branche : ${label}`,
+    info.upstream ? `Suit ${info.upstream} (${info.ahead} à pousser, ${info.behind} à récupérer)` : 'Pas de branche distante',
+    `${info.changes} fichier(s) modifié(s)`,
+    'Clic : voir les changements'
+  ].join('\n')
+  return (
+    <div
+      title={tooltip}
+      onClick={(e) => {
+        e.stopPropagation()
+        useApp.getState().selectProject(projectId)
+        useExplorer.getState().showView('git')
+      }}
+      className="flex min-w-0 items-center gap-1 text-[11px] text-faint hover:text-muted"
+    >
+      <GitBranch size={10} className="shrink-0" />
+      <span className="min-w-0 truncate">{label}</span>
+      {info.ahead > 0 && (
+        <span className="flex shrink-0 items-center">
+          <ArrowUp size={9} />
+          {info.ahead}
+        </span>
+      )}
+      {info.behind > 0 && (
+        <span className="flex shrink-0 items-center">
+          <ArrowDown size={9} />
+          {info.behind}
+        </span>
+      )}
+      {info.changes > 0 && <span className="shrink-0 text-amber-300/80">• {info.changes}</span>}
+    </div>
   )
 }
 
@@ -115,6 +180,7 @@ function ProjectRow({ project, dragging, onDragStart, onDragEnd, onDrop }: RowPr
             {project.name}
           </div>
         )}
+        <BranchLine projectId={project.id} />
       </div>
 
       {agentState && <AgentStatusIcon state={agentState} size={12} />}

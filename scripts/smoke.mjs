@@ -40,9 +40,12 @@ writeFileSync(join(userData, 'projects.json'), JSON.stringify({
   ]
 }))
 
+// An empty Claude config dir: the usage footer must handle "not logged in" without touching the network.
+const claudeConfig = mkdtempSync(join(tmpdir(), 'capitaine-claude-'))
 const app = await electron.launch({
   executablePath: join(appDir, 'node_modules/electron/dist', process.platform === 'win32' ? 'electron.exe' : 'electron'),
   args: [...(process.platform === 'linux' ? ['--ozone-platform=headless'] : []), appDir, `--user-data-dir=${userData}`],
+  env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfig },
   timeout: 30000
 })
 const page = await app.firstWindow()
@@ -55,7 +58,7 @@ const shot = async (name) => {
 const tabTitles = () => page.$$eval('main header span.truncate', (els) => els.slice(1).map((e) => e.textContent))
 
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1300, 800))
-await page.waitForSelector('text=capitaine', { timeout: 15000 })
+await page.waitForSelector('aside nav >> text=capitaine', { timeout: 15000 })
 await page.click('button:has-text("Nouveau terminal")')
 await page.waitForSelector('.xterm', { timeout: 10000 })
 await page.waitForTimeout(1500)
@@ -63,10 +66,10 @@ await page.keyboard.type('echo "hello from $(pwd)"\n', { delay: 10 })
 await page.click('button[title^="Nouvel onglet"]')
 await page.waitForTimeout(1200)
 await page.keyboard.type('for i in 1 2 3; do echo tick $i; sleep 0.3; done\n', { delay: 10 })
-await page.click('text=home')
+await page.click('aside nav >> text=home')
 await page.waitForTimeout(1500)
 await shot('01-other-project')
-await page.click('text=capitaine')
+await page.click('aside nav >> text=capitaine')
 await page.waitForTimeout(800)
 await shot('02-terminal')
 const before = await tabTitles()
@@ -191,7 +194,7 @@ await shot('06-explorer')
 const editorChecks = {}
 const editorText = () =>
   page.evaluate(() => {
-    const view = document.querySelector('[data-editor-tab]:not(.invisible) .view-lines')
+    const view = document.querySelector('[data-editor-tab].flex .view-lines')
     return view ? view.innerText.replace(/\u00a0/g, ' ') : null
   })
 const waitFor = async (fn, timeout = 8000) => {
@@ -203,7 +206,7 @@ const tracked = join(gitDemo, 'tracked.txt')
 await page.dblclick('[role=treeitem]:has-text("tracked.txt")')
 editorChecks.opens = await waitFor(async () => (await editorText())?.includes('v2'), 20000)
 console.log('  editor:', 'opens', editorChecks.opens)
-await page.click('[data-editor-tab]:not(.invisible) .view-lines')
+await page.click('[data-editor-tab].flex .view-lines')
 await page.keyboard.press('Control+End')
 await page.keyboard.type('édité', { delay: 10 })
 editorChecks.dirtyDot = await waitFor(dirtyTab)
@@ -237,7 +240,7 @@ console.log('  editor:', 'diskUntouched', editorChecks.diskUntouched)
 // Closing the window with an unsaved file is vetoed until you decide.
 await page.dblclick('[role=treeitem]:has-text("tracked.txt")')
 await waitFor(async () => (await editorText())?.includes('agent'), 20000)
-await page.click('[data-editor-tab]:not(.invisible) .view-lines')
+await page.click('[data-editor-tab].flex .view-lines')
 await page.keyboard.type('Y', { delay: 10 })
 await waitFor(dirtyTab)
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
@@ -253,16 +256,16 @@ const gitPanel = page.locator('[aria-label="Changements git"]')
 const gitRow = (name) => gitPanel.locator('[role=button]', { hasText: name }).first()
 const diffText = () =>
   page.evaluate(() => {
-    const view = document.querySelector('[data-diff-tab]:not(.invisible) .monaco-diff-editor')
+    const view = document.querySelector('[data-diff-tab].flex .monaco-diff-editor')
     return view ? view.innerText.replace(/\u00a0/g, ' ') : null
   })
-await page.click('[role=tab]:has-text("Git")')
+await page.click('[role=tab][aria-label="Git"]')
 gitChecks.sections = await waitFor(async () => {
   const text = await gitPanel.innerText().catch(() => '')
   return /Indexés/i.test(text) && text.includes('staged.txt') && /Modifications/i.test(text) && text.includes('tracked.txt') && text.includes('new.txt')
 })
 gitChecks.branch = await waitFor(async () => /master|main/.test(await gitPanel.innerText()))
-gitChecks.badge = await waitFor(async () => /\d/.test(await page.locator('[role=tab]:has-text("Git")').innerText()))
+gitChecks.badge = await waitFor(async () => /\d/.test(await page.locator('[role=tab][aria-label="Git"]').innerText()))
 await gitRow('tracked.txt').click()
 gitChecks.diffOpens = await waitFor(async () => {
   const text = await diffText()
@@ -284,12 +287,74 @@ gitChecks.stashFiles = await waitFor(async () => (await gitPanel.locator('[title
 await gitPanel.locator('[title^="src/app.ts"]').click()
 gitChecks.stashDiff = await waitFor(async () => (await diffText())?.includes('stashed'), 20000)
 await shot('08-git')
+// Sidebar branch line and the Claude usage footer.
+gitChecks.sidebarBranch = await waitFor(async () => /master|main/.test(await page.locator('aside nav').innerText()))
+const footer = page.locator('footer[aria-label="Quota Claude"]')
+gitChecks.footerNotLoggedIn = await waitFor(async () => (await footer.innerText()).includes('Non connecté'))
+await footer.locator('[aria-label="Rafraîchir le quota"]').click()
+gitChecks.footerRefresh = await waitFor(async () => (await footer.innerText()).includes('Non connecté'))
 console.log('git checks:', gitChecks)
+
+// Orca-style title bar: brand, window buttons, sidebar toggle, shortcuts matched in main.
+const chromeChecks = {}
+chromeChecks.brand = await waitFor(async () => (await page.locator('aside').innerText()).includes('Capitaine'))
+if (process.platform !== 'darwin') {
+  chromeChecks.windowButtons = (await page.locator('[role=group][aria-label="Fenêtre"] button').count()) === 3
+  const isMaximized = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMaximized())
+  await page.click('[aria-label="Agrandir"]')
+  chromeChecks.maximize = await waitFor(isMaximized)
+  // Headless, the virtual screen is 1×1 px, so a "maximized" window is too: click through the DOM.
+  await page.locator('[aria-label="Restaurer"]').dispatchEvent('click')
+  chromeChecks.restore = await waitFor(async () => !(await isMaximized()))
+  const tabsBefore = await page.locator('main header .group.h-8').count()
+  // Through the window's real input path (Playwright's keys skip main's before-input-event).
+  await app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0].webContents
+    contents.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['control', 'shift'] })
+    contents.sendInputEvent({ type: 'keyUp', keyCode: 'T', modifiers: ['control', 'shift'] })
+  })
+  chromeChecks.shortcutViaMain = await waitFor(async () => (await page.locator('main header .group.h-8').count()) === tabsBefore + 1)
+}
+// Where the window can be grabbed: Chromium uses the innermost element that sets an app-region.
+const draggableAt = (x, y) =>
+  page.evaluate(([px, py]) => {
+    for (let node = document.elementFromPoint(px, py); node; node = node.parentElement) {
+      const region = getComputedStyle(node).getPropertyValue('-webkit-app-region') || getComputedStyle(node).webkitAppRegion
+      if (region === 'drag') return true
+      if (region === 'no-drag') return false
+    }
+    return false
+  }, [x, y])
+const centerOf = async (selector) => {
+  const box = await page.locator(selector).first().boundingBox()
+  return box ? [box.x + box.width / 2, box.y + box.height / 2, box.width] : null
+}
+const tabBarGap = await centerOf('main header [data-window-drag]')
+chromeChecks.tabBarDraggable = !!tabBarGap && tabBarGap[2] >= 96 && (await draggableAt(tabBarGap[0], tabBarGap[1]))
+const panelGap = await centerOf('section [data-window-drag]')
+chromeChecks.rightPanelDraggable = !!panelGap && (await draggableAt(panelGap[0], panelGap[1]))
+const aTab = await centerOf('main header .group.h-8')
+chromeChecks.tabsNotDraggable = !!aTab && !(await draggableAt(aTab[0], aTab[1]))
+const brand = await centerOf('aside img')
+chromeChecks.brandDraggable = !!brand && (await draggableAt(brand[0] + 40, brand[1]))
+
+await page.click('[aria-label="Masquer la barre latérale"]')
+chromeChecks.sidebarHidden = await waitFor(async () => (await page.locator('aside').count()) === 0)
+chromeChecks.brandInTabBar = (await page.locator('main header [aria-label="Afficher la barre latérale"]').count()) === 1
+await shot('09-sidebar-collapsed')
+await page.click('[aria-label="Afficher la barre latérale"]')
+chromeChecks.sidebarBack = await waitFor(async () => (await page.locator('aside').count()) === 1)
+await shot('10-title-bar')
+console.log('chrome checks:', chromeChecks)
 
 // destroy() skips beforeunload: a leftover unsaved buffer must never hang the test run.
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.destroy()))
 await app.close()
 console.log('editor checks:', editorChecks)
+if (Object.values(chromeChecks).includes(false)) {
+  console.error('FAIL: title bar')
+  process.exit(1)
+}
 if (Object.values(gitChecks).includes(false)) {
   console.error('FAIL: git panel')
   process.exit(1)
