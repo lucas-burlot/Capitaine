@@ -101,8 +101,10 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
     })
 
     // Reopened after a restart: show what the terminal had on screen, then start the shell below it.
+    // A resumed Claude conversation prints itself again, so its old screen would only repeat it.
     const restored = restoredTerminal(terminalId)
-    if (restored?.scrollback) term.write(restored.scrollback + RESTORED_MARKER)
+    const resumeAgent = restored?.agent ?? undefined
+    if (restored?.scrollback && !resumeAgent?.sessionId) term.write(restored.scrollback + RESTORED_MARKER)
 
     const onFocus = () => useApp.getState().focusPane(terminalId)
     term.textarea?.addEventListener('focus', onFocus)
@@ -119,7 +121,7 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
       return true
     })
 
-    window.capitaine.pty.create({ cwd, restoreCwd: restored?.cwd ?? undefined, cols: term.cols, rows: term.rows }).then(({ id, shell }) => {
+    window.capitaine.pty.create({ cwd, restoreCwd: restored?.cwd ?? undefined, resumeAgent, cols: term.cols, rows: term.rows }).then(({ id, shell }) => {
       if (disposed) {
         window.capitaine.pty.kill(id)
         return

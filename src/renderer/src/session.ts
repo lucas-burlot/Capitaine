@@ -1,7 +1,8 @@
 /**
  * Keeps the open tabs and terminals across app restarts. The layout is saved shortly after every
  * change, the terminals' screens periodically and when the window unloads; on launch the tabs come
- * back and each terminal starts a new shell in the directory it was in, under its old output.
+ * back and each terminal starts a new shell in the directory it was in, under its old output, and
+ * resumes the Claude session that was running in it.
  */
 import type { Project, SavedTerminal, SessionSaveInput } from '@shared/types'
 import { pane, paneIds, removePane, type LayoutNode } from './layout'
@@ -48,7 +49,13 @@ export async function restoreSession(): Promise<void> {
   if (!workspace) return
   for (const id of Object.keys(workspace.terminals)) {
     const terminal = saved.terminals[id]
-    if (terminal) restored.set(id, { cwd: typeof terminal.cwd === 'string' ? terminal.cwd : null, scrollback: String(terminal.scrollback ?? '') })
+    if (!terminal) continue
+    restored.set(id, {
+      cwd: typeof terminal.cwd === 'string' ? terminal.cwd : null,
+      scrollback: String(terminal.scrollback ?? ''),
+      // Already checked by the main process.
+      agent: terminal.agent ?? null
+    })
   }
   useApp.setState((state) => ({
     terminals: { ...workspace.terminals, ...state.terminals },
@@ -102,7 +109,7 @@ function captureSession(state: AppSnapshot): SessionSaveInput {
     terminals[id] = { id, projectId, tabId, number, shellTitle, customTitle }
     // A terminal not mounted yet still has its saved screen: keep it rather than lose it.
     const pending = restored.get(id)
-    screens[id] = snapshotTerminal(id) ?? { ptyId: null, scrollback: pending?.scrollback ?? '' }
+    screens[id] = snapshotTerminal(id) ?? { ptyId: null, scrollback: pending?.scrollback ?? '', agent: pending?.agent ?? null }
   }
   const tabOrder: Record<string, string[]> = {}
   for (const [projectId, ids] of Object.entries(state.tabOrder)) tabOrder[projectId] = ids.filter((id) => tabs[id])
