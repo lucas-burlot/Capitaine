@@ -79,8 +79,8 @@ L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Retrouv
 <tr>
 <td valign="top">
 
-### 🔀 Changements, index et stash
-Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées. Indexe en un clic, ouvre le **diff** d'un fichier, parcours tes **stash**.
+### 🔀 Git, de la branche au push
+Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées. **Change de branche ou crée-en une** depuis le sélecteur, **commite, pousse et récupère** (pull, sync) sans quitter l'app. Le ✨ fait **écrire le message de commit par Claude**, dans le style de tes commits. En cas de conflit, **Claude propose une résolution** que tu relis (et retouches) dans un diff avant de l'accepter.
 
 </td>
 <td valign="top">
@@ -222,6 +222,8 @@ Capitaine est construit avec **Electron**, **React** et **TypeScript**, sur le m
 | [`src/renderer/src/store.ts`](src/renderer/src/store.ts) | Projets, onglets, terminaux, agents |
 | [`src/renderer/src/layout.ts`](src/renderer/src/layout.ts) | L'arbre de division des onglets (côte à côte, en bas) |
 | [`src/main/source-control.ts`](src/main/source-control.ts) | Statut git, indexation, stash, contenu d'un fichier à une révision |
+| [`src/main/git-actions.ts`](src/main/git-actions.ts) | Branches, commit, push, pull, fin de fusion / rebase, résolution de conflits |
+| [`src/main/git-ai.ts`](src/main/git-ai.ts) | Message de commit et résolution de conflit écrits par Claude (via `claude -p`) |
 | [`src/main/file-system.ts`](src/main/file-system.ts) | Listing des dossiers, surveillance des changements, lecture et écriture |
 | [`src/renderer/src/editor/`](src/renderer/src/editor) | Monaco, chargé à la demande, et les sessions d'édition |
 | [`src/main/claude-usage.ts`](src/main/claude-usage.ts) | Le quota Claude, via la connexion de Claude Code |
@@ -247,6 +249,7 @@ En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle
 - **Ton code reste chez toi.** L'interface ne peut lire que les dossiers de tes projets.
 - **Le quota Claude** passe par la connexion de Claude Code (trousseau macOS ou `~/.claude/.credentials.json`). Le jeton reste dans le processus principal, n'est envoyé qu'à `api.anthropic.com` et n'est jamais renouvelé par Capitaine.
 - **Les mises à jour** interrogent uniquement les releases GitHub de ce dépôt.
+- **Les fonctions IA du panneau Git** (message de commit ✨, résolution de conflit) ne partent que quand tu cliques. Elles passent par ta CLI Claude Code (`claude -p`, sans outils) et envoient à Anthropic le diff à décrire ou le fichier en conflit, comme le ferait une session Claude Code.
 - **Tes projets** sont enregistrés dans un simple fichier local (`projects.json`, dans le dossier de données de l'app).
 
 ## 🗺️ Roadmap
@@ -258,7 +261,8 @@ En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle
 - [x] Panneau Git : changements, index, diffs et stash
 - [x] Quota Claude dans le footer
 - [x] Installeurs macOS, Windows, Linux et mises à jour automatiques
-- [ ] Commit, annulation de modifications et actions sur les stash depuis le panneau Git
+- [x] Branches, commit, push, pull et sync depuis le panneau Git, message de commit et résolution de conflits par Claude
+- [ ] Annulation de modifications et actions sur les stash depuis le panneau Git
 - [ ] Éditeur et diff dans une division, à côté d'un terminal
 - [ ] Restaurer les onglets et leur historique au redémarrage
 - [ ] Un worktree git par tâche, pour faire travailler plusieurs agents sans conflit
@@ -291,7 +295,7 @@ Du même endroit que la commande <code>/usage</code> de Claude Code, avec ta con
 <details>
 <summary><b>Capitaine envoie-t-il mon code quelque part ?</b></summary>
 <br />
-Non. Il n'y a pas de serveur Capitaine. Les seules requêtes réseau sont le quota (vers <code>api.anthropic.com</code>) et la recherche de mises à jour (vers GitHub). Voir <a href="#-confidentialité">Confidentialité</a>.
+Il n'y a pas de serveur Capitaine. Les requêtes réseau sont le quota (vers <code>api.anthropic.com</code>), la recherche de mises à jour (vers GitHub) et les commandes git vers tes dépôts distants. Ton code ne part chez Anthropic que si tu cliques sur une fonction IA du panneau Git (message de commit, résolution de conflit) : Capitaine passe alors par ta CLI Claude Code. Voir <a href="#-confidentialité">Confidentialité</a>.
 </details>
 
 <details>

@@ -1,7 +1,16 @@
 import { execFile } from 'node:child_process'
 import { readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative } from 'node:path'
-import type { BranchInfo, DiffSide, GitChange, GitChangeKind, GitStash, GitStashFile, RepoStatus } from '../shared/types'
+import type {
+  BranchInfo,
+  DiffSide,
+  GitChange,
+  GitChangeKind,
+  GitStash,
+  GitStashFile,
+  RepoOperation,
+  RepoStatus
+} from '../shared/types'
 
 interface GitResult {
   ok: boolean
@@ -9,21 +18,48 @@ interface GitResult {
   stderr: string
 }
 
-function git(cwd: string, args: string[], input?: { maxBuffer?: number }): Promise<GitResult> {
+export interface GitOptions {
+  maxBuffer?: number
+  timeout?: number
+  /** Extra environment variables (merged over the app's). */
+  env?: Record<string, string>
+}
+
+/**
+ * Never let git wait on a prompt nobody can answer: no terminal behind us, and an editor would
+ * block forever (`merge --continue`, `commit` without -m…).
+ */
+const NON_INTERACTIVE_ENV = { GIT_TERMINAL_PROMPT: '0', GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true', GIT_MERGE_AUTOEDIT: 'no' }
+
+export function git(cwd: string, args: string[], options?: GitOptions): Promise<GitResult> {
+  const execOptions = {
+    cwd,
+    windowsHide: true,
+    maxBuffer: options?.maxBuffer ?? 64 * 1024 * 1024,
+    timeout: options?.timeout ?? 15_000,
+    encoding: 'utf8' as const,
+    env: { ...process.env, ...NON_INTERACTIVE_ENV, ...options?.env }
+  }
   return new Promise((resolve) => {
-    execFile(
-      'git',
-      ['-c', 'core.quotepath=false', ...args],
-      { cwd, windowsHide: true, maxBuffer: input?.maxBuffer ?? 64 * 1024 * 1024, timeout: 15_000, encoding: 'utf8' },
-      (error, stdout, stderr) => resolve({ ok: !error, stdout: String(stdout), stderr: String(stderr) })
+    execFile('git', ['-c', 'core.quotepath=false', ...args], execOptions, (error, stdout, stderr) =>
+      resolve({ ok: !error, stdout: String(stdout), stderr: String(stderr) })
     )
   })
 }
 
-async function gitOrThrow(cwd: string, args: string[]): Promise<string> {
-  const result = await git(cwd, args)
-  if (!result.ok) throw new Error(result.stderr.trim() || `git ${args[0]} a échoué`)
+export async function gitOrThrow(cwd: string, args: string[], options?: GitOptions): Promise<string> {
+  const result = await git(cwd, args, options)
+  if (!result.ok) throw new Error(gitError(result, args))
   return result.stdout
+}
+
+/** The useful part of a failed git command's output (hints and progress lines dropped). */
+export function gitError(result: GitResult, args: string[]): string {
+  const lines = `${result.stderr}\n${result.stdout}`
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('hint:') && !/^(remote: )?(Counting|Compressing|Enumerating|Writing|Total|Delta)/.test(line))
+  return lines.slice(0, 6).join('\n') || `git ${args[0]} a échoué`
 }
 
 /** Above this many changed files the lists stop growing (a giant build dir committed by mistake). */
@@ -72,11 +108,13 @@ export async function repoStatus(cwd: string): Promise<RepoStatus | null> {
   if (!top.ok) return null
   const repoRoot = top.stdout.trim()
 
-  const [status, unstagedCounts, stagedCounts, stashes] = await Promise.all([
+  const [status, unstagedCounts, stagedCounts, stashes, remotes, operation] = await Promise.all([
     gitOrThrow(repoRoot, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all']),
     git(repoRoot, ['diff', '--numstat', '-z']),
     git(repoRoot, ['diff', '--cached', '--numstat', '-z']),
-    git(repoRoot, ['stash', 'list', '--format=%gd'])
+    git(repoRoot, ['stash', 'list', '--format=%gd']),
+    git(repoRoot, ['remote']),
+    operationInProgress(repoRoot)
   ])
   const unstagedLines = parseNumstat(unstagedCounts.stdout)
   const stagedLines = parseNumstat(stagedCounts.stdout)
@@ -92,7 +130,10 @@ export async function repoStatus(cwd: string): Promise<RepoStatus | null> {
     unstaged: [],
     conflicts: [],
     truncated: false,
-    stashCount: stashes.ok ? stashes.stdout.split('\n').filter(Boolean).length : 0
+    stashCount: stashes.ok ? stashes.stdout.split('\n').filter(Boolean).length : 0,
+    operation: operation?.kind ?? null,
+    operationLabel: operation?.label ?? null,
+    hasRemote: remotes.ok && remotes.stdout.trim() !== ''
   }
 
   const push = (list: GitChange[], change: GitChange) => {
@@ -144,7 +185,7 @@ export async function repoStatus(cwd: string): Promise<RepoStatus | null> {
     }
     if (type === 'u') {
       const fields = record.split(' ')
-      push(result.conflicts, { path: fields.slice(10).join(' '), kind: 'conflict', added: null, removed: null })
+      push(result.conflicts, { path: fields.slice(10).join(' '), kind: 'conflict', added: null, removed: null, conflictCode: fields[1] })
     }
   }
   return result
@@ -247,9 +288,7 @@ type Blob = { kind: 'text'; content: string } | { kind: 'missing' } | { kind: 'b
 
 /** Working-tree file, by repo-relative path; anything resolving outside the repo is refused. */
 async function readWorktree(repoRoot: string, repoPath: string): Promise<Blob> {
-  const abs = join(repoRoot, repoPath)
-  const rel = relative(repoRoot, abs)
-  if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw new Error('Chemin hors du dépôt')
+  const abs = insideRepo(repoRoot, repoPath)
   const info = await stat(abs).catch(() => null)
   if (!info?.isFile()) return { kind: 'missing' }
   if (info.size > MAX_BLOB_BYTES) return { kind: 'binary' }
@@ -261,6 +300,7 @@ async function readWorktree(repoRoot: string, repoPath: string): Promise<Blob> {
 /** One side of a diff: working tree, `head` (last commit), `index` (staged), or inside a stash. */
 export async function showBlob(repoRoot: string, side: DiffSide): Promise<Blob> {
   if (side.source === 'worktree') return readWorktree(repoRoot, side.path)
+  if (side.source === 'resolution') throw new Error('Résolution non enregistrée')
   if (side.source === 'stash' && !STASH_REF.test(side.ref)) throw new Error('Stash invalide')
   const rev =
     side.source === 'head' ? 'HEAD' : side.source === 'index' ? '' : side.part === 'base' ? `${side.ref}^1` : side.part === 'untracked' ? `${side.ref}^3` : side.ref
@@ -269,4 +309,42 @@ export async function showBlob(repoRoot: string, side: DiffSide): Promise<Blob> 
   if (!result.ok) return { kind: 'missing' }
   if (result.stdout.slice(0, 8000).includes('\0')) return { kind: 'binary' }
   return { kind: 'text', content: result.stdout }
+}
+
+/** Absolute `.git` directory (a worktree's own one, where its merge / rebase state lives). */
+export async function gitDir(repoRoot: string): Promise<string | null> {
+  const out = await git(repoRoot, ['rev-parse', '--absolute-git-dir'])
+  return out.ok ? out.stdout.trim() : null
+}
+
+const exists = (path: string) => stat(path).then(() => true, () => false)
+const readText = (path: string) => readFile(path, 'utf8').then((text) => text.trim(), () => '')
+
+/** Merge / rebase / cherry-pick / revert left half-way, read from the state files git keeps. */
+export async function operationInProgress(repoRoot: string): Promise<{ kind: RepoOperation; label: string } | null> {
+  const dir = await gitDir(repoRoot)
+  if (!dir) return null
+  for (const rebaseDir of ['rebase-merge', 'rebase-apply']) {
+    if (!(await exists(join(dir, rebaseDir)))) continue
+    const head = (await readText(join(dir, rebaseDir, 'head-name'))).replace(/^refs\/heads\//, '')
+    const onto = await readText(join(dir, rebaseDir, 'onto'))
+    const ontoName = onto ? (await git(repoRoot, ['name-rev', '--name-only', '--no-undefined', '--exclude=*/HEAD', onto])).stdout.trim() || onto.slice(0, 8) : ''
+    const step = await readText(join(dir, rebaseDir, 'msgnum'))
+    const total = await readText(join(dir, rebaseDir, 'end'))
+    const progress = step && total ? ` (${step}/${total})` : ''
+    return { kind: 'rebase', label: `Rebase de ${head || 'HEAD'}${ontoName ? ` sur ${ontoName.replace(/^remotes\//, '')}` : ''}${progress}` }
+  }
+  const firstLine = async (file: string) => (await readText(join(dir, file))).split('\n')[0] ?? ''
+  if (await exists(join(dir, 'MERGE_HEAD'))) return { kind: 'merge', label: (await firstLine('MERGE_MSG')) || 'Fusion en cours' }
+  if (await exists(join(dir, 'CHERRY_PICK_HEAD'))) return { kind: 'cherry-pick', label: `Cherry-pick : ${await firstLine('MERGE_MSG')}` }
+  if (await exists(join(dir, 'REVERT_HEAD'))) return { kind: 'revert', label: `Revert : ${await firstLine('MERGE_MSG')}` }
+  return null
+}
+
+/** Repo-relative path → absolute path inside the repo; anything resolving outside it is refused. */
+export function insideRepo(repoRoot: string, repoPath: string): string {
+  const abs = join(repoRoot, repoPath)
+  const rel = relative(repoRoot, abs)
+  if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw new Error('Chemin hors du dépôt')
+  return abs
 }
