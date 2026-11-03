@@ -158,6 +158,16 @@ export interface CommitOptions {
   amend?: boolean
 }
 
+export interface StashOptions {
+  message: string
+  /** `git stash -u`: new files go into the stash too. */
+  includeUntracked: boolean
+  /** `git stash --staged`: only what is staged (git 2.35+). */
+  stagedOnly: boolean
+  /** Only these repo-relative paths (the rest of the changes stay). */
+  paths?: string[]
+}
+
 /** An AI-proposed resolution of one conflicted file, waiting for review. */
 export interface ConflictResolution {
   path: string
@@ -328,6 +338,10 @@ export interface CapitaineApi {
     takeSide(projectId: string, path: string, side: 'current' | 'incoming'): Promise<void>
     /** Writes a resolved file and stages it. */
     writeResolution(projectId: string, path: string, content: string): Promise<void>
+    stashPush(projectId: string, options: StashOptions): Promise<GitActionResult>
+    /** `hash` guards against `stash@{n}` having shifted since the list was read. `drop`: pop. */
+    stashApply(projectId: string, ref: string, hash: string, drop: boolean): Promise<GitActionResult>
+    stashDrop(projectId: string, ref: string, hash: string): Promise<GitActionResult>
     ai: {
       /** Commit message for the staged changes (all changes when `all`), written by Claude. */
       commitMessage(projectId: string, all: boolean): Promise<string>
