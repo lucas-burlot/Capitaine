@@ -11,6 +11,18 @@ export interface PtyCreateOptions {
   rows: number
   /** Directory the shell was in last session; used instead of `cwd` when it still exists. */
   restoreCwd?: string
+  /** Claude session to bring back: the shell starts in its folder and relaunches it once ready. */
+  resumeAgent?: SavedAgent
+}
+
+/** A Claude Code session that was open in a terminal. */
+export interface SavedAgent {
+  /** Null when Claude was open but the conversation had no message yet: it reopens fresh. */
+  sessionId: string | null
+  /** Where Claude ran; its conversations are stored per folder. */
+  cwd: string
+  /** Launch options carried over (permission mode, model, effort). */
+  args: string[]
 }
 
 export interface PtyCreateResult {
@@ -25,6 +37,8 @@ export interface SessionTerminalInput {
   ptyId: string | null
   /** Screen and scrollback, serialized as escape sequences. */
   scrollback: string
+  /** Without a live shell: the Claude session still waiting to be relaunched, kept as is. */
+  agent?: SavedAgent | null
 }
 
 export interface SessionSaveInput {
@@ -36,6 +50,8 @@ export interface SessionSaveInput {
 export interface SavedTerminal {
   cwd: string | null
   scrollback: string
+  /** Claude session running in it when saved. */
+  agent?: SavedAgent | null
 }
 
 /** What was open when the app last closed, so it can come back on the next launch. */

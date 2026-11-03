@@ -5,7 +5,8 @@ import { readlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import type { WebContents } from 'electron'
 import * as pty from 'node-pty'
-import type { PtyCreateOptions, PtyCreateResult } from '../shared/types'
+import type { PtyCreateOptions, PtyCreateResult, SavedAgent } from '../shared/types'
+import { resumeCommand, sanitizeAgent } from './claude-sessions'
 import { buildShellEnv, resolveDefaultShell } from './shell'
 
 interface Session {
@@ -14,12 +15,23 @@ interface Session {
   buffer: string
   flushTimer: NodeJS.Timeout | null
   foreground: string
+  /** Claude session typed at startup, until it has had time to register itself. */
+  relaunched: { agent: SavedAgent; at: number; started: boolean } | null
+  /** The shell's own process name. */
+  shellName: string
 }
 
 // Coalesce bursts of output (e.g. `cat` on a big file) into fewer IPC messages.
 const FLUSH_INTERVAL_MS = 4
 // node-pty only knows the real foreground process on macOS/Linux; on Windows it is always the shell.
 const PROCESS_POLL_MS = process.platform === 'win32' ? 0 : 1500
+const SHELL_READY_POLL_MS = 150
+// Fallback readiness when the terminal mode can't be read: startup output quiet for this long.
+const SHELL_SETTLE_MS = 400
+// Slow rc files (plugin managers…) get this long before the command is typed anyway.
+const SHELL_READY_TIMEOUT_MS = 10_000
+// How long a relaunched Claude counts as running before it shows up in its session file.
+const RELAUNCH_GRACE_MS = 30_000
 
 export class PtyManager {
   private readonly sessions = new Map<string, Session>()
@@ -27,7 +39,9 @@ export class PtyManager {
 
   create(owner: WebContents, options: PtyCreateOptions): PtyCreateResult {
     const shell = resolveDefaultShell()
-    const cwd = [options.restoreCwd, options.cwd].find((dir) => !!dir && isDirectory(dir)) ?? homedir()
+    const agent = options.resumeAgent ? sanitizeAgent(options.resumeAgent) : null
+    // Claude finds its conversation from the folder it is started in.
+    const cwd = agent?.cwd ?? [options.restoreCwd, options.cwd].find((dir) => !!dir && isDirectory(dir)) ?? homedir()
     const id = randomUUID()
 
     const proc = pty.spawn(shell.file, shell.args, {
@@ -38,9 +52,10 @@ export class PtyManager {
       env: buildShellEnv()
     })
 
-    const session: Session = { process: proc, owner, buffer: '', flushTimer: null, foreground: proc.process }
+    const session: Session = { process: proc, owner, buffer: '', flushTimer: null, foreground: proc.process, shellName: proc.process, relaunched: agent && { agent, at: Date.now(), started: false } }
     this.sessions.set(id, session)
     this.ensurePolling()
+    if (agent) this.typeWhenReady(id, session, agent)
 
     proc.onData((data) => {
       session.buffer += data
@@ -82,6 +97,17 @@ export class PtyManager {
     } catch {
       // Already gone.
     }
+  }
+
+  /** The shell's process id, to find what runs under it. */
+  pidOf(id: string): number | null {
+    return this.sessions.get(id)?.process.pid ?? null
+  }
+
+  /** The Claude session relaunched in this terminal moments ago, if it may not be visible yet. */
+  relaunchedAgentOf(id: string): SavedAgent | null {
+    const relaunched = this.sessions.get(id)?.relaunched
+    return relaunched && Date.now() - relaunched.at < RELAUNCH_GRACE_MS ? relaunched.agent : null
   }
 
   /** The shell's current directory (null on Windows, or when it can't be read). */
@@ -135,9 +161,40 @@ export class PtyManager {
         }
         if (name === session.foreground) continue
         session.foreground = name
+        // The relaunched Claude came and went: the terminal is a plain shell again.
+        if (session.relaunched && name !== session.shellName) session.relaunched.started = true
+        else if (session.relaunched?.started) session.relaunched = null
         if (!session.owner.isDestroyed()) session.owner.send('pty:process', id, name)
       }
     }, PROCESS_POLL_MS)
+  }
+
+  /**
+   * Types the resume command once the shell's line editor is reading the keyboard. Typed during
+   * the rc files, the terminal would echo it once and the prompt draw it again.
+   */
+  private typeWhenReady(id: string, session: Session, agent: SavedAgent): void {
+    const startedAt = Date.now()
+    let lastOutputAt = 0
+    const output = session.process.onData(() => {
+      lastOutputAt = Date.now()
+    })
+    const tick = async () => {
+      if (this.sessions.get(id) !== session) return output.dispose()
+      const editing = await lineEditorActive(session.process)
+      if (this.sessions.get(id) !== session) return output.dispose()
+      const now = Date.now()
+      // Without a way to tell (Windows), a shell quiet for a moment after printing is ready enough.
+      const settled = editing === null && lastOutputAt > 0 && now - lastOutputAt >= SHELL_SETTLE_MS
+      if (!editing && !settled && now - startedAt < SHELL_READY_TIMEOUT_MS) {
+        setTimeout(tick, SHELL_READY_POLL_MS)
+        return
+      }
+      output.dispose()
+      session.relaunched = { agent, at: now, started: false }
+      session.process.write(`${resumeCommand(agent)}\r`)
+    }
+    setTimeout(tick, SHELL_READY_POLL_MS)
   }
 
   private flush(id: string): void {
@@ -155,6 +212,21 @@ export class PtyManager {
 }
 
 const LSOF_TIMEOUT_MS = 1500
+
+/**
+ * Whether the shell's line editor (zle, readline…) owns the terminal: it turns canonical mode off,
+ * the kernel's line discipline keeps it on while rc files run. Null when it can't be told.
+ */
+function lineEditorActive(proc: pty.IPty): Promise<boolean | null> {
+  // Not in node-pty's typings, but exposed by its Unix implementation.
+  const tty = (proc as { ptsName?: unknown }).ptsName
+  if (process.platform === 'win32' || typeof tty !== 'string' || !tty.startsWith('/dev/')) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    execFile('stty', [process.platform === 'darwin' ? '-f' : '-F', tty, '-a'], { timeout: 1000 }, (error, stdout) =>
+      resolve(error ? null : /(^|\s)-icanon(\s|;|$)/.test(stdout))
+    )
+  })
+}
 
 function lsofArgs(pid: number): string[] {
   return ['-a', '-p', String(pid), '-d', 'cwd', '-Fn']
