@@ -10,6 +10,7 @@ const labels = {
   splitDown: isMac ? '⌘⇧D' : 'Ctrl+Shift+E',
   nextPane: isMac ? '⌘⌥→' : 'Ctrl+Alt+→',
   toggleExplorer: isMac ? '⌘B' : 'Ctrl+Shift+B',
+  findFile: isMac ? '⌘P' : 'Ctrl+Shift+P',
   toggleSidebar: isMac ? '⌘⇧S' : 'Ctrl+Shift+S'
 }
 

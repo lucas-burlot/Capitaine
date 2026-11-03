@@ -62,6 +62,8 @@ export function App() {
           return app.cyclePane(-1)
         case 'toggle-explorer':
           return useExplorer.getState().toggleOpen()
+        case 'find-file':
+          return useExplorer.getState().focusSearch()
         case 'toggle-sidebar':
           return useExplorer.getState().toggleSidebar()
         case 'add-project':

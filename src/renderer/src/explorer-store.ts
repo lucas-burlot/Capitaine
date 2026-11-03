@@ -25,6 +25,10 @@ interface ExplorerState {
   toggleOpen(): void
   /** Shows the panel on that view (opening it if hidden). */
   showView(view: RightPanelView): void
+  /** Bumped to put the keyboard in the file search. */
+  searchFocusRequest: number
+  /** Opens the files view and focuses its search field. */
+  focusSearch(): void
   loadDir(projectId: string, dir: string): Promise<void>
   toggleDir(projectId: string, dir: string): void
   collapseAll(projectId: string, root: string): void
@@ -110,6 +114,13 @@ export const useExplorer = create<ExplorerState>((set, get) => ({
     localStorage.setItem(VIEW_KEY, view)
     localStorage.setItem(OPEN_KEY, '1')
     set({ view, open: true })
+  },
+
+  searchFocusRequest: 0,
+
+  focusSearch() {
+    get().showView('files')
+    set((s) => ({ searchFocusRequest: s.searchFocusRequest + 1 }))
   },
 
   async loadDir(projectId, dir) {
