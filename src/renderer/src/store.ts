@@ -21,7 +21,8 @@ export interface TerminalPane {
 export interface DiffTarget {
   /** Identity: reopening the same diff brings its tab back. */
   key: string
-  area: 'unstaged' | 'staged' | 'conflict' | 'stash'
+  /** `resolution`: an AI conflict resolution under review (file with markers → proposal). */
+  area: 'unstaged' | 'staged' | 'conflict' | 'stash' | 'resolution'
   /** Repo-relative path. */
   path: string
   repoRoot: string
@@ -111,7 +112,8 @@ const DIFF_AREA_LABEL: Record<DiffTarget['area'], string> = {
   unstaged: 'modifs',
   staged: 'indexé',
   conflict: 'conflit',
-  stash: 'stash'
+  stash: 'stash',
+  resolution: 'résolution IA'
 }
 
 export function tabLabel(state: Pick<AppState, 'terminals'>, tab: Tab): string {

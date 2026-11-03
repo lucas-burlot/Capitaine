@@ -6,7 +6,9 @@ import { installAppMenu, installShortcutHandler, popupAppMenu } from './menu'
 import { claudeUsage } from './claude-usage'
 import { checkForUpdates, downloadUpdate, installUpdate, openReleasesPage, setupUpdater, updateState } from './updater'
 import { branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './source-control'
-import type { DiffSide } from '../shared/types'
+import type { CommitOptions, DiffSide } from '../shared/types'
+import { commit, createBranch, fetchAll, finishOperation, listBranches, pull, push, switchBranch, takeSide, writeResolution } from './git-actions'
+import { generateCommitMessage, resolveConflict } from './git-ai'
 import { ProjectStore } from './project-store'
 import { PtyManager } from './pty-manager'
 import { SessionStore } from './session-store'
@@ -161,6 +163,31 @@ function registerIpc(): void {
     const root = projectPath(projectId)
     return root ? branchInfo(root) : null
   })
+  const text = (value: unknown) => (typeof value === 'string' ? value : '')
+  ipcMain.handle('git:branches', async (_e, projectId: string) => listBranches(await repoOf(projectId)))
+  ipcMain.handle('git:switch', async (_e, projectId: string, name: unknown) => switchBranch(await repoOf(projectId), text(name)))
+  ipcMain.handle('git:create-branch', async (_e, projectId: string, name: unknown, from: unknown) =>
+    createBranch(await repoOf(projectId), text(name), text(from) || undefined)
+  )
+  ipcMain.handle('git:commit', async (_e, projectId: string, options: Partial<CommitOptions> | undefined) =>
+    commit(await repoOf(projectId), { message: text(options?.message), all: options?.all === true, amend: options?.amend === true })
+  )
+  ipcMain.handle('git:push', async (_e, projectId: string) => push(await repoOf(projectId)))
+  ipcMain.handle('git:pull', async (_e, projectId: string) => pull(await repoOf(projectId)))
+  ipcMain.handle('git:fetch', async (_e, projectId: string) => fetchAll(await repoOf(projectId)))
+  ipcMain.handle('git:finish-operation', async (_e, projectId: string, how: unknown) =>
+    finishOperation(await repoOf(projectId), how === 'abort' ? 'abort' : 'continue')
+  )
+  ipcMain.handle('git:take-side', async (_e, projectId: string, path: unknown, side: unknown) =>
+    takeSide(await repoOf(projectId), text(path), side === 'incoming' ? 'incoming' : 'current')
+  )
+  ipcMain.handle('git:write-resolution', async (_e, projectId: string, path: unknown, content: unknown) =>
+    writeResolution(await repoOf(projectId), text(path), text(content))
+  )
+  ipcMain.handle('git:ai-commit-message', async (_e, projectId: string, all: unknown) =>
+    generateCommitMessage(await repoOf(projectId), all === true)
+  )
+  ipcMain.handle('git:ai-resolve', async (_e, projectId: string, path: unknown) => resolveConflict(await repoOf(projectId), text(path)))
   ipcMain.handle('claude:usage', (_e, force: unknown) => claudeUsage(force === true))
   ipcMain.handle('updater:state', () => updateState())
   ipcMain.on('updater:check', () => void checkForUpdates(true))

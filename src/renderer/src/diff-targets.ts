@@ -33,3 +33,16 @@ export function repoAbsolutePath(repoRoot: string, path: string): string {
   const sep = repoRoot.includes('\\') ? '\\' : '/'
   return `${repoRoot}${sep}${sep === '\\' ? path.replace(/\//g, '\\') : path}`
 }
+
+/** Review of an AI conflict resolution: the file as it is (with markers) → the proposal. */
+export function resolutionDiff(repoRoot: string, path: string): DiffTarget {
+  return {
+    key: `resolution::${path}`,
+    area: 'resolution',
+    path,
+    repoRoot,
+    stashRef: null,
+    original: { source: 'worktree', path },
+    modified: { source: 'resolution', path }
+  }
+}

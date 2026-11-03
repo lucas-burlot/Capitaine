@@ -96,7 +96,15 @@ export interface GitChange {
   /** Line counts; null for binary or untracked files. */
   added: number | null
   removed: number | null
+  /**
+   * Conflicts only: git's two-letter code (`UU` both modified, `AA` both added, `UD` deleted by
+   * them, `DU` deleted by us…). Only `UU`/`AA` leave conflict markers in the file.
+   */
+  conflictCode?: string
 }
+
+/** A multi-step git operation left half-way, usually by conflicts. */
+export type RepoOperation = 'merge' | 'rebase' | 'cherry-pick' | 'revert'
 
 export interface RepoStatus {
   repoRoot: string
@@ -112,6 +120,50 @@ export interface RepoStatus {
   /** More changes than the lists show. */
   truncated: boolean
   stashCount: number
+  /** Merge / rebase / cherry-pick / revert in progress. */
+  operation: RepoOperation | null
+  /** Human description of that operation ("Merge branch 'x' into main"). */
+  operationLabel: string | null
+  /** The repo has at least one remote (push / pull make sense). */
+  hasRemote: boolean
+}
+
+/** A local or remote-tracking branch, for the branch picker. */
+export interface GitBranch {
+  /** Short name: `main`, `origin/feature`. */
+  name: string
+  remote: boolean
+  current: boolean
+  upstream: string | null
+  ahead: number
+  behind: number
+  /** Epoch ms of the tip commit. */
+  updatedAt: number
+  subject: string
+}
+
+/** What a commit / push / pull / sync did, for the confirmation line. */
+export interface GitActionResult {
+  message: string
+  /** The action stopped on conflicts (pull, continue…): the status now lists them. */
+  conflicts?: boolean
+}
+
+export type CommitFollowUp = 'none' | 'push' | 'sync'
+
+export interface CommitOptions {
+  message: string
+  /** Nothing staged: stage every change first (VS Code's "smart commit"). */
+  all: boolean
+  amend?: boolean
+}
+
+/** An AI-proposed resolution of one conflicted file, waiting for review. */
+export interface ConflictResolution {
+  path: string
+  content: string
+  /** One or two sentences on what was kept from each side. */
+  explanation: string
 }
 
 export interface GitStash {
@@ -137,6 +189,8 @@ export type DiffSide =
   | { source: 'head'; path: string }
   | { source: 'index'; path: string }
   | { source: 'stash'; ref: string; part: 'base' | 'stash' | 'untracked'; path: string }
+  /** An AI conflict resolution held by the renderer until accepted (never read from git). */
+  | { source: 'resolution'; path: string }
 
 export type BlobContent = { kind: 'text'; content: string } | { kind: 'missing' } | { kind: 'binary' }
 
@@ -259,6 +313,26 @@ export interface CapitaineApi {
     show(projectId: string, side: DiffSide): Promise<BlobContent>
     /** Null when the project isn't in a git repo. */
     branch(projectId: string): Promise<BranchInfo | null>
+    branches(projectId: string): Promise<GitBranch[]>
+    /** Local branch, or a remote one (a tracking local branch is created). */
+    switchBranch(projectId: string, name: string): Promise<GitActionResult>
+    /** `from`: branch to start from; HEAD when omitted. */
+    createBranch(projectId: string, name: string, from?: string): Promise<GitActionResult>
+    commit(projectId: string, options: CommitOptions): Promise<GitActionResult>
+    push(projectId: string): Promise<GitActionResult>
+    pull(projectId: string): Promise<GitActionResult>
+    fetch(projectId: string): Promise<GitActionResult>
+    /** Ends the merge / rebase in progress: `continue` once every conflict is staged, or `abort`. */
+    finishOperation(projectId: string, how: 'continue' | 'abort'): Promise<GitActionResult>
+    /** Resolves a conflict with one side entirely, and stages it. */
+    takeSide(projectId: string, path: string, side: 'current' | 'incoming'): Promise<void>
+    /** Writes a resolved file and stages it. */
+    writeResolution(projectId: string, path: string, content: string): Promise<void>
+    ai: {
+      /** Commit message for the staged changes (all changes when `all`), written by Claude. */
+      commitMessage(projectId: string, all: boolean): Promise<string>
+      resolveConflict(projectId: string, path: string): Promise<ConflictResolution>
+    }
   }
   claude: {
     /** `force`: the refresh button (still throttled to protect the rate-limited endpoint). */

@@ -54,7 +54,21 @@ const api: CapitaineApi = {
     stashes: (projectId) => ipcRenderer.invoke('git:stashes', projectId),
     stashFiles: (projectId, ref) => ipcRenderer.invoke('git:stash-files', projectId, ref),
     show: (projectId, side) => ipcRenderer.invoke('git:show', projectId, side),
-    branch: (projectId) => ipcRenderer.invoke('git:branch', projectId)
+    branch: (projectId) => ipcRenderer.invoke('git:branch', projectId),
+    branches: (projectId) => ipcRenderer.invoke('git:branches', projectId),
+    switchBranch: (projectId, name) => ipcRenderer.invoke('git:switch', projectId, name),
+    createBranch: (projectId, name, from) => ipcRenderer.invoke('git:create-branch', projectId, name, from),
+    commit: (projectId, options) => ipcRenderer.invoke('git:commit', projectId, options),
+    push: (projectId) => ipcRenderer.invoke('git:push', projectId),
+    pull: (projectId) => ipcRenderer.invoke('git:pull', projectId),
+    fetch: (projectId) => ipcRenderer.invoke('git:fetch', projectId),
+    finishOperation: (projectId, how) => ipcRenderer.invoke('git:finish-operation', projectId, how),
+    takeSide: (projectId, path, side) => ipcRenderer.invoke('git:take-side', projectId, path, side),
+    writeResolution: (projectId, path, content) => ipcRenderer.invoke('git:write-resolution', projectId, path, content),
+    ai: {
+      commitMessage: (projectId, all) => ipcRenderer.invoke('git:ai-commit-message', projectId, all),
+      resolveConflict: (projectId, path) => ipcRenderer.invoke('git:ai-resolve', projectId, path)
+    }
   },
   claude: {
     usage: (force) => ipcRenderer.invoke('claude:usage', force)

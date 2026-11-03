@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Columns2, FilePen, Minus, Plus, Rows2 } from 'lucide-react'
+import { Check, Columns2, FilePen, LoaderCircle, Minus, Plus, RotateCw, Rows2, Sparkles, X } from 'lucide-react'
 import type { BlobContent, DiffSide } from '@shared/types'
 import { repoAbsolutePath } from '../diff-targets'
 import { monaco } from '../editor/monaco-setup'
-import { useGit } from '../git-store'
+import { resolutionKey, useGit } from '../git-store'
+import { aiResolvable } from './GitOperationBanner'
 import { useApp, type DiffTarget } from '../store'
 
 interface Props {
@@ -17,7 +18,8 @@ const AREA_LABEL: Record<DiffTarget['area'], string> = {
   unstaged: 'Modifications (index → fichier)',
   staged: 'Indexé (dernier commit → index)',
   conflict: 'Conflit (dernier commit → fichier)',
-  stash: 'Stash'
+  stash: 'Stash',
+  resolution: 'Proposition de Claude (fichier en conflit → résolu)'
 }
 
 const SIDE_BY_SIDE_KEY = 'capitaine.diffSideBySide'
@@ -25,6 +27,11 @@ const SIDE_BY_SIDE_KEY = 'capitaine.diffSideBySide'
 type Loaded = { state: 'loading' } | { state: 'ready' } | { state: 'binary' } | { state: 'error'; message: string }
 
 async function readSide(projectId: string, side: DiffSide): Promise<BlobContent> {
+  if (side.source === 'resolution') {
+    const held = useGit.getState().resolutions[resolutionKey(projectId, side.path)]
+    if (held?.state !== 'ready') throw new Error('Cette proposition n’existe plus : relance la résolution')
+    return { kind: 'text', content: held.resolution.content }
+  }
   return window.capitaine.git.show(projectId, side)
 }
 
@@ -37,6 +44,12 @@ export default function DiffView({ tabId, projectId, diff, visible }: Props) {
   const [sideBySide, setSideBySide] = useState(() => localStorage.getItem(SIDE_BY_SIDE_KEY) !== '0')
   // Stashes never change; working-tree and index diffs follow the repo's status.
   const version = useGit((s) => (diff.area === 'stash' ? 0 : (s.version[projectId] ?? 0)))
+  // A proposal under review is editable, and re-read only when Claude writes a new one.
+  const reviewing = diff.area === 'resolution'
+  const proposal = useGit((s) => {
+    const held = reviewing ? s.resolutions[resolutionKey(projectId, diff.path)] : undefined
+    return held?.state === 'ready' ? held.resolution : null
+  })
 
   useEffect(() => {
     const container = containerRef.current
@@ -48,7 +61,7 @@ export default function DiffView({ tabId, projectId, diff, visible }: Props) {
     const editor = monaco.editor.createDiffEditor(container, {
       theme: 'capitaine',
       automaticLayout: true,
-      readOnly: true,
+      readOnly: !reviewing,
       originalEditable: false,
       renderSideBySide: localStorage.getItem(SIDE_BY_SIDE_KEY) !== '0',
       useInlineViewWhenSpaceIsLimited: true,
@@ -71,7 +84,7 @@ export default function DiffView({ tabId, projectId, diff, visible }: Props) {
       editorRef.current = null
       modelsRef.current = null
     }
-  }, [tabId, diff.path])
+  }, [tabId, diff.path, reviewing])
 
   useEffect(() => {
     let cancelled = false
@@ -96,7 +109,7 @@ export default function DiffView({ tabId, projectId, diff, visible }: Props) {
     return () => {
       cancelled = true
     }
-  }, [projectId, diff, version])
+  }, [projectId, diff, reviewing ? 0 : version, proposal]) // a review must not lose the user's edits on every poll
 
   useEffect(() => {
     editorRef.current?.updateOptions({ renderSideBySide: sideBySide })
@@ -112,6 +125,14 @@ export default function DiffView({ tabId, projectId, diff, visible }: Props) {
       // display:none, not visibility: Monaco forces `visibility: visible` on some layers, which would bleed through.
     >
       <DiffHeader projectId={projectId} diff={diff} sideBySide={sideBySide} onToggleLayout={() => setSideBySide(!sideBySide)} />
+      {reviewing && (
+        <ResolutionBar
+          projectId={projectId}
+          path={diff.path}
+          explanation={proposal?.explanation ?? ''}
+          content={() => modelsRef.current?.modified.getValue() ?? proposal?.content ?? ''}
+        />
+      )}
       <div ref={containerRef} className={`min-h-0 flex-1 ${loaded.state === 'ready' || loaded.state === 'loading' ? '' : 'hidden'}`} />
       {loaded.state === 'binary' && (
         <p className="flex flex-1 items-center justify-center text-[13px] text-muted">Fichier binaire : pas de diff texte.</p>
@@ -129,7 +150,7 @@ function DiffHeader(props: { projectId: string; diff: DiffTarget; sideBySide: bo
   const stillThere = useGit((s) => {
     const status = s.status[projectId]
     if (!status || diff.area === 'stash') return true
-    const list = diff.area === 'staged' ? status.staged : diff.area === 'conflict' ? status.conflicts : status.unstaged
+    const list = diff.area === 'staged' ? status.staged : diff.area === 'conflict' || diff.area === 'resolution' ? status.conflicts : status.unstaged
     return list.some((c) => c.path === diff.path)
   })
   const absolute = repoAbsolutePath(diff.repoRoot, diff.path)
@@ -153,6 +174,7 @@ function DiffHeader(props: { projectId: string; diff: DiffTarget; sideBySide: bo
           <Minus size={13} /> Désindexer
         </HeaderButton>
       )}
+      {diff.area === 'conflict' && stillThere && <ConflictActions projectId={projectId} path={diff.path} />}
       {diff.area !== 'stash' && (
         <HeaderButton title="Ouvrir le fichier dans l’éditeur" onClick={() => useApp.getState().openFile(projectId, absolute)}>
           <FilePen size={13} />
@@ -174,5 +196,80 @@ function HeaderButton(props: { title: string; onClick(): void; children: React.R
     >
       {props.children}
     </button>
+  )
+}
+
+/** Conflict diff header: hand it to Claude, keep one side whole, or mark it resolved as it is. */
+function ConflictActions({ projectId, path }: { projectId: string; path: string }) {
+  const code = useGit((s) => s.status[projectId]?.conflicts.find((c) => c.path === path)?.conflictCode)
+  const resolution = useGit((s) => s.resolutions[resolutionKey(projectId, path)])
+  const busy = useGit((s) => !!s.busy[`${projectId}:${path}`])
+  const git = useGit.getState()
+  return (
+    <>
+      {aiResolvable(code) && (
+        <button
+          disabled={resolution?.state === 'pending'}
+          onClick={() => void git.resolveWithAi(projectId, path)}
+          title="Claude propose une version fusionnée, que tu relis avant de l’appliquer"
+          className="flex shrink-0 items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 text-[11.5px] font-medium text-accent hover:bg-accent/25 disabled:opacity-70"
+        >
+          {resolution?.state === 'pending' ? <LoaderCircle size={12} className="animate-spin" /> : <Sparkles size={12} />}
+          {resolution?.state === 'pending' ? 'Claude résout…' : 'Résoudre avec l’IA'}
+        </button>
+      )}
+      <HeaderButton title="Garder la version courante (HEAD) en entier" onClick={() => !busy && void git.takeSide(projectId, path, 'current')}>
+        Garder la courante
+      </HeaderButton>
+      <HeaderButton title="Garder la version entrante en entier" onClick={() => !busy && void git.takeSide(projectId, path, 'incoming')}>
+        Garder l’entrante
+      </HeaderButton>
+      <HeaderButton title="Le fichier est résolu tel qu’il est sur le disque : l’indexer" onClick={() => !busy && void git.stage(projectId, [path])}>
+        <Check size={13} /> Résolu
+      </HeaderButton>
+    </>
+  )
+}
+
+/** Under the header of a proposal under review: Claude's explanation, then accept / retry / reject. */
+function ResolutionBar(props: { projectId: string; path: string; explanation: string; content(): string }) {
+  const { projectId, path } = props
+  const state = useGit((s) => s.resolutions[resolutionKey(projectId, path)]?.state)
+  const busy = useGit((s) => !!s.busy[`${projectId}:${path}`])
+  const git = useGit.getState()
+  return (
+    <div className="flex shrink-0 items-start gap-2 border-b border-accent/20 bg-accent/[0.06] px-3 py-2 text-[12px]">
+      <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" />
+      <p className="min-w-0 flex-1 leading-relaxed text-muted">
+        {state === 'pending'
+          ? 'Claude réécrit sa proposition…'
+          : state === 'ready'
+            ? props.explanation || 'Proposition prête.'
+            : 'Cette proposition n’existe plus.'}
+        {state === 'ready' && <span className="text-faint"> Tu peux la retoucher à droite avant de l’accepter.</span>}
+      </p>
+      <button
+        disabled={state === 'pending'}
+        onClick={() => void git.resolveWithAi(projectId, path, { review: false })}
+        title="Demander une autre proposition"
+        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px] text-muted hover:bg-line hover:text-fg disabled:opacity-50"
+      >
+        <RotateCw size={12} className={state === 'pending' ? 'animate-spin' : ''} /> Régénérer
+      </button>
+      <button
+        onClick={() => git.discardResolution(projectId, path)}
+        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px] text-muted hover:bg-line hover:text-fg"
+      >
+        <X size={12} /> Rejeter
+      </button>
+      <button
+        disabled={state !== 'ready' || busy}
+        onClick={() => void git.acceptResolution(projectId, path, props.content())}
+        title="Écrire cette version dans le fichier et l’indexer"
+        className="flex shrink-0 items-center gap-1 rounded-md bg-accent px-2.5 py-0.5 text-[11.5px] font-medium text-bg hover:brightness-110 disabled:bg-line disabled:text-faint"
+      >
+        {busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />} Accepter et indexer
+      </button>
+    </div>
   )
 }

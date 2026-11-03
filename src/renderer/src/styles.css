@@ -48,3 +48,23 @@ body,
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Claude writing into a field: a slow gold sweep across it. */
+.commit-shimmer {
+  background-image: linear-gradient(100deg, transparent 20%, rgb(226 192 141 / 0.09) 50%, transparent 80%);
+  background-size: 220% 100%;
+  animation: commit-shimmer 1.6s linear infinite;
+}
+@keyframes commit-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .commit-shimmer {
+    animation: none;
+  }
+}

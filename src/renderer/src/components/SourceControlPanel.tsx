@@ -1,8 +1,12 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Archive, ChevronRight, FilePen, GitBranch, Minus, Plus, TriangleAlert } from 'lucide-react'
+import { Archive, ChevronRight, FilePen, LoaderCircle, Minus, Plus, Sparkles, TriangleAlert } from 'lucide-react'
 import type { GitChange, GitChangeKind, GitStash, Project, RepoStatus } from '@shared/types'
-import { changeDiff, repoAbsolutePath, stashFileDiff } from '../diff-targets'
-import { useGit } from '../git-store'
+import { changeDiff, repoAbsolutePath, resolutionDiff, stashFileDiff } from '../diff-targets'
+import { resolutionKey, useGit } from '../git-store'
+import { relativeTime } from '../relative-time'
+import { CommitBox } from './CommitBox'
+import { GitBranchBar } from './GitBranchBar'
+import { aiResolvable, GitOperationBanner } from './GitOperationBanner'
 import { fileName, useApp } from '../store'
 import { PATHS_MIME } from './FileExplorer'
 import { EntryIcon } from './FileIcon'
@@ -20,7 +24,9 @@ export function SourceControlPanel({ project }: { project: Project }) {
   const clean = status.staged.length + status.unstaged.length + status.conflicts.length === 0
   return (
     <div className="min-h-0 flex-1 overflow-auto pb-2" aria-label="Changements git">
-      <BranchLine status={status} />
+      <GitBranchBar project={project} status={status} />
+      <CommitBox project={project} status={status} />
+      <GitOperationBanner project={project} status={status} />
       {error && (
         <div className="mx-2 mb-1 flex gap-1.5 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[11.5px] text-red-300">
           <TriangleAlert size={12} className="mt-0.5 shrink-0" />
@@ -41,32 +47,6 @@ export function SourceControlPanel({ project }: { project: Project }) {
       )}
       {clean && <p className="px-4 pb-2 text-[12px] text-faint">Aucun changement : l’arbre de travail est propre.</p>}
       <StashSection project={project} status={status} />
-    </div>
-  )
-}
-
-function BranchLine({ status }: { status: RepoStatus }) {
-  return (
-    <div className="flex items-center gap-1.5 px-3 py-2 text-[12px] text-fg" title={status.upstream ? `Suit ${status.upstream}` : 'Pas de branche distante'}>
-      <GitBranch size={13} className="shrink-0 text-accent" />
-      <span className="min-w-0 truncate font-medium">{status.branch ?? 'HEAD détachée'}</span>
-      {status.upstream && (status.ahead > 0 || status.behind > 0) && (
-        <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted">
-          {status.ahead > 0 && (
-            <span className="flex items-center" title={`${status.ahead} commit(s) à pousser`}>
-              <ArrowUp size={11} />
-              {status.ahead}
-            </span>
-          )}
-          {status.behind > 0 && (
-            <span className="flex items-center" title={`${status.behind} commit(s) à récupérer`}>
-              <ArrowDown size={11} />
-              {status.behind}
-            </span>
-          )}
-        </span>
-      )}
-      {!status.upstream && <span className="shrink-0 text-[10.5px] text-faint">locale</span>}
     </div>
   )
 }
@@ -108,8 +88,10 @@ function ChangeRow({ project, status, area, change }: { project: Project; status
     const tab = s.tabs[s.activeTabByProject[project.id] ?? '']
     return tab?.kind === 'diff' && tab.diff?.key === `${area}::${change.path}`
   })
-  const { stage, unstage } = useGit.getState()
+  const resolution = useGit((s) => (area === 'conflict' ? s.resolutions[resolutionKey(project.id, change.path)] : undefined))
+  const { stage, unstage, resolveWithAi } = useGit.getState()
   const absolute = repoAbsolutePath(status.repoRoot, change.path)
+  const canAiResolve = area === 'conflict' && aiResolvable(change.conflictCode)
   const dir = change.path.includes('/') ? change.path.slice(0, change.path.lastIndexOf('/')) : ''
 
   return (
@@ -133,11 +115,17 @@ function ChangeRow({ project, status, area, change }: { project: Project; status
         {fileName(change.path)}
       </span>
       <span className="min-w-0 flex-1 truncate text-[11px] text-faint">{dir}</span>
+      {resolution && <ResolutionBadge projectId={project.id} repoRoot={status.repoRoot} path={change.path} state={resolution} />}
       <span className="flex shrink-0 items-center gap-0.5 group-hover:hidden">
         <LineCounts change={change} />
         <span className={`w-3 text-center text-[10px] font-semibold ${KIND_COLOR[change.kind]}`}>{KIND_LETTER[change.kind]}</span>
       </span>
       <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+        {canAiResolve && resolution?.state !== 'pending' && resolution?.state !== 'ready' && (
+          <HoverAction title="Résoudre avec l’IA (tu valides la proposition avant qu’elle soit appliquée)" onClick={() => void resolveWithAi(project.id, change.path)}>
+            <Sparkles size={12} className="text-accent" />
+          </HoverAction>
+        )}
         {change.kind !== 'deleted' && (
           <HoverAction title="Ouvrir le fichier" onClick={() => useApp.getState().openFile(project.id, absolute)}>
             <FilePen size={12} />
@@ -148,12 +136,46 @@ function ChangeRow({ project, status, area, change }: { project: Project; status
             <Minus size={13} />
           </HoverAction>
         ) : (
-          <HoverAction title="Indexer" disabled={busy} onClick={() => void stage(project.id, [change.path])}>
+          <HoverAction
+            title={area === 'conflict' ? 'Marquer comme résolu (indexer le fichier tel quel)' : 'Indexer'}
+            disabled={busy}
+            onClick={() => void stage(project.id, [change.path])}
+          >
             <Plus size={13} />
           </HoverAction>
         )}
       </span>
     </div>
+  )
+}
+
+function ResolutionBadge(props: { projectId: string; repoRoot: string; path: string; state: NonNullable<ReturnType<typeof useGit.getState>['resolutions'][string]> }) {
+  const { state } = props
+  if (state.state === 'pending') {
+    return (
+      <span className="flex shrink-0 items-center gap-1 text-[10.5px] text-accent" title="Claude prépare une résolution…">
+        <LoaderCircle size={11} className="animate-spin" /> IA
+      </span>
+    )
+  }
+  if (state.state === 'error') {
+    return (
+      <span className="shrink-0 text-red-400" title={`Résolution IA impossible : ${state.message}`}>
+        <TriangleAlert size={11} />
+      </span>
+    )
+  }
+  return (
+    <button
+      title="Proposition de Claude prête : clic pour la relire et l’accepter"
+      onClick={(e) => {
+        e.stopPropagation()
+        useApp.getState().openDiff(props.projectId, resolutionDiff(props.repoRoot, props.path))
+      }}
+      className="flex shrink-0 items-center gap-0.5 rounded bg-accent/15 px-1 text-[10px] font-medium text-accent hover:bg-accent/25"
+    >
+      <Sparkles size={9} /> à valider
+    </button>
   )
 }
 
@@ -283,15 +305,4 @@ const KIND_COLOR: Record<GitChangeKind, string> = {
   'type-changed': 'text-amber-300',
   untracked: 'text-emerald-300',
   conflict: 'text-red-400'
-}
-
-function relativeTime(timestamp: number): string {
-  const minutes = Math.round((Date.now() - timestamp) / 60000)
-  if (minutes < 1) return 'à l’instant'
-  if (minutes < 60) return `il y a ${minutes} min`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `il y a ${hours} h`
-  const days = Math.round(hours / 24)
-  if (days < 30) return `il y a ${days} j`
-  return new Date(timestamp).toLocaleDateString()
 }

@@ -10,6 +10,8 @@ import { SourceControlPanel } from './SourceControlPanel'
 import { customTitleBar, titleBarHeightClass, WindowControlsSpacer } from './TitleBar'
 
 const GIT_POLL_MS = 3000
+/** Background `git fetch`, so the panel knows when there is something to pull. */
+const GIT_FETCH_MS = 3 * 60_000
 // With window buttons on the right the spacer provides the gap; otherwise a small right padding.
 const WINDOW_CONTROLS_PAD = customTitleBar ? '' : 'pr-1.5'
 
@@ -38,9 +40,7 @@ export function RightPanel({ project }: { project: Project }) {
         {view === 'files' ? (
           <FileExplorerActions project={project} />
         ) : (
-          <IconButton title="Rafraîchir" onClick={() => void useGit.getState().refresh(project.id)}>
-            <RefreshCw size={13} />
-          </IconButton>
+          <GitRefreshButton projectId={project.id} />
         )}
         <IconButton title={`Masquer le panneau (${shortcutLabel('toggleExplorer')})`} onClick={toggleOpen}>
           <PanelRightClose size={13} />
@@ -72,6 +72,24 @@ function ViewTab(props: { view: RightPanelView; current: RightPanelView; icon: R
   )
 }
 
+/** Re-reads the repo, and fetches the remotes too (the panel also does it every few minutes). */
+function GitRefreshButton({ projectId }: { projectId: string }) {
+  const fetching = useGit((s) => !!s.fetching[projectId])
+  const hasRemote = useGit((s) => !!s.status[projectId]?.hasRemote)
+  return (
+    <IconButton
+      title={hasRemote ? 'Rafraîchir et récupérer les branches distantes (fetch)' : 'Rafraîchir'}
+      onClick={() => {
+        const git = useGit.getState()
+        if (hasRemote) void git.fetch(projectId, false)
+        else void git.refresh(projectId)
+      }}
+    >
+      <RefreshCw size={13} className={fetching ? 'animate-spin' : ''} />
+    </IconButton>
+  )
+}
+
 function GitBadge({ projectId }: { projectId: string }) {
   const count = useGit((s) => {
     const status = s.status[projectId]
@@ -88,8 +106,13 @@ function GitBadge({ projectId }: { projectId: string }) {
 function useGitPolling(projectId: string) {
   useEffect(() => {
     const refresh = () => void useGit.getState().refresh(projectId)
+    const fetchRemote = () => {
+      if (document.hasFocus() && useGit.getState().status[projectId]?.hasRemote) void useGit.getState().fetch(projectId, true)
+    }
     refresh()
     const timer = setInterval(() => document.hasFocus() && refresh(), GIT_POLL_MS)
+    const fetchTimer = setInterval(fetchRemote, GIT_FETCH_MS)
+    const firstFetch = setTimeout(fetchRemote, 4000)
     let debounce: ReturnType<typeof setTimeout> | undefined
     const offChanged = window.capitaine.files.onChanged(() => {
       clearTimeout(debounce)
@@ -98,6 +121,8 @@ function useGitPolling(projectId: string) {
     window.addEventListener('focus', refresh)
     return () => {
       clearInterval(timer)
+      clearInterval(fetchTimer)
+      clearTimeout(firstFetch)
       clearTimeout(debounce)
       offChanged()
       window.removeEventListener('focus', refresh)
