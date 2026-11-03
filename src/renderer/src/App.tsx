@@ -9,6 +9,7 @@ import { Sidebar } from './components/Sidebar'
 import { useExplorer } from './explorer-store'
 import { Workspace } from './components/Workspace'
 import { startAgentNotifications } from './agent-notifications'
+import { restoreSession, startSessionPersistence } from './session'
 import { useApp } from './store'
 
 export function App() {
@@ -19,7 +20,23 @@ export function App() {
   useEffect(() => startAgentNotifications(), [])
 
   useEffect(() => {
-    void useApp.getState().loadProjects()
+    let cancelled = false
+    let stopPersistence = () => {}
+    useApp
+      .getState()
+      .loadProjects()
+      .then(restoreSession)
+      .catch((error: unknown) => console.error('[capitaine] failed to restore the session', error))
+      .finally(() => {
+        if (!cancelled) stopPersistence = startSessionPersistence()
+      })
+    return () => {
+      cancelled = true
+      stopPersistence()
+    }
+  }, [])
+
+  useEffect(() => {
     return window.capitaine.onMenuCommand((command) => {
       const app = useApp.getState()
       switch (command) {

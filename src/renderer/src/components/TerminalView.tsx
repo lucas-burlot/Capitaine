@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { SquareTerminal, X } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { SerializeAddon } from '@xterm/addon-serialize'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { parseAgentStatus, PROGRAM_STATUS_QUERY_REPLY } from '../agent-status'
 import { attachPty } from '../pty-bus'
 import { pathsForTerminal } from '../shell-quote'
+import { forgetRestoredTerminal, restoredTerminal } from '../session'
 import { registerTerminal } from '../terminal-registry'
 import { isMac } from '../platform'
 import type { Rect } from '../layout'
@@ -28,6 +30,11 @@ interface Props {
 }
 
 const RESIZE_DEBOUNCE_MS = 120
+// Lines of history kept across restarts (the live terminal keeps more).
+const SAVED_SCROLLBACK_LINES = 2000
+// A restored shell printing its first prompt in a background tab isn't news worth a dot.
+const RESTORED_QUIET_MS = 3000
+const RESTORED_MARKER = '\x1b[0m\r\n\x1b[2m── session précédente ──\x1b[0m\r\n'
 
 /** Keys the app menu handles; xterm must not swallow them. */
 function isAppShortcut(event: KeyboardEvent): boolean {
@@ -61,6 +68,8 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
+    const serializer = new SerializeAddon()
+    term.loadAddon(serializer)
     term.loadAddon(new WebLinksAddon((_event, uri) => window.open(uri, '_blank')))
     term.attachCustomKeyEventHandler((event) => !isAppShortcut(event))
     term.open(container)
@@ -75,13 +84,25 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
 
     termRef.current = term
     fitRef.current = fit
-    const unregister = registerTerminal(terminalId, { paste: (text) => term.paste(text), focus: () => term.focus() })
     safeFit(fit)
 
     const store = useApp.getState()
     let ptyId: string | null = null
     let disposed = false
     let detach = () => {}
+    const unregister = registerTerminal(terminalId, {
+      paste: (text) => term.paste(text),
+      focus: () => term.focus(),
+      snapshot: () => ({
+        ptyId,
+        // Modes and the alternate screen (vim, less…) belong to programs that won't be running anymore.
+        scrollback: serializer.serialize({ scrollback: SAVED_SCROLLBACK_LINES, excludeModes: true, excludeAltBuffer: true })
+      })
+    })
+
+    // Reopened after a restart: show what the terminal had on screen, then start the shell below it.
+    const restored = restoredTerminal(terminalId)
+    if (restored?.scrollback) term.write(restored.scrollback + RESTORED_MARKER)
 
     const onFocus = () => useApp.getState().focusPane(terminalId)
     term.textarea?.addEventListener('focus', onFocus)
@@ -98,18 +119,20 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
       return true
     })
 
-    window.capitaine.pty.create({ cwd, cols: term.cols, rows: term.rows }).then(({ id, shell }) => {
+    window.capitaine.pty.create({ cwd, restoreCwd: restored?.cwd ?? undefined, cols: term.cols, rows: term.rows }).then(({ id, shell }) => {
       if (disposed) {
         window.capitaine.pty.kill(id)
         return
       }
       ptyId = id
+      forgetRestoredTerminal(terminalId)
+      const quietUntil = restored ? Date.now() + RESTORED_QUIET_MS : 0
       term.onData((data) => window.capitaine.pty.write(id, data))
       term.onResize(({ cols, rows }) => window.capitaine.pty.resize(id, cols, rows))
       detach = attachPty(id, {
         onData: (data) => {
           term.write(data)
-          if (!isTerminalVisible(useApp.getState(), terminalId)) useApp.getState().markUnread(terminalId)
+          if (Date.now() >= quietUntil && !isTerminalVisible(useApp.getState(), terminalId)) useApp.getState().markUnread(terminalId)
         },
         onProcess: (name) => {
           // Back at the shell prompt: whatever agent ran here is gone, even if it never said so.

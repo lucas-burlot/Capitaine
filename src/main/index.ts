@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
-import type { PtyCreateOptions } from '../shared/types'
+import type { PtyCreateOptions, SessionSaveInput } from '../shared/types'
 import { DirectoryWatchers, gitStatus, isInside, listDirectory, readTextFile, writeTextFile } from './file-system'
 import { installAppMenu, installShortcutHandler, popupAppMenu } from './menu'
 import { claudeUsage } from './claude-usage'
@@ -9,6 +9,7 @@ import { branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, s
 import type { DiffSide } from '../shared/types'
 import { ProjectStore } from './project-store'
 import { PtyManager } from './pty-manager'
+import { SessionStore } from './session-store'
 import icon from '../../resources/icon.png?asset'
 
 const isDev = !app.isPackaged
@@ -17,6 +18,7 @@ let quitRequested = false
 const ptys = new PtyManager()
 const watchers = new DirectoryWatchers()
 let projects: ProjectStore
+let session: SessionStore
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -166,6 +168,13 @@ function registerIpc(): void {
 
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
 
+  ipcMain.handle('session:load', () => session.load())
+  ipcMain.on('session:save', (_e, input: SessionSaveInput) => void session.save(input))
+  // Sent while the window unloads: the shells die right after, so their directories are read now.
+  ipcMain.on('session:save-sync', (event, input: SessionSaveInput) => {
+    session.saveSync(input)
+    event.returnValue = true
+  })
   ipcMain.handle('pty:create', (event, options: PtyCreateOptions) => ptys.create(event.sender, options))
   ipcMain.on('pty:write', (_e, id: string, data: string) => ptys.write(id, data))
   ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => ptys.resize(id, cols, rows))
@@ -205,6 +214,7 @@ app.whenReady().then(() => {
   app.setName('Capitaine')
   if (process.platform === 'darwin' && isDev) app.dock?.setIcon(icon)
   projects = new ProjectStore()
+  session = new SessionStore(ptys)
   registerIpc()
   installAppMenu(isDev)
   createWindow()
