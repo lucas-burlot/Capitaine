@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import type { CommitOptions, GitActionResult, GitBranch } from '../shared/types'
+import type { CommitOptions, GitActionResult, GitBranch, StashOptions } from '../shared/types'
 import { branchInfo, git, gitError, gitOrThrow, insideRepo, operationInProgress, type GitOptions } from './source-control'
 
 /** Network operations get far longer than the local ones (slow remotes, big fetches, hooks). */
@@ -211,4 +211,80 @@ export async function takeSide(repoRoot: string, path: string, side: 'current' |
 export async function writeResolution(repoRoot: string, path: string, content: string): Promise<void> {
   await writeFile(insideRepo(repoRoot, path), content, 'utf8')
   await gitOrThrow(repoRoot, ['add', '--', path])
+}
+
+export async function stashPush(repoRoot: string, options: StashOptions): Promise<GitActionResult> {
+  const unresolved = await unmergedPaths(repoRoot)
+  if (unresolved.length) throw new Error('Résous les conflits avant de stasher')
+  const args = ['stash', 'push']
+  if (options.stagedOnly) args.push('--staged')
+  else if (options.includeUntracked) args.push('--include-untracked')
+  const message = options.message.trim()
+  if (message) args.push('-m', message)
+  const paths = options.paths ?? []
+  for (const path of paths) insideRepo(repoRoot, path)
+  if (paths.length) args.push('--', ...paths)
+  const stashTip = async () => (await git(repoRoot, ['rev-parse', '--verify', '--quiet', 'refs/stash'])).stdout.trim()
+  const before = await stashTip()
+  const result = await git(repoRoot, args)
+  if (!result.ok) {
+    if (options.stagedOnly && /unknown option|--staged/.test(result.stderr)) throw new Error('« Uniquement les fichiers indexés » demande git 2.35 ou plus récent')
+    throw new Error(gitError(result, args))
+  }
+  // git exits 0 when there was nothing to save (in the user's language): look at the stash itself.
+  if ((await stashTip()) === before) throw new Error('Rien à stasher')
+  return { message: `Stash créé${message ? ` : ${message}` : ''}` }
+}
+
+/**
+ * `stash@{n}` indexes shift whenever a stash is added or dropped: act only if the ref still
+ * points at the stash the user clicked.
+ */
+async function checkStash(repoRoot: string, ref: string, hash: string): Promise<void> {
+  if (!/^stash@\{\d+\}$/.test(ref)) throw new Error('Stash invalide')
+  const current = await git(repoRoot, ['rev-parse', '--verify', '--quiet', ref])
+  if (current.stdout.trim() !== hash) throw new Error('La liste des stash a changé entre-temps : réessaie')
+}
+
+/** Applies a stash onto the working tree; `drop` also removes it (pop) when it applied cleanly. */
+export async function stashApply(repoRoot: string, ref: string, hash: string, drop: boolean): Promise<GitActionResult> {
+  await checkStash(repoRoot, ref, hash)
+  const args = ['stash', drop ? 'pop' : 'apply', ref]
+  const result = await git(repoRoot, args)
+  if (!result.ok) {
+    const conflicts = await unmergedPaths(repoRoot)
+    if (!conflicts.length) {
+      const blocking = await dirtyFilesTouchedBy(repoRoot, ref)
+      if (blocking.length) {
+        const names = blocking.slice(0, 3).join(', ') + (blocking.length > 3 ? ` et ${blocking.length - 3} autre(s)` : '')
+        throw new Error(`Le stash modifie des fichiers que tu as changés depuis : ${names}. Commite-les ou stashe-les avant de l’appliquer.`)
+      }
+    }
+    if (conflicts.length) {
+      return { message: `Stash appliqué avec ${plural(conflicts.length, 'conflit', 'conflits')} à résoudre${drop ? ' (il est conservé)' : ''}`, conflicts: true }
+    }
+    throw new Error(gitError(result, args))
+  }
+  return { message: drop ? 'Stash appliqué et supprimé' : 'Stash appliqué (toujours dans la liste)' }
+}
+
+/** Files the stash changes that also have uncommitted changes (git refuses to apply over them). */
+async function dirtyFilesTouchedBy(repoRoot: string, ref: string): Promise<string[]> {
+  const [tracked, untracked, dirty] = await Promise.all([
+    git(repoRoot, ['diff', '--name-only', '-z', `${ref}^1`, ref]),
+    git(repoRoot, ['ls-tree', '-r', '--name-only', '-z', `${ref}^3`]),
+    git(repoRoot, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
+  ])
+  const touched = new Set([...tracked.stdout.split('\0'), ...(untracked.ok ? untracked.stdout.split('\0') : [])].filter(Boolean))
+  const changed = dirty.stdout
+    .split('\0')
+    .filter((entry) => entry.length > 3)
+    .map((entry) => entry.slice(3))
+  return changed.filter((path) => touched.has(path))
+}
+
+export async function stashDrop(repoRoot: string, ref: string, hash: string): Promise<GitActionResult> {
+  await checkStash(repoRoot, ref, hash)
+  await gitOrThrow(repoRoot, ['stash', 'drop', ref])
+  return { message: `Stash supprimé (${hash.slice(0, 7)})` }
 }

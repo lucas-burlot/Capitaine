@@ -6,8 +6,22 @@ import { installAppMenu, installShortcutHandler, popupAppMenu } from './menu'
 import { claudeUsage } from './claude-usage'
 import { checkForUpdates, downloadUpdate, installUpdate, openReleasesPage, setupUpdater, updateState } from './updater'
 import { branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './source-control'
-import type { CommitOptions, DiffSide } from '../shared/types'
-import { commit, createBranch, fetchAll, finishOperation, listBranches, pull, push, switchBranch, takeSide, writeResolution } from './git-actions'
+import type { CommitOptions, DiffSide, StashOptions } from '../shared/types'
+import {
+  commit,
+  createBranch,
+  fetchAll,
+  finishOperation,
+  listBranches,
+  pull,
+  push,
+  stashApply,
+  stashDrop,
+  stashPush,
+  switchBranch,
+  takeSide,
+  writeResolution
+} from './git-actions'
 import { generateCommitMessage, resolveConflict } from './git-ai'
 import { ProjectStore } from './project-store'
 import { PtyManager } from './pty-manager'
@@ -183,6 +197,20 @@ function registerIpc(): void {
   )
   ipcMain.handle('git:write-resolution', async (_e, projectId: string, path: unknown, content: unknown) =>
     writeResolution(await repoOf(projectId), text(path), text(content))
+  )
+  ipcMain.handle('git:stash-push', async (_e, projectId: string, options: Partial<StashOptions> | undefined) =>
+    stashPush(await repoOf(projectId), {
+      message: text(options?.message),
+      includeUntracked: options?.includeUntracked === true,
+      stagedOnly: options?.stagedOnly === true,
+      paths: repoPaths(options?.paths)
+    })
+  )
+  ipcMain.handle('git:stash-apply', async (_e, projectId: string, ref: unknown, hash: unknown, drop: unknown) =>
+    stashApply(await repoOf(projectId), text(ref), text(hash), drop === true)
+  )
+  ipcMain.handle('git:stash-drop', async (_e, projectId: string, ref: unknown, hash: unknown) =>
+    stashDrop(await repoOf(projectId), text(ref), text(hash))
   )
   ipcMain.handle('git:ai-commit-message', async (_e, projectId: string, all: unknown) =>
     generateCommitMessage(await repoOf(projectId), all === true)

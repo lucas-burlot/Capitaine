@@ -80,7 +80,7 @@ L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Retrouv
 <td valign="top">
 
 ### 🔀 Git, de la branche au push
-Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées. **Change de branche ou crée-en une** depuis le sélecteur, **commite, pousse et récupère** (pull, sync) sans quitter l'app. Le ✨ fait **écrire le message de commit par Claude**, dans le style de tes commits. En cas de conflit, **Claude propose une résolution** que tu relis (et retouches) dans un diff avant de l'accepter.
+Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées. **Change de branche ou crée-en une** depuis le sélecteur, **commite, pousse et récupère** (pull, sync) sans quitter l'app. Le ✨ fait **écrire le message de commit par Claude**, dans le style de tes commits. En cas de conflit, **Claude propose une résolution** que tu relis (et retouches) dans un diff avant de l'accepter. **Mets tes changements de côté** dans un stash (tout, un seul fichier ou l'index), puis applique-le en le gardant, ou supprime-le.
 
 </td>
 <td valign="top">
@@ -222,7 +222,7 @@ Capitaine est construit avec **Electron**, **React** et **TypeScript**, sur le m
 | [`src/renderer/src/store.ts`](src/renderer/src/store.ts) | Projets, onglets, terminaux, agents |
 | [`src/renderer/src/layout.ts`](src/renderer/src/layout.ts) | L'arbre de division des onglets (côte à côte, en bas) |
 | [`src/main/source-control.ts`](src/main/source-control.ts) | Statut git, indexation, stash, contenu d'un fichier à une révision |
-| [`src/main/git-actions.ts`](src/main/git-actions.ts) | Branches, commit, push, pull, fin de fusion / rebase, résolution de conflits |
+| [`src/main/git-actions.ts`](src/main/git-actions.ts) | Branches, commit, push, pull, stash, fin de fusion / rebase, résolution de conflits |
 | [`src/main/git-ai.ts`](src/main/git-ai.ts) | Message de commit et résolution de conflit écrits par Claude (via `claude -p`) |
 | [`src/main/file-system.ts`](src/main/file-system.ts) | Listing des dossiers, surveillance des changements, lecture et écriture |
 | [`src/renderer/src/editor/`](src/renderer/src/editor) | Monaco, chargé à la demande, et les sessions d'édition |
@@ -262,7 +262,8 @@ En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle
 - [x] Quota Claude dans le footer
 - [x] Installeurs macOS, Windows, Linux et mises à jour automatiques
 - [x] Branches, commit, push, pull et sync depuis le panneau Git, message de commit et résolution de conflits par Claude
-- [ ] Annulation de modifications et actions sur les stash depuis le panneau Git
+- [x] Stash depuis le panneau Git : mettre de côté (tout, un fichier ou l'index seul), appliquer, pop, supprimer
+- [ ] Annulation de modifications depuis le panneau Git
 - [ ] Éditeur et diff dans une division, à côté d'un terminal
 - [ ] Restaurer les onglets et leur historique au redémarrage
 - [ ] Un worktree git par tâche, pour faire travailler plusieurs agents sans conflit

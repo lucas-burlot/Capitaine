@@ -1,10 +1,20 @@
 import { create } from 'zustand'
-import type { BranchInfo, CommitFollowUp, ConflictResolution, GitActionResult, GitBranch, GitStash, GitStashFile, RepoStatus } from '@shared/types'
+import type {
+  BranchInfo,
+  CommitFollowUp,
+  ConflictResolution,
+  GitActionResult,
+  GitBranch,
+  GitStash,
+  GitStashFile,
+  RepoStatus,
+  StashOptions
+} from '@shared/types'
 import { resolutionDiff } from './diff-targets'
 import { useApp } from './store'
 
 /** The one repo-changing action running for a project (they would step on each other). */
-export type GitPending = 'commit' | 'push' | 'pull' | 'sync' | 'switch' | 'branch' | 'continue' | 'abort'
+export type GitPending = 'commit' | 'push' | 'pull' | 'sync' | 'switch' | 'branch' | 'continue' | 'abort' | 'stash'
 
 export interface GitNotice {
   tone: 'ok' | 'warn'
@@ -57,6 +67,10 @@ interface GitState {
   createBranch(projectId: string, name: string, from?: string): Promise<boolean>
   finishOperation(projectId: string, how: 'continue' | 'abort'): Promise<void>
   takeSide(projectId: string, path: string, side: 'current' | 'incoming'): Promise<void>
+  stashPush(projectId: string, options: StashOptions): Promise<boolean>
+  /** `drop`: pop (apply, then remove it from the list). */
+  applyStash(projectId: string, stash: GitStash, drop: boolean): Promise<void>
+  dropStash(projectId: string, stash: GitStash): Promise<void>
   resolveWithAi(projectId: string, path: string, options?: { review: boolean }): Promise<void>
   acceptResolution(projectId: string, path: string, content: string): Promise<void>
   discardResolution(projectId: string, path: string): void
@@ -107,6 +121,7 @@ export const useGit = create<GitState>((set, get) => ({
         const status = await window.capitaine.git.status(projectId)
         const previous = get().status[projectId]
         const changed = JSON.stringify(previous) !== JSON.stringify(status)
+        // The stash count moves with every push / pop / drop, which also shifts the `stash@{n}` refs.
         const stashesStale = status && (previous?.stashCount !== status.stashCount || !get().stashes[projectId])
         const stashes = stashesStale ? await window.capitaine.git.stashes(projectId) : get().stashes[projectId]
         set((s) => ({
@@ -233,6 +248,18 @@ export const useGit = create<GitState>((set, get) => ({
   async takeSide(projectId, path, side) {
     await withBusy(projectId, [path], () => window.capitaine.git.takeSide(projectId, path, side))
     get().discardResolution(projectId, path)
+  },
+
+  async stashPush(projectId, options) {
+    return run(projectId, 'stash', () => window.capitaine.git.stashPush(projectId, options))
+  },
+
+  async applyStash(projectId, stash, drop) {
+    await run(projectId, 'stash', () => window.capitaine.git.stashApply(projectId, stash.ref, stash.hash, drop))
+  },
+
+  async dropStash(projectId, stash) {
+    await run(projectId, 'stash', () => window.capitaine.git.stashDrop(projectId, stash.ref, stash.hash))
   },
 
   async resolveWithAi(projectId, path, options = { review: true }) {

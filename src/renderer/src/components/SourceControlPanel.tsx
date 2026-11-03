@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Archive, ChevronRight, FilePen, LoaderCircle, Minus, Plus, Sparkles, TriangleAlert } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Archive, ArchiveArrowDown, ArchiveRestore, ChevronRight, FilePen, LoaderCircle, Minus, PackageOpen, Plus, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
 import type { GitChange, GitChangeKind, GitStash, Project, RepoStatus } from '@shared/types'
 import { changeDiff, repoAbsolutePath, resolutionDiff, stashFileDiff } from '../diff-targets'
 import { resolutionKey, useGit } from '../git-store'
@@ -15,6 +15,7 @@ import { EntryIcon } from './FileIcon'
 export function SourceControlPanel({ project }: { project: Project }) {
   const status = useGit((s) => s.status[project.id])
   const error = useGit((s) => s.errors[project.id])
+  const [stashFormOpen, setStashFormOpen] = useState(false)
 
   if (status === undefined) return <p className="px-3 py-3 text-[12px] text-faint">Lecture de git…</p>
   if (status === null) {
@@ -40,13 +41,20 @@ export function SourceControlPanel({ project }: { project: Project }) {
         <ChangeSection project={project} status={status} area="conflict" title="Conflits" changes={status.conflicts} />
       )}
       {status.staged.length > 0 && (
-        <ChangeSection project={project} status={status} area="staged" title="Indexés" changes={status.staged} />
+        <ChangeSection project={project} status={status} area="staged" title="Indexés" changes={status.staged} onStash={() => setStashFormOpen(true)} />
       )}
       {(status.unstaged.length > 0 || clean) && (
-        <ChangeSection project={project} status={status} area="unstaged" title="Modifications" changes={status.unstaged} />
+        <ChangeSection
+          project={project}
+          status={status}
+          area="unstaged"
+          title="Modifications"
+          changes={status.unstaged}
+          onStash={() => setStashFormOpen(true)}
+        />
       )}
       {clean && <p className="px-4 pb-2 text-[12px] text-faint">Aucun changement : l’arbre de travail est propre.</p>}
-      <StashSection project={project} status={status} />
+      <StashSection project={project} status={status} formOpen={stashFormOpen} setFormOpen={setStashFormOpen} />
     </div>
   )
 }
@@ -57,15 +65,22 @@ interface SectionProps {
   area: 'staged' | 'unstaged' | 'conflict'
   title: string
   changes: GitChange[]
+  /** Opens the "stash my changes" form. */
+  onStash?(): void
 }
 
-function ChangeSection({ project, status, area, title, changes }: SectionProps) {
+function ChangeSection({ project, status, area, title, changes, onStash }: SectionProps) {
   const [open, setOpen] = useState(true)
   const { stage, unstage } = useGit.getState()
   const paths = changes.map((c) => c.path)
   return (
     <section className="mb-1">
       <SectionHeader open={open} onToggle={() => setOpen(!open)} title={title} count={changes.length}>
+        {onStash && changes.length > 0 && (
+          <HoverAction title="Mettre les modifications de côté (stash)…" onClick={onStash}>
+            <ArchiveArrowDown size={13} />
+          </HoverAction>
+        )}
         {area === 'staged' && changes.length > 0 && (
           <HoverAction title="Tout désindexer" onClick={() => void unstage(project.id, paths)}>
             <Minus size={13} />
@@ -124,6 +139,17 @@ function ChangeRow({ project, status, area, change }: { project: Project; status
         {canAiResolve && resolution?.state !== 'pending' && resolution?.state !== 'ready' && (
           <HoverAction title="Résoudre avec l’IA (tu valides la proposition avant qu’elle soit appliquée)" onClick={() => void resolveWithAi(project.id, change.path)}>
             <Sparkles size={12} className="text-accent" />
+          </HoverAction>
+        )}
+        {area !== 'conflict' && (
+          <HoverAction
+            title="Stasher ce fichier seul (le reste ne bouge pas)"
+            disabled={busy}
+            onClick={() =>
+              void useGit.getState().stashPush(project.id, { message: change.path, includeUntracked: true, stagedOnly: false, paths: [change.path] })
+            }
+          >
+            <ArchiveArrowDown size={12} />
           </HoverAction>
         )}
         {change.kind !== 'deleted' && (
@@ -190,15 +216,111 @@ function LineCounts({ change }: { change: GitChange }) {
   )
 }
 
-function StashSection({ project, status }: { project: Project; status: RepoStatus }) {
+function StashSection(props: { project: Project; status: RepoStatus; formOpen: boolean; setFormOpen(open: boolean): void }) {
+  const { project, status, formOpen, setFormOpen } = props
   const stashes = useGit((s) => s.stashes[project.id]) ?? []
   const [open, setOpen] = useState(true)
+  const hasChanges = status.staged.length + status.unstaged.length > 0
   return (
     <section className="mt-1 border-t border-line pt-1">
-      <SectionHeader open={open} onToggle={() => setOpen(!open)} title="Stash" count={stashes.length} />
-      {open && stashes.length === 0 && <p className="px-6 py-1 text-[11.5px] text-faint">Aucun stash.</p>}
+      <SectionHeader open={open} onToggle={() => setOpen(!open)} title="Stash" count={stashes.length}>
+        {hasChanges && (
+          <HoverAction title="Mettre les modifications de côté (stash)…" onClick={() => setFormOpen(true)}>
+            <ArchiveArrowDown size={13} />
+          </HoverAction>
+        )}
+      </SectionHeader>
+      {formOpen && <StashForm project={project} status={status} onClose={() => setFormOpen(false)} />}
+      {open && stashes.length === 0 && !formOpen && (
+        <p className="px-6 py-1 text-[11.5px] text-faint">
+          Aucun stash.
+          {hasChanges && (
+            <>
+              {' '}
+              <button onClick={() => setFormOpen(true)} className="text-muted underline decoration-line underline-offset-2 hover:text-accent">
+                Stasher les modifications
+              </button>
+            </>
+          )}
+        </p>
+      )}
       {open && stashes.map((stash) => <StashRow key={stash.hash} project={project} status={status} stash={stash} />)}
     </section>
+  )
+}
+
+/** "Put my changes aside": message, new files in or out, or only what is staged. */
+function StashForm({ project, status, onClose }: { project: Project; status: RepoStatus; onClose(): void }) {
+  const [message, setMessage] = useState('')
+  const [includeUntracked, setIncludeUntracked] = useState(true)
+  const [stagedOnly, setStagedOnly] = useState(false)
+  const pending = useGit((s) => s.pending[project.id])
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => inputRef.current?.focus(), [])
+
+  const untracked = status.unstaged.filter((c) => c.kind === 'untracked').length
+  const canStageOnly = status.staged.length > 0 && status.unstaged.length > 0
+  const onlyStaged = canStageOnly && stagedOnly
+  const count = onlyStaged ? status.staged.length : status.staged.length + status.unstaged.length - (includeUntracked ? 0 : untracked)
+  const busy = pending === 'stash'
+
+  const submit = async () => {
+    if (busy || count === 0) return
+    const ok = await useGit.getState().stashPush(project.id, { message, includeUntracked: includeUntracked && !onlyStaged, stagedOnly: onlyStaged })
+    if (ok) onClose()
+  }
+
+  return (
+    <div className="mx-2 mt-1 mb-2 rounded-md border border-violet-300/25 bg-violet-300/[0.05] p-2">
+      <input
+        ref={inputRef}
+        value={message}
+        spellCheck={false}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void submit()
+          if (e.key === 'Escape') onClose()
+        }}
+        placeholder="Message du stash (optionnel)"
+        className="h-7 w-full rounded border border-line bg-bg/60 px-2 text-[12.5px] text-fg outline-none placeholder:text-faint focus:border-violet-300/50"
+      />
+      <div className="mt-1.5 flex flex-col gap-1 text-[11.5px] text-muted">
+        {untracked > 0 && (
+          <label className={`flex cursor-pointer items-center gap-1.5 ${onlyStaged ? 'opacity-40' : ''}`}>
+            <input
+              type="checkbox"
+              checked={includeUntracked && !onlyStaged}
+              disabled={onlyStaged}
+              onChange={(e) => setIncludeUntracked(e.target.checked)}
+              className="accent-[#c4b5fd]"
+            />
+            Inclure les nouveaux fichiers ({untracked})
+          </label>
+        )}
+        {canStageOnly && (
+          <label className="flex cursor-pointer items-center gap-1.5">
+            <input type="checkbox" checked={stagedOnly} onChange={(e) => setStagedOnly(e.target.checked)} className="accent-[#c4b5fd]" />
+            Uniquement les fichiers indexés ({status.staged.length})
+          </label>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-[11px] text-faint">
+          {count === 0 ? 'Rien à mettre de côté' : `${count} fichier${count > 1 ? 's' : ''} mis de côté`}
+        </span>
+        <button onClick={onClose} className="h-6 rounded-md px-2 text-[11.5px] text-muted hover:bg-line hover:text-fg">
+          Annuler
+        </button>
+        <button
+          disabled={busy || count === 0}
+          onClick={() => void submit()}
+          className="flex h-6 items-center gap-1 rounded-md bg-violet-300/90 px-2 text-[11.5px] font-medium text-bg hover:bg-violet-300 disabled:bg-line disabled:text-faint"
+        >
+          {busy ? <LoaderCircle size={12} className="animate-spin" /> : <Archive size={12} />}
+          Stasher
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -206,17 +328,27 @@ function StashRow({ project, status, stash }: { project: Project; status: RepoSt
   const [open, setOpen] = useState(false)
   const files = useGit((s) => s.stashFiles[stash.hash])
   const [error, setError] = useState<string | null>(null)
+  const [confirmDrop, setConfirmDrop] = useState(false)
+  const busy = useGit((s) => s.pending[project.id] === 'stash')
+  const { applyStash, dropStash } = useGit.getState()
   const toggle = () => {
     setOpen(!open)
     if (!open && !files) useGit.getState().loadStashFiles(project.id, stash).catch((e: unknown) => setError(String(e)))
   }
+  // The confirmation lapses on its own if left alone.
+  useEffect(() => {
+    if (!confirmDrop) return
+    const timer = setTimeout(() => setConfirmDrop(false), 5000)
+    return () => clearTimeout(timer)
+  }, [confirmDrop])
+
   return (
     <div>
       <div
         role="button"
         onClick={toggle}
         title={`${stash.ref}${stash.branch ? ` · sur ${stash.branch}` : ''}\n${stash.message}`}
-        className="flex cursor-pointer items-start gap-1 py-1 pr-2 pl-3 text-[12px] text-muted hover:bg-panel-2/60 hover:text-fg"
+        className="group flex cursor-pointer items-start gap-1 py-1 pr-2 pl-3 text-[12px] text-muted hover:bg-panel-2/60 hover:text-fg"
       >
         <ChevronRight size={12} className={`mt-0.5 shrink-0 text-faint transition-transform ${open ? 'rotate-90' : ''}`} />
         <Archive size={13} className="mt-0.5 shrink-0 text-violet-300/80" />
@@ -227,7 +359,51 @@ function StashRow({ project, status, stash }: { project: Project; status: RepoSt
             {stash.branch && ` · ${stash.branch}`} · {relativeTime(stash.createdAt)}
           </span>
         </span>
+        {!confirmDrop && (
+          <span className={`mt-0.5 shrink-0 items-center gap-0.5 ${busy ? 'flex opacity-40' : 'hidden group-hover:flex'}`}>
+            <HoverAction title="Appliquer (le stash reste dans la liste)" disabled={busy} onClick={() => void applyStash(project.id, stash, false)}>
+              <ArchiveRestore size={13} />
+            </HoverAction>
+            <HoverAction title="Appliquer et supprimer (pop)" disabled={busy} onClick={() => void applyStash(project.id, stash, true)}>
+              <PackageOpen size={13} />
+            </HoverAction>
+            <HoverAction title="Supprimer ce stash…" disabled={busy} onClick={() => setConfirmDrop(true)}>
+              <Trash2 size={12} />
+            </HoverAction>
+          </span>
+        )}
       </div>
+      {confirmDrop && (
+        <div className="mx-2 mb-1 flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 py-1 pr-1 pl-2 text-[11.5px]">
+          <span className="min-w-0 flex-1 text-red-200">Supprimer définitivement ce stash ?</span>
+          <button onClick={() => setConfirmDrop(false)} className="h-6 rounded px-1.5 text-muted hover:bg-line hover:text-fg">
+            Annuler
+          </button>
+          <button
+            autoFocus
+            onClick={() => {
+              setConfirmDrop(false)
+              void dropStash(project.id, stash)
+            }}
+            className="flex h-6 items-center gap-1 rounded bg-red-500/80 px-2 font-medium text-white hover:bg-red-500"
+          >
+            <Trash2 size={11} /> Supprimer
+          </button>
+        </div>
+      )}
+      {open && (
+        <div className="flex flex-wrap items-center gap-1 py-1 pr-2 pl-8">
+          <StashTextButton disabled={busy} onClick={() => void applyStash(project.id, stash, false)}>
+            <ArchiveRestore size={12} /> Appliquer
+          </StashTextButton>
+          <StashTextButton disabled={busy} onClick={() => void applyStash(project.id, stash, true)}>
+            <PackageOpen size={12} /> Appliquer et supprimer
+          </StashTextButton>
+          <StashTextButton disabled={busy} danger onClick={() => setConfirmDrop(true)}>
+            <Trash2 size={11} /> Supprimer
+          </StashTextButton>
+        </div>
+      )}
       {open && error && <p className="py-0.5 pl-9 text-[11px] text-red-400">{error}</p>}
       {open && !files && !error && <p className="py-0.5 pl-9 text-[11px] text-faint">Chargement…</p>}
       {open &&
@@ -249,6 +425,20 @@ function StashRow({ project, status, stash }: { project: Project; status: RepoSt
         ))}
       {open && files?.length === 0 && <p className="py-0.5 pl-9 text-[11px] text-faint">Stash vide.</p>}
     </div>
+  )
+}
+
+function StashTextButton(props: { disabled?: boolean; danger?: boolean; onClick(): void; children: React.ReactNode }) {
+  return (
+    <button
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className={`flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-[11px] disabled:opacity-40 ${
+        props.danger ? 'text-muted hover:bg-red-500/15 hover:text-red-300' : 'text-muted hover:bg-line hover:text-fg'
+      }`}
+    >
+      {props.children}
+    </button>
   )
 }
 
