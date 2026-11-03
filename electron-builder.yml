@@ -25,6 +25,9 @@ mac:
   category: public.app-category.developer-tools
   # Version-free names keep the README's "latest/download" links valid forever.
   artifactName: Capitaine-mac-${arch}.${ext}
+dmg:
+  # electron-updater only ever downloads the zip: a blockmap for the dmg would never be read.
+  writeUpdateInfo: false
 win:
   target: [nsis]
   artifactName: Capitaine-win-${arch}.${ext}
