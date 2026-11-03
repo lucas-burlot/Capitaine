@@ -43,7 +43,7 @@ function isAppShortcut(event: KeyboardEvent): boolean {
   if (isMac) return event.metaKey
   if (event.ctrlKey && key === 'tab') return true
   if (event.ctrlKey && event.altKey && (key === 'arrowleft' || key === 'arrowright')) return true
-  return event.ctrlKey && event.shiftKey && ['t', 'w', 'o', 'c', 'v', 'a', 'd', 'e', 'b'].includes(key)
+  return event.ctrlKey && event.shiftKey && ['t', 'w', 'o', 'c', 'v', 'a', 'd', 'e', 'b', 'p'].includes(key)
 }
 
 export function TerminalView({ terminalId, cwd, rect, visible, focused, showHeader }: Props) {

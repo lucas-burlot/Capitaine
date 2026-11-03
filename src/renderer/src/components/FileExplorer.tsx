@@ -16,6 +16,7 @@ import { pathsForTerminal } from '../shell-quote'
 import { useApp } from '../store'
 import { focusedTerminalId, pasteIntoTerminal } from '../terminal-registry'
 import { EntryIcon } from './FileIcon'
+import { FileSearch } from './FileSearch'
 
 /** Drag payload understood by terminals: a JSON array of absolute paths. */
 export const PATHS_MIME = 'application/x-capitaine-paths'
@@ -42,6 +43,9 @@ export function FileExplorer({ project }: { project: Project }) {
   const rootError = useExplorer((s) => s.errors[project.path])
   const { loadDir, refreshGit } = useExplorer.getState()
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => setQuery(''), [project.id])
 
   useEffect(() => {
     if (!useExplorer.getState().children[project.path]) void loadDir(project.id, project.path)
@@ -55,7 +59,8 @@ export function FileExplorer({ project }: { project: Project }) {
 
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-auto py-1" role="tree" aria-label={`Fichiers de ${project.name}`}>
+      <FileSearch project={project} query={query} onQueryChange={setQuery} onContextMenu={setMenu} />
+      <div hidden={query.trim() !== ''} className="min-h-0 flex-1 overflow-auto py-1" role="tree" aria-label={`Fichiers de ${project.name}`}>
         <div className="truncate px-3 pb-1 text-[11px] font-medium text-faint" title={project.path}>
           {project.name}
         </div>

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import type { PtyCreateOptions, SessionSaveInput } from '../shared/types'
-import { DirectoryWatchers, gitStatus, isInside, listDirectory, readTextFile, writeTextFile } from './file-system'
+import { DirectoryWatchers, gitStatus, isInside, listDirectory, listProjectFiles, readTextFile, writeTextFile } from './file-system'
 import { installAppMenu, installShortcutHandler, popupAppMenu } from './menu'
 import { claudeUsage } from './claude-usage'
 import { checkForUpdates, downloadUpdate, installUpdate, openReleasesPage, setupUpdater, updateState } from './updater'
@@ -111,6 +111,10 @@ function registerIpc(): void {
     const root = projectPath(projectId, dir)
     if (!root) throw new Error('Chemin hors du projet')
     return listDirectory(root, dir)
+  })
+  ipcMain.handle('files:all', (_e, projectId: string) => {
+    const root = projectPath(projectId)
+    return root ? listProjectFiles(root) : []
   })
   ipcMain.on('files:watch', (event, projectId: string, dir: string) => {
     if (projectPath(projectId, dir)) watchers.add(event.sender, dir)

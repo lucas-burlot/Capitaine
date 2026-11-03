@@ -72,7 +72,7 @@ Des onglets par projet, que tu divises à droite ou en bas autant que tu veux. L
 <td valign="top">
 
 ### 🌳 Explorateur de fichiers
-L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Glisse un fichier dans un terminal** pour donner son chemin à Claude.
+L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Retrouve n'importe quel fichier** en tapant quelques lettres de son nom (`⌘P` / `Ctrl+Shift+P`), et **glisse-le dans un terminal** pour donner son chemin à Claude.
 
 </td>
 </tr>
@@ -253,7 +253,7 @@ En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle
 
 - [x] Projets, terminaux par projet et divisions côte à côte
 - [x] Suivi des sessions Claude Code et de leurs sous-agents, notifications
-- [x] Explorateur de fichiers avec statut git et glisser-déposer vers les terminaux
+- [x] Explorateur de fichiers avec statut git, recherche de fichier et glisser-déposer vers les terminaux
 - [x] Éditeur intégré (Monaco), rechargé quand un agent modifie le fichier
 - [x] Panneau Git : changements, index, diffs et stash
 - [x] Quota Claude dans le footer

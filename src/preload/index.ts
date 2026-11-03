@@ -35,6 +35,7 @@ const api: CapitaineApi = {
   },
   files: {
     list: (projectId, dir) => ipcRenderer.invoke('files:list', projectId, dir),
+    all: (projectId) => ipcRenderer.invoke('files:all', projectId),
     watch: (projectId, dir) => ipcRenderer.send('files:watch', projectId, dir),
     unwatch: (dir) => ipcRenderer.send('files:unwatch', dir),
     onChanged: (listener) => subscribe<[string]>('fs:changed', listener),

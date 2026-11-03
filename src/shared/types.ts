@@ -203,6 +203,7 @@ export type MenuCommand =
   | 'add-project'
   | 'toggle-explorer'
   | 'toggle-sidebar'
+  | 'find-file'
 
 /** API exposed to the renderer by the preload script as `window.capitaine`. */
 export interface CapitaineApi {
@@ -233,6 +234,8 @@ export interface CapitaineApi {
   }
   files: {
     list(projectId: string, dir: string): Promise<DirEntry[]>
+    /** Every file of the project (project-relative, `/`-separated), minus git-ignored ones. */
+    all(projectId: string): Promise<string[]>
     watch(projectId: string, dir: string): void
     unwatch(dir: string): void
     onChanged(listener: (dir: string) => void): () => void

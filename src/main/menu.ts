@@ -25,6 +25,7 @@ const SHORTCUTS: Shortcut[] = [
   { action: 'prev-terminal', mac: 'Cmd+Shift+[', other: 'Ctrl+Shift+Tab' },
   { action: 'next-pane', mac: 'Cmd+Alt+Right', other: 'Ctrl+Alt+Right' },
   { action: 'prev-pane', mac: 'Cmd+Alt+Left', other: 'Ctrl+Alt+Left' },
+  { action: 'find-file', mac: 'Cmd+P', other: 'Ctrl+Shift+P' },
   { action: 'toggle-explorer', mac: 'Cmd+B', other: 'Ctrl+Shift+B' },
   { action: 'toggle-sidebar', mac: 'Cmd+Shift+S', other: 'Ctrl+Shift+S' },
   { action: 'copy', mac: 'Cmd+C', other: 'Ctrl+Shift+C' },
@@ -139,6 +140,7 @@ export function installAppMenu(isDev: boolean): void {
       label: 'Fichier',
       submenu: [
         item('Ajouter un projet…', 'add-project'),
+        item('Rechercher un fichier…', 'find-file'),
         { type: 'separator' },
         item('Nouvel onglet', 'new-terminal'),
         item('Fermer le terminal', 'close-terminal'),

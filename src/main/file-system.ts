@@ -35,6 +35,42 @@ export async function listDirectory(root: string, dir: string): Promise<DirEntry
   return entries.sort((a, b) => (a.isDirectory === b.isDirectory ? collator.compare(a.name, b.name) : a.isDirectory ? -1 : 1))
 }
 
+// The search keeps this many files at most; past that the project is mostly generated content.
+const MAX_SEARCHED_FILES = 100_000
+// Outside git there's no .gitignore to go by: skip the usual heavy, generated folders.
+const SKIPPED_DIRS = new Set(['.git', 'node_modules', '.hg', '.svn', '.next', '.nuxt', '.turbo', '.cache', '.venv', 'venv', '__pycache__', 'target', 'vendor'])
+
+/** Every file of the project, project-relative and `/`-separated, for the file search. */
+export async function listProjectFiles(root: string): Promise<string[]> {
+  // In a git repo: tracked and untracked files, minus the ignored ones (fast, and what you mean).
+  const listed = await run(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
+  if (listed !== null) {
+    // Tracked files deleted from the disk are still in the index.
+    const deleted = new Set(((await run(root, ['ls-files', '-z', '--deleted'])) ?? '').split('\0'))
+    return [...new Set(listed.split('\0'))].filter((path) => path && !deleted.has(path)).slice(0, MAX_SEARCHED_FILES)
+  }
+  return walkFiles(root)
+}
+
+async function walkFiles(root: string): Promise<string[]> {
+  const files: string[] = []
+  const queue = [root]
+  while (queue.length > 0 && files.length < MAX_SEARCHED_FILES) {
+    const dir = queue.shift()!
+    const dirents = await readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const d of dirents) {
+      const path = join(dir, d.name)
+      // Symlinked folders aren't followed: they can loop.
+      if (d.isDirectory()) {
+        if (!SKIPPED_DIRS.has(d.name)) queue.push(path)
+      } else {
+        files.push(toRelPath(root, path))
+      }
+    }
+  }
+  return files.slice(0, MAX_SEARCHED_FILES)
+}
+
 /** Beyond this the editor would crawl; the file opens in the OS app instead. */
 const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
 
