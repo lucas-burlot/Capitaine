@@ -1,5 +1,7 @@
+import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { readlinkSync, statSync } from 'node:fs'
+import { readlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import type { WebContents } from 'electron'
 import * as pty from 'node-pty'
@@ -25,7 +27,7 @@ export class PtyManager {
 
   create(owner: WebContents, options: PtyCreateOptions): PtyCreateResult {
     const shell = resolveDefaultShell()
-    const cwd = existsSync(options.cwd) ? options.cwd : homedir()
+    const cwd = [options.restoreCwd, options.cwd].find((dir) => !!dir && isDirectory(dir)) ?? homedir()
     const id = randomUUID()
 
     const proc = pty.spawn(shell.file, shell.args, {
@@ -82,6 +84,29 @@ export class PtyManager {
     }
   }
 
+  /** The shell's current directory (null on Windows, or when it can't be read). */
+  async cwdOf(id: string): Promise<string | null> {
+    const pid = this.sessions.get(id)?.process.pid
+    if (!pid) return null
+    if (process.platform === 'linux') return readlink(`/proc/${pid}/cwd`).catch(() => null)
+    if (process.platform !== 'darwin') return null
+    return new Promise((resolve) => {
+      execFile('lsof', lsofArgs(pid), { timeout: LSOF_TIMEOUT_MS }, (error, stdout) => resolve(error ? null : parseLsofCwd(stdout)))
+    })
+  }
+
+  cwdOfSync(id: string): string | null {
+    const pid = this.sessions.get(id)?.process.pid
+    if (!pid) return null
+    try {
+      if (process.platform === 'linux') return readlinkSync(`/proc/${pid}/cwd`)
+      if (process.platform === 'darwin') return parseLsofCwd(execFileSync('lsof', lsofArgs(pid), { timeout: LSOF_TIMEOUT_MS, encoding: 'utf8' }))
+    } catch {
+      // Process gone or lsof unavailable.
+    }
+    return null
+  }
+
   killAllFor(owner: WebContents): void {
     for (const [id, session] of this.sessions) {
       if (session.owner === owner) this.kill(id)
@@ -126,5 +151,25 @@ export class PtyManager {
     const data = session.buffer
     session.buffer = ''
     if (!session.owner.isDestroyed()) session.owner.send('pty:data', id, data)
+  }
+}
+
+const LSOF_TIMEOUT_MS = 1500
+
+function lsofArgs(pid: number): string[] {
+  return ['-a', '-p', String(pid), '-d', 'cwd', '-Fn']
+}
+
+/** `lsof -Fn` prints one field per line; the name field starts with `n`. */
+function parseLsofCwd(output: string): string | null {
+  const line = output.split('\n').find((l) => l.startsWith('n'))
+  return line ? line.slice(1) : null
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
   }
 }

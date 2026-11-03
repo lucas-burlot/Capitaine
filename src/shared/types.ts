@@ -9,12 +9,42 @@ export interface PtyCreateOptions {
   cwd: string
   cols: number
   rows: number
+  /** Directory the shell was in last session; used instead of `cwd` when it still exists. */
+  restoreCwd?: string
 }
 
 export interface PtyCreateResult {
   id: string
   /** Foreground process name at spawn, i.e. the shell (`zsh`, `bash`…). */
   shell: string
+}
+
+/** One terminal as the renderer hands it over when saving the session. */
+export interface SessionTerminalInput {
+  /** Live shell, so the main process can read its current directory. */
+  ptyId: string | null
+  /** Screen and scrollback, serialized as escape sequences. */
+  scrollback: string
+}
+
+export interface SessionSaveInput {
+  /** Tabs, layouts and terminal metadata. Opaque here: the renderer owns (and validates) its shape. */
+  workspace: unknown
+  terminals: Record<string, SessionTerminalInput>
+}
+
+export interface SavedTerminal {
+  cwd: string | null
+  scrollback: string
+}
+
+/** What was open when the app last closed, so it can come back on the next launch. */
+export interface SavedSession {
+  version: 1
+  savedAt: number
+  workspace: unknown
+  /** Keyed by terminal id. */
+  terminals: Record<string, SavedTerminal>
 }
 
 export interface DirEntry {
@@ -178,6 +208,12 @@ export interface CapitaineApi {
     onExit(listener: (id: string, exitCode: number) => void): () => void
     /** Fires when the terminal's foreground process changes (macOS/Linux only). */
     onProcess(listener: (id: string, processName: string) => void): () => void
+  }
+  session: {
+    load(): Promise<SavedSession | null>
+    save(input: SessionSaveInput): void
+    /** Blocks until written: for the moment the window unloads. */
+    saveNow(input: SessionSaveInput): void
   }
   files: {
     list(projectId: string, dir: string): Promise<DirEntry[]>

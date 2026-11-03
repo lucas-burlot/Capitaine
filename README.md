@@ -66,7 +66,7 @@ Une notification système quand un agent t'attend ou a fini, sauf si tu regardes
 <td valign="top">
 
 ### 🪟 Terminaux côte à côte
-Des onglets par projet, que tu divises à droite ou en bas autant que tu veux. Les shells restent vivants quand tu changes d'onglet ou de projet : tes agents continuent de travailler.
+Des onglets par projet, que tu divises à droite ou en bas autant que tu veux. Les shells restent vivants quand tu changes d'onglet ou de projet : tes agents continuent de travailler. Ferme l'app et rouvre-la : tes onglets reviennent, chaque terminal dans le dossier où tu l'avais laissé, avec son historique.
 
 </td>
 <td valign="top">

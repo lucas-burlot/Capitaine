@@ -26,6 +26,13 @@ const api: CapitaineApi = {
     onExit: (listener) => subscribe<[string, number]>('pty:exit', listener),
     onProcess: (listener) => subscribe<[string, string]>('pty:process', listener)
   },
+  session: {
+    load: () => ipcRenderer.invoke('session:load'),
+    save: (input) => ipcRenderer.send('session:save', input),
+    saveNow: (input) => {
+      ipcRenderer.sendSync('session:save-sync', input)
+    }
+  },
   files: {
     list: (projectId, dir) => ipcRenderer.invoke('files:list', projectId, dir),
     watch: (projectId, dir) => ipcRenderer.send('files:watch', projectId, dir),
