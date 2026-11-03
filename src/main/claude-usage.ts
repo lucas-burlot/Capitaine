@@ -119,6 +119,12 @@ let inFlight: Promise<ClaudeUsage> | null = null
 const empty = { session: null, weekly: null, weeklyByModel: [], extraUsagePercent: null }
 
 async function fetchUsage(): Promise<ClaudeUsage> {
+  // Screenshots and tests: a JSON file shaped like the API's answer, instead of the network.
+  const fixture = process.env.CAPITAINE_USAGE_FIXTURE
+  if (fixture) {
+    const raw = await readFile(fixture, 'utf8').catch(() => null)
+    if (raw) return { ...mapUsage(JSON.parse(raw) as RawUsage), status: 'ok', error: null, fetchedAt: Date.now() }
+  }
   const credentials = await readCredentials()
   const fetchedAt = Date.now()
   if (!credentials) return { ...empty, status: 'no-credentials', error: null, fetchedAt }

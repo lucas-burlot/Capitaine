@@ -1,149 +1,332 @@
+<div align="center">
+
+<img src="docs/assets/logo.png" width="128" alt="Logo de Capitaine" />
+
 # Capitaine
 
-IDE « IA-first » personnel, inspiré d'[Orca](https://github.com/stablyai/orca).
-Version 0.1 : gestion de projets + terminaux par projet. macOS, Windows et Linux.
+### Garde le cap sur tes agents IA.
 
-## Fonctionnalités
+**L'espace de travail IA-first pour piloter tes sessions Claude Code, projet par projet.**<br />
+Terminaux côte à côte, statut de chaque agent en direct, fichiers, git et quota : tout dans une seule fenêtre.
 
-- **Projets** : ajouter un dossier, renommer (double-clic), réordonner (glisser-déposer), ouvrir dans le gestionnaire de fichiers, retirer. La liste est sauvegardée dans `projects.json` du dossier de données de l'app.
-- **Terminaux** : plusieurs onglets par projet, ouverts dans le dossier du projet avec votre shell par défaut (`$SHELL -l` sur mac/Linux, PowerShell 7 → Windows PowerShell → cmd sur Windows).
-- Les terminaux **restent vivants** quand vous changez d'onglet ou de projet (pratique pour laisser tourner un agent). Un point signale une sortie non lue.
-- `exit` ferme l'onglet ; un code de sortie ≠ 0 laisse l'onglet ouvert pour lire l'erreur.
-- **Terminaux côte à côte** : divise un onglet à droite ou en bas, autant de fois que tu veux (boutons en haut à droite ou raccourcis). Glisse un séparateur pour redimensionner, double-clic pour égaliser. Chaque panneau a son en-tête (nom, statut de l'agent, ×), et un clic dessus lui donne le focus.
-- **Explorateur de fichiers** du projet actif, à droite des terminaux (masquable avec le bouton en haut à droite, redimensionnable par son bord gauche) :
-  - arborescence chargée à la demande et rafraîchie toute seule quand un fichier change ;
-  - **statut git** : modifié (M, orange), nouveau (U/A, vert), renommé, en conflit, et fichiers ignorés estompés. Un point sur un dossier replié indique un changement à l'intérieur. Pratique pour voir ce que Claude a touché ;
-  - **glisser un fichier dans un terminal** (depuis l'explorateur ou depuis le bureau) insère son chemin, correctement échappé : idéal pour le donner à Claude ;
-  - **double-clic** : ouvre le fichier dans l'éditeur intégré (voir ci-dessous) ;
-  - clic droit : ouvrir dans l'éditeur, ouvrir avec l'application par défaut, insérer le chemin dans le terminal actif, copier le chemin / le chemin relatif, afficher dans le gestionnaire de fichiers.
-- **Éditeur de fichiers intégré** (Monaco, le moteur de VS Code, embarqué : marche hors ligne) :
-  - s'ouvre dans un onglet à côté des terminaux ; rouvrir un fichier déjà ouvert ramène son onglet ;
-  - coloration syntaxique selon l'extension, thème assorti à l'app ;
-  - **⌘S / Ctrl+S** enregistre (seulement quand l'éditeur a le focus, pour laisser Ctrl+S aux terminaux) ;
-  - modifications non enregistrées : **●** sur l'onglet ; fermer l'onglet ou la fenêtre demande *Enregistrer / Ne pas enregistrer / Annuler* ;
-  - **fichier modifié sur le disque** (par un agent, par exemple) : rechargement automatique si tu n'as rien modifié (Ctrl+Z ramène la version précédente) ; sinon un bandeau te laisse *prendre la version du disque* ou *garder la tienne* ;
-  - fichiers binaires ou de plus de 5 Mo : message et bouton pour les ouvrir dans l'application du système.
-- **Panneau Git** (onglet *Git* du panneau de droite, avec le nombre de changements) :
-  - branche courante, et commits à pousser ↑ / à récupérer ↓ par rapport à la branche distante ;
-  - sections **Conflits**, **Indexés** (staged) et **Modifications** (y compris les fichiers non suivis), avec lignes +/− et statut (M, A, D, R, U…) ;
-  - **indexer / désindexer** un fichier (au survol) ou toute une section ;
-  - clic sur un fichier : **diff** dans un onglet (Monaco, côte à côte ou en ligne, régions inchangées repliées), mis à jour quand le fichier change ; double-clic : ouvrir le fichier ; glisser vers un terminal : insérer son chemin ;
-  - **liste des stash** (message, branche, date) ; déplier un stash montre ses fichiers, et un clic ouvre le diff du stash.
-  - Rafraîchi toutes les 3 s, au retour sur la fenêtre et après chaque changement de fichier.
-- **Branche git dans la barre latérale**, sous chaque projet : nom de la branche, commits ↑ à pousser / ↓ à récupérer, nombre de fichiers modifiés. Clic : ouvre le panneau Git du projet.
-- **Quota Claude dans le footer** : session de 5 h, semaine et quotas hebdomadaires par modèle (barre, %, heure de remise à zéro et temps restant), crédits supplémentaires s'ils sont activés. Bouton ↻ pour rafraîchir ; sinon toutes les 5 min et au retour sur la fenêtre.
-  - Même source que `/usage` de Claude Code : l'API `api.anthropic.com/api/oauth/usage` avec la connexion de Claude Code (trousseau macOS, sinon `~/.claude/.credentials.json`, ou `$CLAUDE_CONFIG_DIR`). Le jeton reste dans le processus principal et n'est jamais renouvelé par Capitaine : s'il a expiré, lance `claude` pour le rafraîchir.
-- **Barre de titre façon Orca** : en haut à gauche la casquette de Capitaine, le nom de l'app et le bouton pour replier la barre latérale. Sur Linux et Windows, la barre de titre du système est remplacée par celle de l'app : bouton ⋯ (menu de l'application) et boutons réduire / agrandir / fermer à droite. Sur macOS, les feux tricolores restent à leur place.
-- **Barre latérale repliable** (bouton à côté du nom, ou raccourci) : la marque passe alors dans la barre d'onglets.
-- **Barre latérale redimensionnable** : glisse son bord droit (double-clic pour revenir à la largeur par défaut). La largeur est mémorisée.
-- Titre d'onglet fourni par le shell (celui du panneau actif), renommable (double-clic). Clic molette = fermer.
-- Liens cliquables dans le terminal, rendu WebGL.
+[![Dernière version](https://img.shields.io/github/v/release/lucas-burlot/Capitaine?style=flat-square&color=e2b04f&label=version)](https://github.com/lucas-burlot/Capitaine/releases/latest)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-e2b04f?style=flat-square)](LICENSE)
+[![Plateformes](https://img.shields.io/badge/plateformes-macOS%20%7C%20Windows%20%7C%20Linux-38bdf8?style=flat-square)](#-télécharger)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.295-d97757?style=flat-square)](#-suivi-des-agents-sans-configuration)
+[![Gratuit](https://img.shields.io/badge/prix-gratuit-22c55e?style=flat-square)](#-pourquoi-capitaine)
+[![Electron](https://img.shields.io/badge/Electron-45-47848f?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org)
+[![Étoiles GitHub](https://img.shields.io/github/stars/lucas-burlot/Capitaine?style=flat-square&color=f59e0b&label=%C3%A9toiles)](https://github.com/lucas-burlot/Capitaine/stargazers)
 
-### Suivi des agents (Claude Code)
+[**Télécharger**](#-télécharger) · [**Fonctionnalités**](#-fonctionnalités) · [**Comment ça marche**](#-comment-ça-marche) · [**FAQ**](#-faq) · [**Roadmap**](#%EF%B8%8F-roadmap)
 
-Lancez simplement `claude` dans un terminal : Capitaine le détecte tout seul, sans hook ni configuration.
+<br />
 
-- Sous chaque projet, la barre latérale liste les sessions Claude ouvertes, avec le **nom de la session**, le **statut** et depuis combien de temps :
-  - ⟳ **Travaille**
-  - ? **Attend ta réponse** (question), 🛡 **Attend ta permission**, 🔑 **Connexion requise**, avec le texte de la question
-  - ✓ **Terminé** (fin du tour)
-  - ○ **En attente d'une consigne**
-- Les **sous-agents** en cours s'affichent sous leur session.
-- Le projet et l'onglet affichent le statut le plus urgent, et un résumé global est affiché en bas de la barre latérale.
-- **Notification système** quand Claude t'attend ou a terminé, sauf si tu regardes déjà ce terminal. Un clic dessus ouvre le bon terminal.
+<img src="docs/assets/hero.png" alt="Capitaine : deux sessions Claude côte à côte, leurs statuts dans la barre latérale, le panneau Git et le quota" width="100%" />
 
-Comment ça marche : Claude Code (≥ 2.1.295) implémente le [Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status) (OSC 7501). Il sonde le terminal (`OSC 7501 ; ?`), Capitaine répond, puis Claude écrit son état dans le flux du terminal (`state=working`, `state=blocked:kind=question:msg=…`, sous-agents via `id=…`). Le nom de session vient du titre du terminal. Si Claude plante sans prévenir, Capitaine le voit quand le shell repasse au premier plan (macOS/Linux). C'est le canal de secours d'Orca, qui utilise en plus des hooks.
+</div>
 
-`node scripts/fake-agent.mjs` dans un terminal de Capitaine rejoue ces séquences sans consommer de tokens.
+<br />
 
-## Raccourcis
+> **Trois agents qui travaillent, c'est trois fois plus d'onglets à surveiller.** Lequel a fini ? Lequel attend ta réponse depuis dix minutes ?
+> Capitaine te le dit en un coup d'œil, et te prévient quand on a besoin de toi.
 
-| Action              | macOS  | Windows / Linux  |
-| ------------------- | ------ | ---------------- |
-| Nouvel onglet       | ⌘T     | Ctrl+Shift+T     |
-| Fermer le terminal (panneau actif) | ⌘W | Ctrl+Shift+W |
-| Diviser à droite    | ⌘D     | Ctrl+Shift+D     |
-| Diviser en bas      | ⌘⇧D    | Ctrl+Shift+E     |
-| Panneau suivant / précédent | ⌘⌥→ / ⌘⌥← | Ctrl+Alt+→ / ← |
-| Onglet suivant      | ⌘⇧]    | Ctrl+Tab         |
-| Onglet précédent    | ⌘⇧[    | Ctrl+Shift+Tab   |
-| Ajouter un projet   | ⌘O     | Ctrl+Shift+O     |
-| Afficher / masquer le panneau de droite | ⌘B | Ctrl+Shift+B |
-| Afficher / masquer la barre latérale | ⌘⇧S | Ctrl+Shift+S |
-| Copier / Coller     | ⌘C / ⌘V | Ctrl+Shift+C / V |
+## 💡 Pourquoi Capitaine
 
-Sur Windows/Linux, `Ctrl+<lettre>` reste au shell (Ctrl+C, Ctrl+W, Ctrl+R…), d'où les `Ctrl+Shift`. Comme la fenêtre n'a plus de cadre système, ces raccourcis sont interceptés par le processus principal (`before-input-event`) avant d'atteindre la page. En dev : `Ctrl+Shift+R` recharge, `Ctrl+Shift+I` ouvre les outils de développement.
+Lancer plusieurs Claude Code en parallèle est puissant, mais un terminal classique ne te dit rien de ce qu'ils font. Capitaine garde tes sessions rangées par projet et affiche leur état en direct, **sans hook ni configuration** : tu lances `claude`, c'est tout.
 
-## Développement
+|  | **Capitaine** | Terminal + éditeur classiques |
+| :--- | :---: | :---: |
+| **Qui travaille, qui t'attend** | ✅ en direct, par projet | ❌ fouiller les onglets |
+| **Sous-agents en cours** | ✅ listés sous leur session | ❌ |
+| **Alerte quand Claude t'attend** | ✅ notification système | ❌ |
+| **Terminaux par projet, côte à côte** | ✅ | ⚠️ à organiser soi-même |
+| **Fichiers modifiés par l'agent, diffs** | ✅ dans la même fenêtre | ⚠️ un autre outil |
+| **Quota Claude (5 h, semaine)** | ✅ toujours visible | ❌ `/usage` à la main |
+| **Configuration** | ✅ aucune | — |
+| **Prix** | **Gratuit, open source** | — |
+
+## ✨ Fonctionnalités
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🧭 Tes agents en un coup d'œil
+Sous chaque projet, la liste de tes sessions Claude : leur nom, leurs **sous-agents**, et leur statut en direct (*Travaille*, *Attend ta réponse*, *Attend ta permission*, *Terminé*), avec le texte de la question en attente.
+
+</td>
+<td width="50%" valign="top">
+
+### 🔔 Prévenu au bon moment
+Une notification système quand un agent t'attend ou a fini, sauf si tu regardes déjà son terminal. Un clic et tu y es.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🪟 Terminaux côte à côte
+Des onglets par projet, que tu divises à droite ou en bas autant que tu veux. Les shells restent vivants quand tu changes d'onglet ou de projet : tes agents continuent de travailler.
+
+</td>
+<td valign="top">
+
+### 🌳 Explorateur de fichiers
+L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Glisse un fichier dans un terminal** pour donner son chemin à Claude.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🔀 Changements, index et stash
+Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées. Indexe en un clic, ouvre le **diff** d'un fichier, parcours tes **stash**.
+
+</td>
+<td valign="top">
+
+### 📝 Éditeur intégré
+Double-clic sur un fichier : il s'ouvre dans Monaco, l'éditeur de VS Code. Si un agent le modifie pendant que tu le lis, il se recharge tout seul.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 📊 Ton quota Claude
+La session de 5 h, la semaine et les quotas par modèle, avec l'heure de remise à zéro, en bas de la fenêtre.
+
+</td>
+<td valign="top">
+
+### 🔄 Toujours à jour
+Capitaine se met à jour tout seul depuis les releases GitHub. Il reste aussi le bouton *Rechercher les mises à jour*.
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+<br />
+<img src="docs/assets/diff.png" alt="Le diff d'un fichier modifié par un agent, ouvert depuis le panneau Git" width="100%" />
+<sub><b>Ce que l'agent a changé, ligne par ligne.</b> Un clic dans le panneau Git.</sub>
+</div>
+
+## 🧭 Suivi des agents, sans configuration
+
+Claude Code (version 2.1.295 et plus) sait annoncer son état au terminal qui l'héberge, via le *Program Status Protocol* (OSC 7501). Capitaine répond à sa sonde, puis lit ce qu'il annonce :
+
+| Ce que fait Claude | Ce que tu vois |
+| :--- | :--- |
+| Travaille sur ta demande | ⟳ **Travaille** · depuis combien de temps |
+| Lance des sous-agents | ↳ un sous-agent par ligne, sous la session |
+| Te pose une question | ❓ **Attend ta réponse**, avec la question et les choix |
+| Demande une permission | 🛡️ **Attend ta permission** |
+| A fini son tour | ✅ **Terminé** |
+| Est fermé (`/exit`) | La session disparaît de la liste |
+
+Le nom de la session vient du titre que Claude donne à la conversation. Si Claude s'arrête brutalement, Capitaine s'en rend compte dès que le shell reprend la main (macOS, Linux).
+
+## 📥 Télécharger
+
+| Plateforme | Fichier |
+| :--- | :--- |
+| 🍏 **macOS** · Apple Silicon (M1 et plus) | [**Capitaine-mac-arm64.dmg**](https://github.com/lucas-burlot/Capitaine/releases/latest/download/Capitaine-mac-arm64.dmg) |
+| 🍏 **macOS** · Intel | [**Capitaine-mac-x64.dmg**](https://github.com/lucas-burlot/Capitaine/releases/latest/download/Capitaine-mac-x64.dmg) |
+| 🪟 **Windows** 10 / 11 | [**Capitaine-win-x64.exe**](https://github.com/lucas-burlot/Capitaine/releases/latest/download/Capitaine-win-x64.exe) |
+| 🐧 **Linux** | [**.deb**](https://github.com/lucas-burlot/Capitaine/releases/latest/download/capitaine-linux-amd64.deb) (Ubuntu, Debian) · [**AppImage**](https://github.com/lucas-burlot/Capitaine/releases/latest/download/Capitaine-linux-x86_64.AppImage) |
+
+Toutes les versions et leurs notes : [**Releases**](https://github.com/lucas-burlot/Capitaine/releases). Tu préfères compiler toi-même ? Voir [Lancer depuis les sources](#-démarrage-rapide).
+
+<details>
+<summary><b>⚠️ Premier lancement : les applications ne sont pas encore signées</b></summary>
+
+<br />
+
+Capitaine est gratuit et n'a pas (encore) de certificat Apple ou Microsoft, donc ton système te prévient la première fois :
+
+- **macOS** : ouvre le `.dmg` et glisse Capitaine dans *Applications*. Au premier lancement, macOS dit ne pas pouvoir vérifier le développeur : ouvre *Réglages Système → Confidentialité et sécurité*, descends et clique sur **Ouvrir quand même**. (Ou lance une fois `xattr -dr com.apple.quarantine /Applications/Capitaine.app`.)
+- **Windows** : SmartScreen affiche *« Windows a protégé votre ordinateur »* : clique sur **Informations complémentaires → Exécuter quand même**.
+- **Linux** : `sudo apt install ./capitaine-linux-amd64.deb`. Sur Ubuntu, préfère le `.deb` à l'AppImage : son installation configure le sandbox de Chromium.
+
+</details>
+
+## 🚀 Démarrage rapide
+
+1. **Ajoute un projet** : le bouton 📁+ de la barre latérale, puis le dossier de ton code.
+2. **Ouvre un terminal** : il démarre dans le dossier du projet, avec ton shell habituel.
+3. **Lance `claude`**. La session apparaît sous le projet, avec son statut. 🎉
+
+Divise l'onglet pour lancer un deuxième agent à côté, et ouvre le panneau de droite pour voir les fichiers et les changements git.
+
+<details>
+<summary><b>🧑‍💻 Lancer depuis les sources</b></summary>
+
+<br />
+
+Il faut [Node.js](https://nodejs.org) 22 ou plus. Sur Linux, `python3`, `make` et `g++` aussi (pour compiler `node-pty`).
 
 ```bash
+git clone https://github.com/lucas-burlot/Capitaine.git
+cd Capitaine
 npm install
-npm run dev        # lance l'app avec rechargement à chaud
-npm run typecheck
-npm run build && npm run smoke   # test E2E headless (Linux), statut agents inclus, captures dans smoke-shots/
+npm run dev
 ```
 
-Si `npm install` ne télécharge pas le binaire Electron : `node node_modules/electron/install.js`.
-
-**Linux (Ubuntu 23.10+) : `The SUID sandbox helper binary was found, but is not configured correctly`.**
-Ubuntu bloque les user namespaces dont le sandbox Chromium a besoin, et Electron se rabat alors sur `chrome-sandbox`, qui doit appartenir à root (à refaire après chaque réinstallation d'Electron) :
+**Ubuntu 23.10 et plus** : si le lancement échoue avec *« The SUID sandbox helper binary was found, but is not configured correctly »*, donne à `chrome-sandbox` les droits qu'attend Electron (à refaire après chaque réinstallation d'Electron) :
 
 ```bash
 sudo chown root:root node_modules/electron/dist/chrome-sandbox
 sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 ```
 
-`node-pty` est un module natif. Sur Linux il est compilé à l'installation (il faut `python3`, `make`, `g++`) ; sur macOS et Windows des binaires précompilés sont fournis.
+Pour l'installer comme une vraie application : `npm run dist:linux` puis `sudo apt install ./dist/capitaine-linux-amd64.deb` (ou `dist:mac`, `dist:win`, chacun sur son système).
 
-## Distribution
+</details>
+
+## ⌨️ Raccourcis
+
+| Action | macOS | Windows / Linux |
+| :--- | :---: | :---: |
+| Nouvel onglet | <kbd>⌘</kbd> <kbd>T</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>T</kbd> |
+| Fermer le terminal ou l'onglet | <kbd>⌘</kbd> <kbd>W</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>W</kbd> |
+| Diviser à droite | <kbd>⌘</kbd> <kbd>D</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>D</kbd> |
+| Diviser en bas | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>D</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>E</kbd> |
+| Panneau suivant / précédent | <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>→</kbd> / <kbd>←</kbd> | <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>→</kbd> / <kbd>←</kbd> |
+| Onglet suivant / précédent | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>]</kbd> / <kbd>[</kbd> | <kbd>Ctrl</kbd> <kbd>Tab</kbd> / <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Tab</kbd> |
+| Ajouter un projet | <kbd>⌘</kbd> <kbd>O</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>O</kbd> |
+| Barre latérale | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>S</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd> |
+| Panneau de droite (fichiers, git) | <kbd>⌘</kbd> <kbd>B</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd> |
+| Enregistrer (éditeur) | <kbd>⌘</kbd> <kbd>S</kbd> | <kbd>Ctrl</kbd> <kbd>S</kbd> |
+| Copier / coller (terminal) | <kbd>⌘</kbd> <kbd>C</kbd> / <kbd>V</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>C</kbd> / <kbd>V</kbd> |
+
+Sur Windows et Linux, <kbd>Ctrl</kbd> + lettre reste au shell (<kbd>Ctrl</kbd> <kbd>C</kbd>, <kbd>Ctrl</kbd> <kbd>R</kbd>, <kbd>Ctrl</kbd> <kbd>W</kbd>…), d'où les raccourcis en <kbd>Ctrl</kbd> <kbd>Shift</kbd>.
+
+## 🧠 Comment ça marche
+
+```mermaid
+flowchart LR
+    A["🤖 claude<br/><sub>dans un terminal</sub>"] -- "OSC 7501<br/><sub>statut, sous-agents</sub>" --> B["🖥️ node-pty<br/><sub>processus principal</sub>"]
+    B -- IPC --> C["⌨️ xterm.js<br/><sub>répond à la sonde,<br/>lit les rapports</sub>"]
+    C --> D["🧭 Barre latérale<br/><sub>sessions, statuts</sub>"]
+    C --> E["🔔 Notification<br/><sub>Claude t'attend</sub>"]
+    B -- "git, fichiers,<br/>quota, mises à jour" --> F["🗂️ Panneaux<br/><sub>Git, explorateur, footer</sub>"]
+```
+
+Capitaine est construit avec **Electron**, **React** et **TypeScript**, sur le même socle qu'[Orca](https://github.com/stablyai/orca) : xterm.js, node-pty et Monaco. Les fichiers qui comptent :
+
+| Fichier | Rôle |
+| :--- | :--- |
+| [`src/main/pty-manager.ts`](src/main/pty-manager.ts) | Les shells (node-pty) : création, sortie regroupée, processus au premier plan |
+| [`src/renderer/src/agent-status.ts`](src/renderer/src/agent-status.ts) | Le parseur OSC 7501 et le modèle session / sous-agents |
+| [`src/renderer/src/store.ts`](src/renderer/src/store.ts) | Projets, onglets, terminaux, agents |
+| [`src/renderer/src/layout.ts`](src/renderer/src/layout.ts) | L'arbre de division des onglets (côte à côte, en bas) |
+| [`src/main/source-control.ts`](src/main/source-control.ts) | Statut git, indexation, stash, contenu d'un fichier à une révision |
+| [`src/main/file-system.ts`](src/main/file-system.ts) | Listing des dossiers, surveillance des changements, lecture et écriture |
+| [`src/renderer/src/editor/`](src/renderer/src/editor) | Monaco, chargé à la demande, et les sessions d'édition |
+| [`src/main/claude-usage.ts`](src/main/claude-usage.ts) | Le quota Claude, via la connexion de Claude Code |
+| [`src/main/updater.ts`](src/main/updater.ts) | Les mises à jour automatiques (releases GitHub) |
+| [`src/main/menu.ts`](src/main/menu.ts) | Le menu et les raccourcis de chaque plateforme |
+
+## 🔄 Mises à jour
+
+L'application installée regarde au démarrage, puis toutes les 6 h, s'il existe une version plus récente sur GitHub. Si oui, elle la télécharge en arrière-plan et le footer propose **Redémarrer pour passer à X**. Sinon, la mise à jour s'installe quand tu quittes Capitaine.
+
+Pour chercher tout de suite : menu **⋯ → Aide → Rechercher les mises à jour…**, ou clic sur le numéro de version en bas à droite.
+
+> 💡 Sur macOS, l'installation automatique demande une app signée. En attendant, télécharge la nouvelle version depuis la page des releases.
+
+## 🔒 Confidentialité
+
+- **Pas de serveur Capitaine.** Il n'y a ni compte ni télémétrie.
+- **Ton code reste chez toi.** L'interface ne peut lire que les dossiers de tes projets.
+- **Le quota Claude** passe par la connexion de Claude Code (trousseau macOS ou `~/.claude/.credentials.json`). Le jeton reste dans le processus principal, n'est envoyé qu'à `api.anthropic.com` et n'est jamais renouvelé par Capitaine.
+- **Les mises à jour** interrogent uniquement les releases GitHub de ce dépôt.
+- **Tes projets** sont enregistrés dans un simple fichier local (`projects.json`, dans le dossier de données de l'app).
+
+## 🗺️ Roadmap
+
+- [x] Projets, terminaux par projet et divisions côte à côte
+- [x] Suivi des sessions Claude Code et de leurs sous-agents, notifications
+- [x] Explorateur de fichiers avec statut git et glisser-déposer vers les terminaux
+- [x] Éditeur intégré (Monaco), rechargé quand un agent modifie le fichier
+- [x] Panneau Git : changements, index, diffs et stash
+- [x] Quota Claude dans le footer
+- [x] Installeurs macOS, Windows, Linux et mises à jour automatiques
+- [ ] Commit, annulation de modifications et actions sur les stash depuis le panneau Git
+- [ ] Éditeur et diff dans une division, à côté d'un terminal
+- [ ] Restaurer les onglets et leur historique au redémarrage
+- [ ] Un worktree git par tâche, pour faire travailler plusieurs agents sans conflit
+- [ ] Hooks Claude Code : dernier message, outil en cours, reprise de session
+- [ ] Interface en anglais
+- [ ] Signature des applications macOS et Windows
+
+Une idée ? [Ouvre une issue](https://github.com/lucas-burlot/Capitaine/issues).
+
+## ❓ FAQ
+
+<details>
+<summary><b>Faut-il configurer Claude Code ou installer des hooks ?</b></summary>
+<br />
+Non. Lance <code>claude</code> dans un terminal de Capitaine : la session apparaît toute seule. Il faut Claude Code 2.1.295 ou plus récent.
+</details>
+
+<details>
+<summary><b>Et les autres agents (Codex, Aider…) ?</b></summary>
+<br />
+Ils fonctionnent comme dans n'importe quel terminal. Ceux qui annoncent leur état par le même protocole (OSC 7501) apparaissent aussi dans la liste, avec les détails qu'ils fournissent.
+</details>
+
+<details>
+<summary><b>D'où vient le quota affiché en bas ?</b></summary>
+<br />
+Du même endroit que la commande <code>/usage</code> de Claude Code, avec ta connexion Claude Code. Si elle a expiré, lance <code>claude</code> une fois pour la renouveler.
+</details>
+
+<details>
+<summary><b>Capitaine envoie-t-il mon code quelque part ?</b></summary>
+<br />
+Non. Il n'y a pas de serveur Capitaine. Les seules requêtes réseau sont le quota (vers <code>api.anthropic.com</code>) et la recherche de mises à jour (vers GitHub). Voir <a href="#-confidentialité">Confidentialité</a>.
+</details>
+
+<details>
+<summary><b>Où sont enregistrés mes projets ?</b></summary>
+<br />
+Dans <code>~/.config/Capitaine</code> (Linux), <code>~/Library/Application Support/Capitaine</code> (macOS) ou <code>%APPDATA%\Capitaine</code> (Windows).
+</details>
+
+<details>
+<summary><b>L'interface existe-t-elle en anglais ?</b></summary>
+<br />
+Pas encore : elle est en français pour l'instant. C'est dans la <a href="#%EF%B8%8F-roadmap">roadmap</a>.
+</details>
+
+## 🛠️ Développement
 
 ```bash
-npm run dist:mac     # .dmg + .zip   (à lancer sur un Mac)
-npm run dist:win     # installeur NSIS (à lancer sur Windows)
-npm run dist:linux   # AppImage + .deb
+npm install
+npm run dev                                    # l'app, avec rechargement à chaud
+npm run typecheck                              # TypeScript, main + interface
+npm run build && npm run smoke                 # test de bout en bout, sans fenêtre (Linux)
+npm run build && node scripts/screenshots.mjs  # régénère les images du README
 ```
 
-Chaque plateforme se package sur son propre OS (module natif). Les binaires sont produits dans `dist/`.
-Une icône peut être ajoutée dans `resources/` (`icon.png` 1024×1024, `icon.icns`, `icon.ico`).
+`node scripts/fake-agent.mjs`, lancé dans un terminal de Capitaine, rejoue les statuts de Claude Code sans consommer de tokens.
 
-## Architecture
+**Publier une version** : `npm run release:patch` (ou `release:minor`). Le script augmente la version, crée le tag `vX.Y.Z` et le pousse ; [GitHub Actions](.github/workflows/release.yml) construit alors l'app pour les trois plateformes et publie la release, que les apps installées récupèrent toutes seules.
 
-Même socle qu'Orca : Electron + electron-vite + React + TypeScript + Tailwind + zustand + xterm.js + node-pty.
+Les contributions sont les bienvenues : crée une branche, vérifie que `npm run typecheck` et `npm run smoke` passent, et ouvre une pull request.
 
-```
-src/
-  main/            processus principal (Node)
-    index.ts         fenêtre, IPC
-    pty-manager.ts   cycle de vie des shells (node-pty), sortie regroupée par lots
-    shell.ts         choix du shell et de l'environnement selon l'OS
-    project-store.ts persistance des projets (JSON, écriture atomique)
-    menu.ts          menu de l'app, raccourcis par plateforme (interceptés en main hors macOS), menu ⋯
-    file-system.ts   listing des dossiers, surveillance des changements, statut git
-    claude-usage.ts  quota Claude (lecture de la connexion Claude Code, appel de l'API d'usage)
-    source-control.ts  statut détaillé (porcelain v2), indexation, stash, contenu d'un fichier à une révision
-  preload/         pont sécurisé `window.capitaine` (contextIsolation + sandbox)
-  shared/types.ts  contrat d'API main ⇄ renderer
-  renderer/src/    interface React
-    store.ts         état (projets, onglets, terminal actif par projet, agents)
-    agent-status.ts  parseur OSC 7501 + modèle session / sous-agents
-    agent-notifications.ts  notifications système
-    explorer-store.ts  état de l'explorateur (dossiers dépliés, listings, statut git)
-    terminal-registry.ts  insertion de texte dans un terminal (glisser-déposer, menu)
-    editor-store.ts  état des onglets éditeur (modifié, conflit) et confirmations de fermeture
-    editor/          Monaco (chargé à la demande) et sessions d'édition (lecture, sauvegarde, changements externes)
-    git-store.ts     statut git, stash et indexation côté interface
-    diff-targets.ts  ce que compare chaque diff (index, HEAD, disque, stash)
-    components/TitleBar.tsx  marque, menu ⋯, boutons de fenêtre (barre de titre maison)
-    layout.ts        arbre de division d'un onglet (split, fermeture, tailles, calcul des positions)
-    pty-bus.ts       un seul listener IPC, routé vers chaque terminal
-    components/      Sidebar, Workspace (onglets), TerminalView (xterm)
-```
+## 🙏 Remerciements
 
-## Pistes pour la suite
+Capitaine s'inspire d'[Orca](https://github.com/stablyai/orca) et repose sur [Electron](https://www.electronjs.org), [electron-vite](https://electron-vite.org), [React](https://react.dev), [xterm.js](https://xtermjs.org), [node-pty](https://github.com/microsoft/node-pty), [Monaco Editor](https://microsoft.github.io/monaco-editor/), [zustand](https://github.com/pmndrs/zustand), [Tailwind CSS](https://tailwindcss.com) et [Lucide](https://lucide.dev).
 
-- Restaurer les onglets (et le scrollback) au redémarrage
-- Glisser un onglet dans un autre pour les mettre côte à côte
-- Lancer un agent (Claude Code, Codex…) en un clic dans un terminal
-- Worktrees git par tâche, comme Orca
-- Commit depuis le panneau Git, annuler des modifications, appliquer / supprimer un stash
-- Éditeur ou diff dans un split à côté d'un terminal
+<div align="center">
+
+<br />
+
+**Si Capitaine t'aide à garder le cap, une ⭐ aide d'autres à le trouver.**
+
+<sub>Licence MIT · Fait par <a href="https://github.com/lucas-burlot">Lucas Burlot</a></sub>
+
+</div>
