@@ -3,6 +3,7 @@ import { CloseEditorDialog } from './components/CloseEditorDialog'
 import { RightPanel } from './components/RightPanel'
 import { UsageFooter } from './components/UsageFooter'
 import { WindowControls } from './components/TitleBar'
+import { UpdateCard } from './components/UpdateCard'
 import { useEditors } from './editor-store'
 import { Sidebar } from './components/Sidebar'
 import { useExplorer } from './explorer-store'
@@ -60,6 +61,7 @@ export function App() {
         {explorerOpen && activeProject && <RightPanel key={activeProject.id} project={activeProject} />}
       </div>
       <UsageFooter />
+      <UpdateCard />
       <WindowControls />
       <CloseEditorDialog />
     </div>

@@ -124,15 +124,25 @@ export interface ClaudeUsage {
 }
 
 export interface UpdateState {
-  /** `unsupported`: dev mode or an install flavour that can't self-update (unpacked dir…). */
-  status: 'idle' | 'unsupported' | 'checking' | 'up-to-date' | 'downloading' | 'ready' | 'error'
+  /**
+   * `available`: a newer version exists (nothing downloaded yet); `ready`: downloaded, installs on
+   * restart or quit; `unsupported`: dev mode or an install flavour that can't self-update.
+   */
+  status: 'idle' | 'unsupported' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error'
   currentVersion: string
-  /** The newer version being downloaded / ready to install. */
+  /** The newer version on offer. */
   version: string | null
+  /** Release highlights, one line each. */
+  notes: string[]
+  releaseUrl: string | null
   percent: number | null
   error: string | null
   /** The last check was asked by the user (so its outcome is worth showing). */
   manual: boolean
+  /** Epoch ms of the last completed check. */
+  checkedAt: number | null
+  /** False on unsigned macOS builds: "download" opens the release page instead. */
+  canSelfInstall: boolean
 }
 
 export type MenuCommand =
@@ -213,9 +223,11 @@ export interface CapitaineApi {
   updater: {
     state(): Promise<UpdateState>
     check(): void
+    /** Starts downloading the version on offer (never automatic). */
+    download(): void
     /** Restart on the downloaded version. */
     install(): void
-    openReleases(): void
+    openReleases(version?: string): void
     onState(listener: (state: UpdateState) => void): () => void
   }
   focusWindow(): void

@@ -4,7 +4,7 @@ import type { PtyCreateOptions } from '../shared/types'
 import { DirectoryWatchers, gitStatus, isInside, listDirectory, readTextFile, writeTextFile } from './file-system'
 import { installAppMenu, installShortcutHandler, popupAppMenu } from './menu'
 import { claudeUsage } from './claude-usage'
-import { checkForUpdates, installUpdate, openReleasesPage, setupUpdater, updateState } from './updater'
+import { checkForUpdates, downloadUpdate, installUpdate, openReleasesPage, setupUpdater, updateState } from './updater'
 import { branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './source-control'
 import type { DiffSide } from '../shared/types'
 import { ProjectStore } from './project-store'
@@ -158,8 +158,11 @@ function registerIpc(): void {
   ipcMain.handle('claude:usage', (_e, force: unknown) => claudeUsage(force === true))
   ipcMain.handle('updater:state', () => updateState())
   ipcMain.on('updater:check', () => void checkForUpdates(true))
+  ipcMain.on('updater:download', () => void downloadUpdate())
   ipcMain.on('updater:install', () => installUpdate())
-  ipcMain.on('updater:open-releases', () => openReleasesPage())
+  ipcMain.on('updater:open-releases', (_e, version: unknown) =>
+    openReleasesPage(typeof version === 'string' && /^\d+\.\d+\.\d+[\w.-]*$/.test(version) ? version : undefined)
+  )
 
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
 

@@ -1,51 +1,52 @@
-import { useEffect, useState } from 'react'
-import { ArrowDownToLine, CircleCheck, LoaderCircle, RefreshCcw, TriangleAlert } from 'lucide-react'
-import type { UpdateState } from '@shared/types'
+import { ArrowDownToLine, CircleArrowUp, CircleCheck, LoaderCircle, RefreshCcw, TriangleAlert } from 'lucide-react'
+import { offersUpdate, useUpdates } from '../update-store'
 
-/** How long the answer to a manual "check for updates" stays visible. */
-const MANUAL_RESULT_MS = 6000
+function checkedLabel(checkedAt: number | null): string {
+  if (!checkedAt) return ''
+  const minutes = Math.floor((Date.now() - checkedAt) / 60000)
+  return minutes < 1 ? 'à l’instant' : minutes < 60 ? `il y a ${minutes} min` : `il y a ${Math.floor(minutes / 60)} h`
+}
 
-/** Footer, right end: app version, update progress, and the restart button once an update is ready. */
+/** Footer, right end: the running version, and whether a newer one is available. */
 export function UpdateStatus() {
-  const [state, setState] = useState<UpdateState | null>(null)
-  const [showResult, setShowResult] = useState(false)
-
-  useEffect(() => {
-    void window.capitaine.updater.state().then(setState)
-    return window.capitaine.updater.onState((next) => {
-      setState(next)
-      if (next.manual && ['up-to-date', 'error', 'unsupported'].includes(next.status)) setShowResult(true)
-    })
-  }, [])
-
-  useEffect(() => {
-    if (!showResult) return
-    const timer = setTimeout(() => setShowResult(false), MANUAL_RESULT_MS)
-    return () => clearTimeout(timer)
-  }, [showResult, state])
-
+  const state = useUpdates((s) => s.state)
+  const result = useUpdates((s) => s.result)
+  const openCard = useUpdates((s) => s.openCard)
   if (!state) return null
-  const check = () => window.capitaine.updater.check()
-  const version = `v${state.currentVersion}`
 
-  if (state.status === 'ready') {
-    return (
-      <button
-        onClick={() => window.capitaine.updater.install()}
-        title={`Capitaine ${state.version} est téléchargé. Redémarrer pour l’installer (il s’installera aussi en quittant).`}
-        className="flex shrink-0 items-center gap-1.5 rounded bg-accent px-2 py-0.5 font-medium text-bg hover:brightness-110"
-      >
-        <RefreshCcw size={11} />
-        Redémarrer pour passer à {state.version}
-      </button>
-    )
-  }
+  const api = window.capitaine.updater
+  const current = `v${state.currentVersion}`
+  const versionLabel = (
+    <span className="shrink-0 text-faint" title={`Capitaine ${state.currentVersion}`}>
+      {current}
+    </span>
+  )
 
-  if (state.status === 'downloading') {
+  // A newer version exists: always visible, and a click brings the update card back.
+  if (offersUpdate(state)) {
+    const label =
+      state.status === 'available'
+        ? `${state.version} disponible`
+        : state.status === 'downloading'
+          ? `${state.version} · ${state.percent ?? 0} %`
+          : state.status === 'ready'
+            ? `Redémarrer pour ${state.version}`
+            : `${state.version} : échec`
+    const Icon = state.status === 'downloading' ? ArrowDownToLine : state.status === 'ready' ? RefreshCcw : state.status === 'error' ? TriangleAlert : CircleArrowUp
     return (
-      <span className="flex shrink-0 items-center gap-1.5 text-sky-300" title={`Téléchargement de Capitaine ${state.version}`}>
-        <ArrowDownToLine size={11} />
-        Mise à jour {state.version} · {state.percent ?? 0} %
+      <span className="flex shrink-0 items-center gap-2">
+        {versionLabel}
+        <button
+          onClick={openCard}
+          aria-label="Mise à jour disponible"
+          title={`Capitaine ${state.version} est disponible (tu as la ${state.currentVersion})`}
+          className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium ${
+            state.status === 'error' ? 'bg-amber-500/15 text-amber-300' : 'bg-accent/15 text-accent hover:bg-accent/25'
+          }`}
+        >
+          <Icon size={11} />
+          {label}
+        </button>
       </span>
     )
   }
@@ -59,18 +60,9 @@ export function UpdateStatus() {
     )
   }
 
-  if (showResult && state.status === 'up-to-date') {
-    return (
-      <span className="flex shrink-0 items-center gap-1.5 text-emerald-300">
-        <CircleCheck size={11} />
-        Capitaine est à jour ({version})
-      </span>
-    )
-  }
-
-  if (showResult && (state.status === 'error' || state.status === 'unsupported')) {
+  if (result === 'error' || result === 'unsupported') {
     const text =
-      state.status === 'unsupported'
+      result === 'unsupported'
         ? state.error === 'Mode développement'
           ? 'Mises à jour indisponibles en mode développement'
           : 'Cette installation ne se met pas à jour toute seule'
@@ -79,22 +71,36 @@ export function UpdateStatus() {
       <span className="flex min-w-0 shrink items-center gap-1.5 text-amber-300/90" title={text}>
         <TriangleAlert size={11} className="shrink-0" />
         <span className="truncate">{text}</span>
-        <button onClick={() => window.capitaine.updater.openReleases()} className="shrink-0 underline hover:text-amber-200">
+        <button onClick={() => api.openReleases()} className="shrink-0 underline hover:text-amber-200">
           Voir les versions
         </button>
       </span>
     )
   }
 
+  const upToDate = state.status === 'up-to-date'
   return (
     <button
-      onClick={check}
-      title={`Capitaine ${version}${state.status === 'error' ? `\nDernière recherche : ${state.error}` : ''}\nCliquer pour rechercher les mises à jour`}
+      onClick={() => api.check()}
       aria-label="Rechercher les mises à jour"
-      className="flex shrink-0 items-center gap-1 rounded px-1 text-faint hover:bg-panel-2 hover:text-muted"
+      title={[
+        `Capitaine ${state.currentVersion}`,
+        upToDate ? `À jour (vérifié ${checkedLabel(state.checkedAt)})` : null,
+        state.status === 'error' ? `Dernière recherche : ${state.error}` : null,
+        state.status === 'unsupported' ? 'Pas de mise à jour automatique pour cette installation' : null,
+        'Cliquer pour rechercher les mises à jour'
+      ]
+        .filter(Boolean)
+        .join('\n')}
+      className={`flex shrink-0 items-center gap-1.5 rounded px-1 hover:bg-panel-2 ${result === 'up-to-date' ? 'text-emerald-300' : 'text-faint hover:text-muted'}`}
     >
       {state.status === 'error' && <TriangleAlert size={10} className="text-amber-300/70" />}
-      {version}
+      {current}
+      {upToDate && (
+        <span className="flex items-center gap-1">
+          · <CircleCheck size={10} className="text-emerald-400/80" /> {result === 'up-to-date' ? 'Capitaine est à jour' : 'à jour'}
+        </span>
+      )}
     </button>
   )
 }

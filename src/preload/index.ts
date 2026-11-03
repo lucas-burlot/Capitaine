@@ -63,8 +63,9 @@ const api: CapitaineApi = {
   updater: {
     state: () => ipcRenderer.invoke('updater:state'),
     check: () => ipcRenderer.send('updater:check'),
+    download: () => ipcRenderer.send('updater:download'),
     install: () => ipcRenderer.send('updater:install'),
-    openReleases: () => ipcRenderer.send('updater:open-releases'),
+    openReleases: (version) => ipcRenderer.send('updater:open-releases', version),
     onState: (listener) => subscribe<[UpdateState]>('updater:state', listener)
   },
   focusWindow: () => ipcRenderer.send('window:focus'),

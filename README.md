@@ -100,7 +100,7 @@ La session de 5 h, la semaine et les quotas par modèle, avec l'heure de remise 
 <td valign="top">
 
 ### 🔄 Toujours à jour
-Capitaine se met à jour tout seul depuis les releases GitHub. Il reste aussi le bouton *Rechercher les mises à jour*.
+Une carte t'annonce chaque nouvelle version, avec ses nouveautés. Tu choisis quand la télécharger et l'installer, et ta version reste affichée dans le footer.
 
 </td>
 </tr>
@@ -230,11 +230,16 @@ Capitaine est construit avec **Electron**, **React** et **TypeScript**, sur le m
 
 ## 🔄 Mises à jour
 
-L'application installée regarde au démarrage, puis toutes les 6 h, s'il existe une version plus récente sur GitHub. Si oui, elle la télécharge en arrière-plan et le footer propose **Redémarrer pour passer à X**. Sinon, la mise à jour s'installe quand tu quittes Capitaine.
+Capitaine regarde au démarrage, puis toutes les 6 h, s'il existe une version plus récente sur GitHub, **sans rien télécharger**. Si oui, une carte apparaît en bas à droite, avec les nouveautés :
 
-Pour chercher tout de suite : menu **⋯ → Aide → Rechercher les mises à jour…**, ou clic sur le numéro de version en bas à droite.
+1. **Télécharger** : la mise à jour se télécharge pendant que tu continues à travailler ;
+2. **Redémarrer maintenant**, ou **Au prochain lancement** : elle s'installera quand tu quitteras Capitaine.
 
-> 💡 Sur macOS, l'installation automatique demande une app signée. En attendant, télécharge la nouvelle version depuis la page des releases.
+*Plus tard* range la carte : la version reste signalée dans le footer, et un clic dessus la fait revenir.
+
+En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle **disponible** (`0.1.2 disponible`). Un clic sur ta version, ou le menu **⋯ → Aide → Rechercher les mises à jour…**, vérifie tout de suite.
+
+> 💡 Sur macOS, l'installation automatique demande une app signée. En attendant, *Télécharger* ouvre la page de la nouvelle version sur GitHub.
 
 ## 🔒 Confidentialité
 

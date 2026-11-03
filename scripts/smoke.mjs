@@ -42,10 +42,13 @@ writeFileSync(join(userData, 'projects.json'), JSON.stringify({
 
 // An empty Claude config dir: the usage footer must handle "not logged in" without touching the network.
 const claudeConfig = mkdtempSync(join(tmpdir(), 'capitaine-claude-'))
+// A simulated update (no network, no install) to exercise the update card.
+const updateFixture = join(userData, 'update.json')
+writeFileSync(updateFixture, JSON.stringify({ version: '9.9.9', notes: ['fix(linux): icônes à toutes les tailles', 'feat(updates): carte de mise à jour'] }))
 const app = await electron.launch({
   executablePath: join(appDir, 'node_modules/electron/dist', process.platform === 'win32' ? 'electron.exe' : 'electron'),
   args: [...(process.platform === 'linux' ? ['--ozone-platform=headless'] : []), appDir, `--user-data-dir=${userData}`],
-  env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfig },
+  env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfig, CAPITAINE_UPDATE_FIXTURE: updateFixture },
   timeout: 30000
 })
 const page = await app.firstWindow()
@@ -59,6 +62,17 @@ const tabTitles = () => page.$$eval('main header span.truncate', (els) => els.sl
 
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1300, 800))
 await page.waitForSelector('aside nav >> text=capitaine', { timeout: 15000 })
+const updateCard = page.locator('[role=dialog][aria-label="Mise à jour de Capitaine"]')
+await updateCard.waitFor({ timeout: 10000 })
+const updateChecks = {}
+const cardText = await updateCard.innerText()
+updateChecks.cardAnnounces = cardText.includes('Nouvelle version disponible') && cardText.includes('9.9.9') && cardText.includes('Tu utilises la')
+updateChecks.notesWithoutPrefix = cardText.includes('Icônes à toutes les tailles') && !cardText.includes('fix(linux)')
+updateChecks.noAutoDownload = !cardText.includes('Téléchargement')
+await shot('00-update-available')
+await updateCard.locator('button:has-text("Plus tard")').click()
+updateChecks.laterHides = (await updateCard.count()) === 0
+updateChecks.footerShowsAvailable = (await page.locator('footer').innerText()).includes('9.9.9 disponible')
 await page.click('button:has-text("Nouveau terminal")')
 await page.waitForSelector('.xterm', { timeout: 10000 })
 await page.waitForTimeout(1500)
@@ -293,9 +307,17 @@ const footer = page.locator('footer[aria-label="Quota Claude"]')
 gitChecks.footerNotLoggedIn = await waitFor(async () => (await footer.innerText()).includes('Non connecté'))
 await footer.locator('[aria-label="Rafraîchir le quota"]').click()
 gitChecks.footerRefresh = await waitFor(async () => (await footer.innerText()).includes('Non connecté'))
-// Updates: in dev the version button says why it can't self-update.
-await footer.locator('[aria-label="Rechercher les mises à jour"]').click()
-gitChecks.updaterDevNotice = await waitFor(async () => (await footer.innerText()).includes('mode développement'))
+// Update card: reopened from the footer, downloaded on request, installed "next launch".
+await footer.locator('[aria-label="Mise à jour disponible"]').click()
+updateChecks.footerReopensCard = await waitFor(async () => (await updateCard.count()) === 1)
+await updateCard.locator('button:has-text("Télécharger")').click()
+updateChecks.downloadProgress = await waitFor(async () => (await updateCard.innerText().catch(() => '')).includes('Téléchargement'), 3000)
+updateChecks.ready = await waitFor(async () => (await updateCard.innerText().catch(() => '')).includes('Redémarrer maintenant'))
+updateChecks.footerReady = (await footer.innerText()).includes('Redémarrer pour 9.9.9')
+await shot('11-update-ready')
+await updateCard.locator('button:has-text("Au prochain lancement")').click()
+updateChecks.nextLaunchCloses = (await updateCard.count()) === 0
+console.log('update checks:', updateChecks)
 console.log('git checks:', gitChecks)
 
 // Orca-style title bar: brand, window buttons, sidebar toggle, shortcuts matched in main.
@@ -354,6 +376,10 @@ console.log('chrome checks:', chromeChecks)
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.destroy()))
 await app.close()
 console.log('editor checks:', editorChecks)
+if (Object.values(updateChecks).includes(false)) {
+  console.error('FAIL: update card')
+  process.exit(1)
+}
 if (Object.values(chromeChecks).includes(false)) {
   console.error('FAIL: title bar')
   process.exit(1)
