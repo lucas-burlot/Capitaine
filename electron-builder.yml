@@ -25,6 +25,12 @@ mac:
   category: public.app-category.developer-tools
   # Version-free names keep the README's "latest/download" links valid forever.
   artifactName: Capitaine-mac-${arch}.${ext}
+  # No Apple Developer certificate yet: sign ad hoc so the bundle's signature is complete. Without it the
+  # app only has the linker's partial signature and Gatekeeper reports it as "damaged" instead of
+  # offering "Open Anyway" (System Settings > Privacy & Security).
+  identity: '-'
+  # Hardened runtime + ad hoc signing rejects Electron's pre-signed frameworks (library validation).
+  hardenedRuntime: false
 dmg:
   # electron-updater only ever downloads the zip: a blockmap for the dmg would never be read.
   writeUpdateInfo: false
