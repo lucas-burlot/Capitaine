@@ -1,7 +1,7 @@
 {
   "name": "capitaine",
   "productName": "Capitaine",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "IDE IA-first : projets et terminaux",
   "main": "./out/main/index.js",
   "author": "Lucas Burlot",
