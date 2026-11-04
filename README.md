@@ -241,7 +241,7 @@ Capitaine regarde au démarrage, puis toutes les 6 h, s'il existe une version pl
 
 En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle **disponible** (`0.1.2 disponible`). Un clic sur ta version, ou le menu **⋯ → Aide → Rechercher les mises à jour…**, vérifie tout de suite.
 
-> 💡 Sur macOS, l'installation automatique demande une app signée. En attendant, *Télécharger* ouvre la page de la nouvelle version sur GitHub.
+> 💡 Sur macOS, l'installation automatique marche à partir de la v0.2.2 : les versions précédentes sont à remplacer une fois à la main. Si macOS refuse quand même la mise à jour, *Télécharger* ouvre la page de la nouvelle version sur GitHub.
 
 ## 🔒 Confidentialité
 

@@ -9,8 +9,14 @@ const RELEASES_URL = 'https://github.com/lucas-burlot/Capitaine/releases'
 /** Background check cadence once the first startup check is done. */
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000
 const FIRST_CHECK_DELAY_MS = 10_000
-/** Unsigned macOS apps can't install an update themselves: the download button opens the release instead. */
-const canSelfInstall = process.platform !== 'darwin'
+/**
+ * Every platform installs its own updates. On macOS this relies on the ad hoc signature's stable designated
+ * requirement (scripts/mac-designated-requirement.cjs); if Squirrel.Mac still rejects the signature, this
+ * turns false and the download button opens the release instead.
+ */
+const canSelfInstall = true
+
+const isSignatureError = (message: string) => /signature|code sign/i.test(message)
 
 let state: UpdateState = {
   status: 'idle',
@@ -145,7 +151,7 @@ function describe(error: unknown): string {
   // The feed is missing until the first release exists.
   if (/No published versions|404|latest.*\.yml|Cannot find/i.test(message)) return 'Aucune version publiée pour le moment'
   if (/net::|ENOTFOUND|ECONNREFUSED|ETIMEDOUT/i.test(message)) return 'Pas de connexion à GitHub'
-  if (/signature|code sign/i.test(message)) return 'Installation automatique impossible (app non signée) : télécharge la nouvelle version'
+  if (isSignatureError(message)) return 'Installation automatique impossible (signature refusée) : télécharge la nouvelle version'
   return message.split('\n')[0].slice(0, 200)
 }
 
@@ -173,8 +179,10 @@ export function setupUpdater(): void {
   autoUpdater.on('download-progress', (progress) => publish({ status: 'downloading', percent: Math.round(progress.percent) }))
   autoUpdater.on('update-downloaded', (info) => publish({ status: 'ready', version: info.version, percent: 100 }))
   autoUpdater.on('error', (error) => {
-    // A failed download keeps the version, so the card can offer to retry.
-    publish({ status: 'error', error: describe(error) })
+    // A failed download keeps the version, so the card can offer to retry — or, when macOS refused the
+    // signature, to download it from GitHub instead.
+    const signatureRefused = process.platform === 'darwin' && isSignatureError(error.message)
+    publish({ status: 'error', error: describe(error), ...(signatureRefused ? { canSelfInstall: false } : {}) })
   })
 
   if (!updatesSupported()) {
