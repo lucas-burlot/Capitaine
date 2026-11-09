@@ -192,11 +192,12 @@ export function PrimaryButton({ onClick, disabled, children }: { onClick(): void
   )
 }
 
-export function TextButton({ onClick, disabled, children }: { onClick(): void; disabled?: boolean; children: React.ReactNode }) {
+export function TextButton({ onClick, disabled, title, children }: { onClick(): void; disabled?: boolean; title?: string; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={title}
       className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] text-muted outline-none hover:bg-panel-2 hover:text-fg focus-visible:bg-panel-2 focus-visible:text-fg disabled:opacity-50 disabled:hover:bg-transparent"
     >
       {children}

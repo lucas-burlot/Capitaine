@@ -162,6 +162,23 @@ export async function containerAction(id: string, action: DockerAction): Promise
   if (!result.ok) throw new Error(errorText(result, `docker ${action} a échoué`))
 }
 
+/** Docker's own rule for container names. */
+const NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$/
+
+/**
+ * What to type in a terminal to get a shell inside a running container: bash when the image has
+ * it, sh otherwise. Null when the name is not a container name or docker is missing.
+ */
+export async function containerShellCommand(name: string): Promise<string | null> {
+  if (typeof name !== 'string' || !NAME_PATTERN.test(name)) return null
+  const cli = await resolveDocker()
+  if (!cli) return null
+  const inner = 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'
+  if (process.platform === 'win32') return `& '${cli.file.replace(/'/g, "''")}' exec -it ${name} sh -c '${inner}'`
+  const docker = /^[\w@%+=:,./-]+$/.test(cli.file) ? cli.file : `'${cli.file.replace(/'/g, `'\\''`)}'`
+  return `${docker} exec -it ${name} sh -c '${inner}'`
+}
+
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
 
 /** stdout and stderr merged in arrival order, colour codes stripped. */

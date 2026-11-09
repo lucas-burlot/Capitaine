@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { DiffSide, Project } from '@shared/types'
 import { applyAgentReport, stripStatusGlyph, type AgentReport, type AgentSession, type AgentState } from '@/features/claude/agent-status'
+import { setTerminalStartup } from '@/features/terminals/terminal-startup'
 import { pane, paneIds, removePane, resizeSplit, splitPane, type LayoutNode, type SplitDirection } from './layout'
 
 /** One shell. Lives in a pane of a tab's layout. */
@@ -67,6 +68,8 @@ interface AppState {
   selectProject(id: string): void
 
   newTab(projectId?: string): void
+  /** New tab whose shell opens a shell inside a running container (`docker exec`). */
+  openContainerShell(projectId: string, container: string, title: string): void
   /** Opens a file in an editor tab, or brings its existing tab forward. */
   openFile(projectId: string, path: string): void
   /** Opens a diff tab, or brings the one showing the same change forward. */
@@ -269,6 +272,16 @@ export const useApp = create<AppState>((set, get) => ({
         nextTerminalNumber: { ...state.nextTerminalNumber, [target]: nextNumber }
       }
     })
+  },
+
+  openContainerShell(projectId, container, title) {
+    get().newTab(projectId)
+    const tabId = get().activeTabByProject[projectId]
+    const tab = tabId ? get().tabs[tabId] : undefined
+    if (!tab) return
+    setTerminalStartup(tab.activePaneId, { dockerExec: container })
+    set((state) => ({ tabs: { ...state.tabs, [tab.id]: { ...state.tabs[tab.id], customTitle: title } } }))
+    get().selectProject(projectId)
   },
 
   openFile(projectId, path) {

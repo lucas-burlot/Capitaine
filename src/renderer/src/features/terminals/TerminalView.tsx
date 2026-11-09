@@ -11,6 +11,7 @@ import { attachPty } from './pty-bus'
 import { pathsForTerminal } from '@/lib/shell-quote'
 import { forgetRestoredTerminal, restoredTerminal } from '@/features/workspace/session'
 import { registerTerminal } from './terminal-registry'
+import { takeTerminalStartup } from './terminal-startup'
 import { isMac } from '@/lib/platform'
 import type { Rect } from '@/features/workspace/layout'
 import { isTerminalVisible, terminalLabel, useApp } from '@/features/workspace/workspace-store'
@@ -104,6 +105,7 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
     // A resumed Claude conversation prints itself again, so its old screen would only repeat it.
     const restored = restoredTerminal(terminalId)
     const resumeAgent = restored?.agent ?? undefined
+    const startup = takeTerminalStartup(terminalId)
     if (restored?.scrollback && !resumeAgent?.sessionId) term.write(restored.scrollback + RESTORED_MARKER)
 
     const onFocus = () => useApp.getState().focusPane(terminalId)
@@ -121,7 +123,7 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
       return true
     })
 
-    window.capitaine.pty.create({ cwd, restoreCwd: restored?.cwd ?? undefined, resumeAgent, cols: term.cols, rows: term.rows }).then(({ id, shell }) => {
+    window.capitaine.pty.create({ cwd, restoreCwd: restored?.cwd ?? undefined, resumeAgent, dockerExec: startup?.dockerExec, cols: term.cols, rows: term.rows }).then(({ id, shell }) => {
       if (disposed) {
         window.capitaine.pty.kill(id)
         return

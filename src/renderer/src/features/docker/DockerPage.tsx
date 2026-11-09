@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Container, ExternalLink, LoaderCircle, Play, RotateCw, Square, TriangleAlert, X } from 'lucide-react'
+import { Container, ExternalLink, LoaderCircle, Play, RotateCw, Square, SquareTerminal, TriangleAlert, X } from 'lucide-react'
 import type { DockerContainer, Project } from '@shared/types'
 import { usePanels } from '@/app/panels-store'
+import { useApp } from '@/features/workspace/workspace-store'
 import { PageListRow, PageMessage, PageShell, PageSplit, PrimaryButton, Property, TextButton, useListKeys } from '@/ui/Page'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { belongsTo, cleanIpcError, useDocker } from './docker-store'
@@ -92,7 +93,7 @@ export function DockerPage({ project }: { project: Project }) {
           list={groups.map((group) => (
             <GroupSection key={group.key} group={group} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
           ))}
-          detail={selected ? <ContainerDetail key={selected.id} container={selected} projectPath={project.path} /> : null}
+          detail={selected ? <ContainerDetail key={selected.id} container={selected} project={project} /> : null}
         />
       )}
     </PageShell>
@@ -143,7 +144,8 @@ function GroupSection({ group, selectedId, onSelect }: { group: Group; selectedI
   )
 }
 
-function ContainerDetail({ container, projectPath }: { container: DockerContainer; projectPath: string }) {
+function ContainerDetail({ container, project }: { container: DockerContainer; project: Project }) {
+  const projectPath = project.path
   const busy = useDocker((s) => s.busy[container.id])
   const act = useDocker.getState().act
   const look = statusLook(container)
@@ -176,6 +178,17 @@ function ContainerDetail({ container, projectPath }: { container: DockerContaine
             Démarrer
           </PrimaryButton>
         )}
+        <TextButton
+          onClick={() => {
+            usePanels.getState().setPage(null)
+            useApp.getState().openContainerShell(project.id, container.name, `${displayName(container)} · docker`)
+          }}
+          disabled={container.state !== 'running'}
+          title={container.state === 'running' ? `Ouvrir un terminal dans le conteneur (docker exec -it ${container.name})` : 'Le conteneur doit être démarré'}
+        >
+          <SquareTerminal size={12} />
+          Terminal
+        </TextButton>
         <TextButton onClick={() => void act(container.id, 'restart')} disabled={!!busy}>
           <RotateCw size={12} />
           Redémarrer

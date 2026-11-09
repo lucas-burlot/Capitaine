@@ -7,6 +7,7 @@ import type { WebContents } from 'electron'
 import * as pty from 'node-pty'
 import type { PtyCreateOptions, PtyCreateResult, SavedAgent } from '../../shared/types'
 import { resumeCommand, sanitizeAgent } from '../claude/claude-sessions'
+import { containerShellCommand } from '../docker/docker'
 import { buildShellEnv, resolveDefaultShell } from '../system/shell'
 
 interface Session {
@@ -55,7 +56,15 @@ export class PtyManager {
     const session: Session = { process: proc, owner, buffer: '', flushTimer: null, foreground: proc.process, shellName: proc.process, relaunched: agent && { agent, at: Date.now(), started: false } }
     this.sessions.set(id, session)
     this.ensurePolling()
-    if (agent) this.typeWhenReady(id, session, agent)
+    if (agent) {
+      this.typeWhenReady(id, session, async () => {
+        session.relaunched = { agent, at: Date.now(), started: false }
+        return resumeCommand(agent)
+      })
+    } else if (options.dockerExec) {
+      const container = options.dockerExec
+      this.typeWhenReady(id, session, () => containerShellCommand(container))
+    }
 
     proc.onData((data) => {
       session.buffer += data
@@ -173,7 +182,8 @@ export class PtyManager {
    * Types the resume command once the shell's line editor is reading the keyboard. Typed during
    * the rc files, the terminal would echo it once and the prompt draw it again.
    */
-  private typeWhenReady(id: string, session: Session, agent: SavedAgent): void {
+  /** Types `command()` into the shell once it is ready for input (its line editor is waiting). */
+  private typeWhenReady(id: string, session: Session, command: () => Promise<string | null>): void {
     const startedAt = Date.now()
     let lastOutputAt = 0
     const output = session.process.onData(() => {
@@ -191,8 +201,8 @@ export class PtyManager {
         return
       }
       output.dispose()
-      session.relaunched = { agent, at: now, started: false }
-      session.process.write(`${resumeCommand(agent)}\r`)
+      const text = await command().catch(() => null)
+      if (text && this.sessions.get(id) === session) session.process.write(`${text}\r`)
     }
     setTimeout(tick, SHELL_READY_POLL_MS)
   }

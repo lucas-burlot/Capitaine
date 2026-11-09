@@ -6,6 +6,8 @@ export interface PtyCreateOptions {
   restoreCwd?: string
   /** Claude session to bring back: the shell starts in its folder and relaunches it once ready. */
   resumeAgent?: SavedAgent
+  /** Container name: once the shell is ready, `docker exec` opens a shell inside that container. */
+  dockerExec?: string
 }
 
 /** A Claude Code session that was open in a terminal. */
