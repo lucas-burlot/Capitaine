@@ -213,21 +213,40 @@ flowchart LR
     B -- "git, fichiers,<br/>quota, mises à jour" --> F["🗂️ Panneaux<br/><sub>Git, explorateur, footer</sub>"]
 ```
 
-Capitaine est construit avec **Electron**, **React** et **TypeScript**, sur le même socle qu'[Orca](https://github.com/stablyai/orca) : xterm.js, node-pty et Monaco. Les fichiers qui comptent :
+Capitaine est construit avec **Electron**, **React** et **TypeScript**, sur le même socle qu'[Orca](https://github.com/stablyai/orca) : xterm.js, node-pty et Monaco. Le code est rangé **par fonctionnalité**, avec les mêmes domaines côté processus principal et côté interface :
+
+```
+src/
+├── shared/types/      Types partagés, un fichier par domaine (+ api.ts : le contrat window.capitaine)
+├── preload/           Le pont window.capitaine
+├── main/              Processus principal (Node)
+│   ├── index.ts       Cycle de vie de l'app · window.ts : la fenêtre · menu.ts : menu et raccourcis
+│   ├── system/        Shell de connexion, chemins, validation des arguments IPC
+│   └── projects/ terminals/ files/ git/ claude/ docker/ updater/
+│                      La logique du domaine + <domaine>-ipc.ts, ses handlers IPC
+└── renderer/src/      Interface (React)
+    ├── app/           Le cadre de la fenêtre : barre de titre, panneau de droite, état des panneaux
+    ├── features/      projects · workspace · terminals · claude · files · editor · git · docker · updates
+    ├── ui/            Composants génériques (boutons, en-têtes de section, poignée de redimensionnement)
+    └── lib/           Utilitaires sans état (plateforme, dates relatives, glisser-déposer…)
+```
+
+Côté interface, `@/` pointe vers `src/renderer/src`, `@shared/` vers `src/shared` et `@resources/` vers `resources`. Les fichiers qui comptent :
 
 | Fichier | Rôle |
 | :--- | :--- |
-| [`src/main/pty-manager.ts`](src/main/pty-manager.ts) | Les shells (node-pty) : création, sortie regroupée, processus au premier plan |
-| [`src/renderer/src/agent-status.ts`](src/renderer/src/agent-status.ts) | Le parseur OSC 7501 et le modèle session / sous-agents |
-| [`src/renderer/src/store.ts`](src/renderer/src/store.ts) | Projets, onglets, terminaux, agents |
-| [`src/renderer/src/layout.ts`](src/renderer/src/layout.ts) | L'arbre de division des onglets (côte à côte, en bas) |
-| [`src/main/source-control.ts`](src/main/source-control.ts) | Statut git, indexation, stash, contenu d'un fichier à une révision |
-| [`src/main/git-actions.ts`](src/main/git-actions.ts) | Branches, commit, push, pull, stash, fin de fusion / rebase, résolution de conflits |
-| [`src/main/git-ai.ts`](src/main/git-ai.ts) | Message de commit et résolution de conflit écrits par Claude (via `claude -p`) |
-| [`src/main/file-system.ts`](src/main/file-system.ts) | Listing des dossiers, surveillance des changements, lecture et écriture |
-| [`src/renderer/src/editor/`](src/renderer/src/editor) | Monaco, chargé à la demande, et les sessions d'édition |
-| [`src/main/claude-usage.ts`](src/main/claude-usage.ts) | Le quota Claude, via la connexion de Claude Code |
-| [`src/main/updater.ts`](src/main/updater.ts) | Les mises à jour automatiques (releases GitHub) |
+| [`src/main/terminals/pty-manager.ts`](src/main/terminals/pty-manager.ts) | Les shells (node-pty) : création, sortie regroupée, processus au premier plan |
+| [`src/renderer/src/features/claude/agent-status.ts`](src/renderer/src/features/claude/agent-status.ts) | Le parseur OSC 7501 et le modèle session / sous-agents |
+| [`src/renderer/src/features/workspace/workspace-store.ts`](src/renderer/src/features/workspace/workspace-store.ts) | Projets, onglets, terminaux, agents |
+| [`src/renderer/src/features/workspace/layout.ts`](src/renderer/src/features/workspace/layout.ts) | L'arbre de division des onglets (côte à côte, en bas) |
+| [`src/main/git/git-repo.ts`](src/main/git/git-repo.ts) | Statut git, indexation, stash, contenu d'un fichier à une révision |
+| [`src/main/git/git-actions.ts`](src/main/git/git-actions.ts) | Branches, commit, push, pull, stash, fin de fusion / rebase, résolution de conflits |
+| [`src/main/git/git-ai.ts`](src/main/git/git-ai.ts) | Message de commit et résolution de conflit écrits par Claude (via `claude -p`) |
+| [`src/main/files/file-system.ts`](src/main/files/file-system.ts) | Listing des dossiers, surveillance des changements, lecture et écriture |
+| [`src/renderer/src/features/editor/`](src/renderer/src/features/editor) | Monaco, chargé à la demande, et les sessions d'édition |
+| [`src/main/docker/docker.ts`](src/main/docker/docker.ts) | Les conteneurs Docker : liste, statut, démarrage / arrêt, logs |
+| [`src/main/claude/claude-usage.ts`](src/main/claude/claude-usage.ts) | Le quota Claude, via la connexion de Claude Code |
+| [`src/main/updater/updater.ts`](src/main/updater/updater.ts) | Les mises à jour automatiques (releases GitHub) |
 | [`src/main/menu.ts`](src/main/menu.ts) | Le menu et les raccourcis de chaque plateforme |
 
 ## 🔄 Mises à jour
