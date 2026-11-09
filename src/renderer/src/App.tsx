@@ -92,8 +92,9 @@ export function App() {
         {/* Pages cover the terminals without unmounting them (they keep their scrollback). */}
         <div className="relative flex min-w-0 flex-1">
           <Workspace />
-          {explorerOpen && activeProject && <RightPanel key={activeProject.id} project={activeProject} />}
-          {page === 'claude' && activeProject && <ClaudeConfigPage key={activeProject.id} project={activeProject} />}
+          {/* Siblings: their keys must differ, or React mixes them up and leaves stale panels behind. */}
+          {explorerOpen && activeProject && <RightPanel key={`panel:${activeProject.id}`} project={activeProject} />}
+          {page === 'claude' && activeProject && <ClaudeConfigPage key={`claude:${activeProject.id}`} project={activeProject} />}
           {page === 'docker' && activeProject && <DockerPage project={activeProject} />}
         </div>
       </div>
