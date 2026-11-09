@@ -104,6 +104,20 @@ Une carte t'annonce chaque nouvelle version, avec ses nouveautés. Tu choisis qu
 
 </td>
 </tr>
+<tr>
+<td valign="top">
+
+### 🧩 Skills et agents
+Tout ce que Claude Code charge pour le projet, au même endroit : **skills, agents, commands, rules et `CLAUDE.md`**, ceux du projet, les tiens (`~/.claude`) et ceux de tes plugins. Pour chacun : comment l'appeler, quand il est chargé, ses propriétés et son contenu, et un clic pour l'ouvrir dans l'éditeur. Un nom défini à la fois dans le projet et en global est signalé.
+
+</td>
+<td valign="top">
+
+### 🐳 Docker
+Les conteneurs de la machine, ceux du projet en premier. Démarre, arrête ou redémarre-les, ouvre leurs ports en un clic et suis leurs **logs en direct**.
+
+</td>
+</tr>
 </table>
 
 <div align="center">
@@ -225,9 +239,9 @@ src/
 │   └── projects/ terminals/ files/ git/ claude/ docker/ updater/
 │                      La logique du domaine + <domaine>-ipc.ts, ses handlers IPC
 └── renderer/src/      Interface (React)
-    ├── app/           Le cadre de la fenêtre : barre de titre, panneau de droite, état des panneaux
+    ├── app/           Le cadre de la fenêtre : barre de titre, panneau de droite, état des panneaux et des pages
     ├── features/      projects · workspace · terminals · claude · files · editor · git · docker · updates
-    ├── ui/            Composants génériques (boutons, en-têtes de section, poignée de redimensionnement)
+    ├── ui/            Composants génériques (boutons, en-têtes de section, poignée de redimensionnement, pages plein écran)
     └── lib/           Utilitaires sans état (plateforme, dates relatives, glisser-déposer…)
 ```
 
@@ -245,6 +259,7 @@ Côté interface, `@/` pointe vers `src/renderer/src`, `@shared/` vers `src/shar
 | [`src/main/files/file-system.ts`](src/main/files/file-system.ts) | Listing des dossiers, surveillance des changements, lecture et écriture |
 | [`src/renderer/src/features/editor/`](src/renderer/src/features/editor) | Monaco, chargé à la demande, et les sessions d'édition |
 | [`src/main/docker/docker.ts`](src/main/docker/docker.ts) | Les conteneurs Docker : liste, statut, démarrage / arrêt, logs |
+| [`src/main/claude/claude-config.ts`](src/main/claude/claude-config.ts) | Les skills, agents, commands, rules et CLAUDE.md d'un projet (projet, global, plugins) |
 | [`src/main/claude/claude-usage.ts`](src/main/claude/claude-usage.ts) | Le quota Claude, via la connexion de Claude Code |
 | [`src/main/updater/updater.ts`](src/main/updater/updater.ts) | Les mises à jour automatiques (releases GitHub) |
 | [`src/main/menu.ts`](src/main/menu.ts) | Le menu et les raccourcis de chaque plateforme |
@@ -265,7 +280,7 @@ En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle
 ## 🔒 Confidentialité
 
 - **Pas de serveur Capitaine.** Il n'y a ni compte ni télémétrie.
-- **Ton code reste chez toi.** L'interface ne peut lire que les dossiers de tes projets.
+- **Ton code reste chez toi.** L'interface ne peut lire que les dossiers de tes projets, et les fichiers de configuration Claude Code (skills, agents, commands, rules, `CLAUDE.md`) qu'elle liste pour eux.
 - **Le quota Claude** passe par la connexion de Claude Code (trousseau macOS ou `~/.claude/.credentials.json`). Le jeton reste dans le processus principal, n'est envoyé qu'à `api.anthropic.com` et n'est jamais renouvelé par Capitaine.
 - **Les mises à jour** interrogent uniquement les releases GitHub de ce dépôt.
 - **Les fonctions IA du panneau Git** (message de commit ✨, résolution de conflit) ne partent que quand tu cliques. Elles passent par ta CLI Claude Code (`claude -p`, sans outils) et envoient à Anthropic le diff à décrire ou le fichier en conflit, comme le ferait une session Claude Code.
@@ -282,6 +297,9 @@ En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle
 - [x] Installeurs macOS, Windows, Linux et mises à jour automatiques
 - [x] Branches, commit, push, pull et sync depuis le panneau Git, message de commit et résolution de conflits par Claude
 - [x] Stash depuis le panneau Git : mettre de côté (tout, un fichier ou l'index seul), appliquer, pop, supprimer
+- [x] Skills, agents, commands, rules et CLAUDE.md du projet, du global et des plugins, dans une page dédiée
+- [x] Docker : conteneurs, actions et logs en direct, dans une page dédiée
+- [ ] Créer un skill ou un agent depuis un modèle, le copier entre le global et le projet
 - [ ] Annulation de modifications depuis le panneau Git
 - [ ] Éditeur et diff dans une division, à côté d'un terminal
 - [ ] Restaurer les onglets et leur historique au redémarrage
