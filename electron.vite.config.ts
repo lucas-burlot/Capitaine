@@ -12,7 +12,7 @@ export default defineConfig({
   },
   renderer: {
     resolve: {
-      alias: { '@shared': resolve('src/shared'), '@': resolve('src/renderer/src') }
+      alias: { '@shared': resolve('src/shared'), '@': resolve('src/renderer/src'), '@resources': resolve('resources') }
     },
     plugins: [react(), tailwindcss()]
   }
