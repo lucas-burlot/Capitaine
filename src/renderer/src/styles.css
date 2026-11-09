@@ -10,6 +10,8 @@
   --color-faint: #5c6270;
   --color-accent: #e2c08d;
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, sans-serif;
+  /* Same stack as the terminals and the editor. */
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
 }
 
 html,
@@ -47,6 +49,16 @@ body,
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* Thin dark scrollbars, as in the terminals, instead of the light native ones. */
+.scrollbar-sleek {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2e37 transparent;
+}
+
+.app-page ::selection {
+  background: rgb(226 192 141 / 0.25);
 }
 
 /* Claude writing into a field: a slow gold sweep across it. */

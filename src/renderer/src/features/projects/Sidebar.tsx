@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, FolderOpen, FolderPlus, GitBranch, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Container, FolderOpen, FolderPlus, GitBranch, MoreHorizontal, Pencil, Sparkles, Trash2 } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { isMac, shortcutLabel } from '@/lib/platform'
-import { usePanels } from '@/app/panels-store'
+import { usePanels, type AppPage } from '@/app/panels-store'
+import { belongsTo, useDocker } from '@/features/docker/docker-store'
 import { useGit } from '@/features/git/git-store'
 import { useApp } from '@/features/workspace/workspace-store'
 import { AgentStatusIcon, AgentSummary, ProjectAgentList } from '@/features/claude/AgentStatus'
@@ -58,8 +59,51 @@ export function Sidebar() {
           <p className="px-2 py-3 text-xs leading-relaxed text-faint">Aucun projet. Ajoutez un dossier pour commencer.</p>
         )}
       </nav>
+      <PageNav />
       <AgentSummary />
     </aside>
+  )
+}
+
+/** Bottom of the sidebar: the pages that cover the terminals (skills and agents, Docker). */
+function PageNav() {
+  const page = usePanels((s) => s.page)
+  const projectPath = useApp((s) => s.projects.find((p) => p.id === s.activeProjectId)?.path)
+  // Known once the Docker page has been opened.
+  const running = useDocker((s) =>
+    s.result?.ok && projectPath ? s.result.containers.filter((c) => c.state === 'running' && belongsTo(c, projectPath)).length : 0
+  )
+  if (!projectPath) return null
+  return (
+    <div className="flex flex-col gap-0.5 border-t border-line px-2 py-1.5">
+      <PageNavButton page="claude" current={page} icon={<Sparkles size={14} />} label="Skills et agents" tooltip="Skills, agents, commands, rules et CLAUDE.md du projet sélectionné" />
+      <PageNavButton
+        page="docker"
+        current={page}
+        icon={<Container size={14} />}
+        label="Docker"
+        tooltip="Les conteneurs de la machine, ceux du projet en premier"
+        badge={running > 0 ? <span className="rounded-full bg-emerald-400/15 px-1.5 text-[10px] text-emerald-300 tabular-nums">{running}</span> : null}
+      />
+    </div>
+  )
+}
+
+function PageNavButton(props: { page: AppPage; current: AppPage | null; icon: React.ReactNode; label: string; tooltip: string; badge?: React.ReactNode }) {
+  const open = props.current === props.page
+  return (
+    <button
+      aria-current={open ? 'page' : undefined}
+      onClick={() => usePanels.getState().setPage(open ? null : props.page)}
+      title={props.tooltip}
+      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] outline-none focus-visible:ring-1 focus-visible:ring-accent/50 ${
+        open ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
+      }`}
+    >
+      <span className={open ? 'text-accent' : 'text-muted'}>{props.icon}</span>
+      <span className="flex-1">{props.label}</span>
+      {props.badge}
+    </button>
   )
 }
 

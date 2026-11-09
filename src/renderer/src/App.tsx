@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
+import { ClaudeConfigPage } from '@/features/claude/ClaudeConfigPage'
 import { CloseEditorDialog } from '@/features/editor/CloseEditorDialog'
+import { DockerPage } from '@/features/docker/DockerPage'
 import { RightPanel } from '@/app/RightPanel'
 import { UsageFooter } from '@/features/claude/UsageFooter'
 import { WindowControls } from '@/app/TitleBar'
@@ -16,9 +18,19 @@ import { useApp } from '@/features/workspace/workspace-store'
 export function App() {
   const explorerOpen = usePanels((s) => s.rightOpen)
   const sidebarOpen = usePanels((s) => s.sidebarOpen)
+  const page = usePanels((s) => s.page)
   const activeProject = useApp((s) => s.projects.find((p) => p.id === s.activeProjectId))
 
   useEffect(() => startAgentNotifications(), [])
+
+  // Opening or switching a tab (new terminal, file search…) brings the terminals back.
+  useEffect(
+    () =>
+      useApp.subscribe((state, prev) => {
+        if (state.activeTabByProject !== prev.activeTabByProject) usePanels.getState().setPage(null)
+      }),
+    []
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -77,8 +89,13 @@ export function App() {
     <div className="flex h-full flex-col">
       <div className="flex min-h-0 flex-1">
         {sidebarOpen && <Sidebar />}
-        <Workspace />
-        {explorerOpen && activeProject && <RightPanel key={activeProject.id} project={activeProject} />}
+        {/* Pages cover the terminals without unmounting them (they keep their scrollback). */}
+        <div className="relative flex min-w-0 flex-1">
+          <Workspace />
+          {explorerOpen && activeProject && <RightPanel key={activeProject.id} project={activeProject} />}
+          {page === 'claude' && activeProject && <ClaudeConfigPage key={activeProject.id} project={activeProject} />}
+          {page === 'docker' && activeProject && <DockerPage project={activeProject} />}
+        </div>
       </div>
       <UsageFooter />
       <UpdateCard />

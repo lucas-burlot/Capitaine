@@ -1,11 +1,9 @@
 import { useEffect } from 'react'
-import { Container, FolderTree, GitBranch, PanelRightClose, RefreshCw } from 'lucide-react'
+import { FolderTree, GitBranch, PanelRightClose, RefreshCw } from 'lucide-react'
 import type { Project } from '@shared/types'
-import { belongsTo, useDocker } from '@/features/docker/docker-store'
 import { usePanels, type RightPanelView } from './panels-store'
 import { useGit } from '@/features/git/git-store'
 import { shortcutLabel } from '@/lib/platform'
-import { DockerPanel } from '@/features/docker/DockerPanel'
 import { FileExplorer, FileExplorerActions } from '@/features/files/FileExplorer'
 import { IconButton } from '@/ui/IconButton'
 import { ResizeHandle, usePanelWidth } from '@/ui/ResizeHandle'
@@ -38,15 +36,12 @@ export function RightPanel({ project }: { project: Project }) {
         <div className="no-drag flex shrink-0 items-center gap-0.5" role="tablist">
           <ViewTab view="files" current={view} icon={<FolderTree size={14} />} label="Fichiers" />
           <ViewTab view="git" current={view} icon={<GitBranch size={14} />} label="Git" badge={<GitBadge projectId={project.id} />} />
-          <ViewTab view="docker" current={view} icon={<Container size={14} />} label="Docker" badge={<DockerBadge projectPath={project.path} />} />
         </div>
         <div className="min-w-[32px] flex-1 self-stretch" data-window-drag />
         {view === 'files' ? (
           <FileExplorerActions project={project} />
-        ) : view === 'git' ? (
-          <GitRefreshButton projectId={project.id} />
         ) : (
-          <DockerRefreshButton />
+          <GitRefreshButton projectId={project.id} />
         )}
         <IconButton title={`Masquer le panneau (${shortcutLabel('toggleExplorer')})`} onClick={toggleOpen}>
           <PanelRightClose size={13} />
@@ -55,10 +50,8 @@ export function RightPanel({ project }: { project: Project }) {
       </header>
       {view === 'files' ? (
         <FileExplorer project={project} />
-      ) : view === 'git' ? (
-        <SourceControlPanel project={project} />
       ) : (
-        <DockerPanel project={project} />
+        <SourceControlPanel project={project} />
       )}
     </section>
   )
@@ -100,24 +93,6 @@ function GitRefreshButton({ projectId }: { projectId: string }) {
       <RefreshCw size={13} className={fetching ? 'animate-spin' : ''} />
     </IconButton>
   )
-}
-
-function DockerRefreshButton() {
-  const refreshing = useDocker((s) => s.refreshing)
-  return (
-    <IconButton title="Rafraîchir les conteneurs" onClick={() => void useDocker.getState().refresh()}>
-      <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-    </IconButton>
-  )
-}
-
-/** Containers of this project that are up (known once the Docker view has been opened). */
-function DockerBadge({ projectPath }: { projectPath: string }) {
-  const count = useDocker((s) =>
-    s.result?.ok ? s.result.containers.filter((c) => c.state === 'running' && belongsTo(c, projectPath)).length : 0
-  )
-  if (!count) return null
-  return <span className="rounded-full bg-emerald-400/15 px-1.5 text-[10px] text-emerald-300 tabular-nums">{count}</span>
 }
 
 function GitBadge({ projectId }: { projectId: string }) {
