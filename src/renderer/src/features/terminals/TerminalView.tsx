@@ -16,7 +16,7 @@ import type { Rect } from '@/features/workspace/layout'
 import { isTerminalVisible, terminalLabel, useApp } from '@/features/workspace/workspace-store'
 import { terminalTheme } from './terminal-theme'
 import { AgentStatusIcon } from '@/features/claude/AgentStatus'
-import { PATHS_MIME } from '@/features/files/FileExplorer'
+import { PATHS_MIME } from '@/lib/drag'
 
 interface Props {
   terminalId: string

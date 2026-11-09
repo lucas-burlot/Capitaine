@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, FolderOpen, FolderPlus, GitBranch, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { isMac, shortcutLabel } from '@/lib/platform'
-import { useExplorer } from '@/features/files/explorer-store'
+import { usePanels } from '@/app/panels-store'
 import { useGit } from '@/features/git/git-store'
 import { useApp } from '@/features/workspace/workspace-store'
 import { AgentStatusIcon, AgentSummary, ProjectAgentList } from '@/features/claude/AgentStatus'
@@ -98,7 +98,7 @@ function BranchLine({ projectId }: { projectId: string }) {
       onClick={(e) => {
         e.stopPropagation()
         useApp.getState().selectProject(projectId)
-        useExplorer.getState().showView('git')
+        usePanels.getState().showView('git')
       }}
       className="flex min-w-0 items-center gap-1 text-[11px] text-faint hover:text-muted"
     >

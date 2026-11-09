@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Columns2, FolderPlus, GitCompare, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import { useEditors } from '@/features/editor/editor-store'
-import { useExplorer } from '@/features/files/explorer-store'
+import { usePanels } from '@/app/panels-store'
 import { startDrag } from '@/lib/drag'
 import { computeLayout, dragSizes, nodeAt, paneIds, type Divider, type Rect } from './layout'
 import { isMac, shortcutLabel } from '@/lib/platform'
@@ -130,7 +130,7 @@ function SplitDivider({ tab, divider, stackRef }: { tab: Tab; divider: Divider; 
 }
 
 function TitleSpacer() {
-  const sidebarOpen = useExplorer((s) => s.sidebarOpen)
+  const sidebarOpen = usePanels((s) => s.sidebarOpen)
   return (
     <div className={`drag-region flex shrink-0 items-center border-b border-line ${titleBarHeightClass}`}>
       {!sidebarOpen && <TitleBarBrand compact />}
@@ -147,9 +147,9 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
   const activeIsTerminal = useApp((s) => s.tabs[s.activeTabByProject[projectId] ?? '']?.kind === 'terminal')
   const newTab = useApp((s) => s.newTab)
   const splitActivePane = useApp((s) => s.splitActivePane)
-  const explorerOpen = useExplorer((s) => s.open)
-  const toggleExplorer = useExplorer((s) => s.toggleOpen)
-  const sidebarOpen = useExplorer((s) => s.sidebarOpen)
+  const explorerOpen = usePanels((s) => s.rightOpen)
+  const toggleExplorer = usePanels((s) => s.toggleRight)
+  const sidebarOpen = usePanels((s) => s.sidebarOpen)
 
   return (
     <header className={`drag-region flex shrink-0 items-end gap-3 border-b border-line bg-panel ${explorerOpen ? 'pr-2' : ''} ${titleBarHeightClass}`}>

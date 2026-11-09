@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MoreHorizontal, PanelLeft } from 'lucide-react'
 import logo from '@resources/logo.svg'
-import { useExplorer } from '@/features/files/explorer-store'
+import { usePanels } from './panels-store'
 import { isMac, shortcutLabel } from '@/lib/platform'
 
 /** Linux/Windows: the app draws its own title bar (Orca-style), window buttons included. */
@@ -16,8 +16,8 @@ export const titleBarHeightClass = isMac ? 'h-12' : 'h-10'
  * native menu bar is gone, and the sidebar toggle.
  */
 export function TitleBarBrand({ compact = false }: { compact?: boolean }) {
-  const toggleSidebar = useExplorer((s) => s.toggleSidebar)
-  const sidebarOpen = useExplorer((s) => s.sidebarOpen)
+  const toggleSidebar = usePanels((s) => s.toggleSidebar)
+  const sidebarOpen = usePanels((s) => s.sidebarOpen)
   return (
     <div className={`flex shrink-0 items-center gap-1 ${isMac ? 'pl-[76px]' : 'pl-2.5'}`}>
       <img src={logo} alt="" aria-hidden draggable={false} className="h-[18px] w-auto shrink-0" />

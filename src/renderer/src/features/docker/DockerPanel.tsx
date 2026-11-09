@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ChevronRight, LoaderCircle, Play, RotateCw, ScrollText, Square, TriangleAlert, X } from 'lucide-react'
+import { LoaderCircle, Play, RotateCw, ScrollText, Square, TriangleAlert, X } from 'lucide-react'
 import type { DockerContainer, Project } from '@shared/types'
+import { HoverAction } from '@/ui/HoverAction'
+import { SectionHeader } from '@/ui/SectionHeader'
 import { belongsTo, cleanIpcError, useDocker } from './docker-store'
 
 const POLL_MS = 3000
@@ -94,21 +96,14 @@ function GroupSection({ group, defaultOpen }: { group: Group; defaultOpen: boole
   const running = group.containers.filter((c) => c.state === 'running').length
   return (
     <section className="mb-1">
-      <div
-        role="button"
-        onClick={() => setOpen(!open)}
-        title={group.current ? 'Conteneurs lancés depuis le dossier de ce projet (docker compose)' : undefined}
-        className="flex h-6 cursor-pointer items-center gap-1 pr-2 pl-2 text-[11px] font-semibold tracking-wider text-muted uppercase hover:text-fg"
-      >
-        <ChevronRight size={12} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
-        <span className={`flex-1 truncate ${group.current ? 'text-accent' : ''}`}>{group.title}</span>
-        <span
-          className="ml-1 rounded-full bg-line px-1.5 text-[10px] font-medium tracking-normal text-muted tabular-nums"
-          title={`${running} en cours sur ${group.containers.length}`}
-        >
-          {running}/{group.containers.length}
-        </span>
-      </div>
+      <SectionHeader
+        open={open}
+        onToggle={() => setOpen(!open)}
+        title={group.title}
+        count={`${running}/${group.containers.length}`}
+        highlight={group.current}
+        tooltip={group.current ? 'Conteneurs lancés depuis le dossier de ce projet (docker compose)' : `${running} en cours sur ${group.containers.length}`}
+      />
       {open && group.containers.map((container) => <ContainerRow key={container.id} container={container} />)}
     </section>
   )
@@ -160,25 +155,25 @@ function ContainerRow({ container }: { container: DockerContainer }) {
             </span>
             <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
               {published.slice(0, 3).map((port) => (
-                <RowAction key={`${port.host}:${port.container}`} title={`Ouvrir http://localhost:${port.host}`} onClick={() => window.open(`http://localhost:${port.host}`)}>
+                <HoverAction key={`${port.host}:${port.container}`} title={`Ouvrir http://localhost:${port.host}`} onClick={() => window.open(`http://localhost:${port.host}`)}>
                   <span className="px-0.5 text-[10px] tabular-nums">:{port.host}</span>
-                </RowAction>
+                </HoverAction>
               ))}
               {container.state === 'running' || container.state === 'restarting' ? (
-                <RowAction title="Arrêter" onClick={() => void act(container.id, 'stop')}>
+                <HoverAction title="Arrêter" onClick={() => void act(container.id, 'stop')}>
                   <Square size={12} />
-                </RowAction>
+                </HoverAction>
               ) : (
-                <RowAction title="Démarrer" onClick={() => void act(container.id, 'start')}>
+                <HoverAction title="Démarrer" onClick={() => void act(container.id, 'start')}>
                   <Play size={12} />
-                </RowAction>
+                </HoverAction>
               )}
-              <RowAction title="Redémarrer" onClick={() => void act(container.id, 'restart')}>
+              <HoverAction title="Redémarrer" onClick={() => void act(container.id, 'restart')}>
                 <RotateCw size={12} />
-              </RowAction>
-              <RowAction title={logsOpen ? 'Masquer les logs' : 'Afficher les logs'} onClick={() => setLogsOpen(!logsOpen)}>
+              </HoverAction>
+              <HoverAction title={logsOpen ? 'Masquer les logs' : 'Afficher les logs'} onClick={() => setLogsOpen(!logsOpen)}>
                 <ScrollText size={12} />
-              </RowAction>
+              </HoverAction>
             </span>
           </>
         )}
@@ -189,21 +184,6 @@ function ContainerRow({ container }: { container: DockerContainer }) {
 }
 
 const BUSY_LABEL = { start: 'démarrage', stop: 'arrêt', restart: 'redémarrage' } as const
-
-function RowAction(props: { title: string; onClick(): void; children: React.ReactNode }) {
-  return (
-    <button
-      title={props.title}
-      onClick={(e) => {
-        e.stopPropagation()
-        props.onClick()
-      }}
-      className="rounded p-0.5 text-muted hover:bg-line hover:text-fg"
-    >
-      {props.children}
-    </button>
-  )
-}
 
 /** The container's last lines, re-read while it runs and the window has focus. */
 function ContainerLogs({ id, live }: { id: string; live: boolean }) {

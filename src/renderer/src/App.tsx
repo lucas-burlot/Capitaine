@@ -6,6 +6,7 @@ import { WindowControls } from '@/app/TitleBar'
 import { UpdateCard } from '@/features/updates/UpdateCard'
 import { useEditors } from '@/features/editor/editor-store'
 import { Sidebar } from '@/features/projects/Sidebar'
+import { usePanels } from '@/app/panels-store'
 import { useExplorer } from '@/features/files/explorer-store'
 import { Workspace } from '@/features/workspace/Workspace'
 import { startAgentNotifications } from '@/features/claude/agent-notifications'
@@ -13,8 +14,8 @@ import { restoreSession, startSessionPersistence } from '@/features/workspace/se
 import { useApp } from '@/features/workspace/workspace-store'
 
 export function App() {
-  const explorerOpen = useExplorer((s) => s.open)
-  const sidebarOpen = useExplorer((s) => s.sidebarOpen)
+  const explorerOpen = usePanels((s) => s.rightOpen)
+  const sidebarOpen = usePanels((s) => s.sidebarOpen)
   const activeProject = useApp((s) => s.projects.find((p) => p.id === s.activeProjectId))
 
   useEffect(() => startAgentNotifications(), [])
@@ -61,11 +62,11 @@ export function App() {
         case 'prev-pane':
           return app.cyclePane(-1)
         case 'toggle-explorer':
-          return useExplorer.getState().toggleOpen()
+          return usePanels.getState().toggleRight()
         case 'find-file':
           return useExplorer.getState().focusSearch()
         case 'toggle-sidebar':
-          return useExplorer.getState().toggleSidebar()
+          return usePanels.getState().toggleSidebar()
         case 'add-project':
           return void app.addProject()
       }

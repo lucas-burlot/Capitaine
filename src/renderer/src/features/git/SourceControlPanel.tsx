@@ -8,7 +8,9 @@ import { CommitBox } from './CommitBox'
 import { GitBranchBar } from './GitBranchBar'
 import { aiResolvable, GitOperationBanner } from './GitOperationBanner'
 import { fileName, useApp } from '@/features/workspace/workspace-store'
-import { PATHS_MIME } from '@/features/files/FileExplorer'
+import { PATHS_MIME } from '@/lib/drag'
+import { HoverAction } from '@/ui/HoverAction'
+import { SectionHeader } from '@/ui/SectionHeader'
 import { EntryIcon } from '@/features/files/FileIcon'
 
 /** Changes (unstaged), staged files and stashes of the project's repo. */
@@ -442,38 +444,7 @@ function StashTextButton(props: { disabled?: boolean; danger?: boolean; onClick(
   )
 }
 
-function SectionHeader(props: { open: boolean; onToggle(): void; title: string; count: number; children?: React.ReactNode }) {
-  return (
-    <div
-      role="button"
-      onClick={props.onToggle}
-      className="group flex h-6 cursor-pointer items-center gap-1 pr-2 pl-2 text-[11px] font-semibold tracking-wider text-muted uppercase hover:text-fg"
-    >
-      <ChevronRight size={12} className={`shrink-0 transition-transform ${props.open ? 'rotate-90' : ''}`} />
-      <span className="flex-1 truncate">{props.title}</span>
-      <span className="hidden items-center group-hover:flex" onClick={(e) => e.stopPropagation()}>
-        {props.children}
-      </span>
-      <span className="ml-1 rounded-full bg-line px-1.5 text-[10px] font-medium tracking-normal text-muted tabular-nums">{props.count}</span>
-    </div>
-  )
-}
 
-function HoverAction(props: { title: string; disabled?: boolean; onClick(): void; children: React.ReactNode }) {
-  return (
-    <button
-      title={props.title}
-      disabled={props.disabled}
-      onClick={(e) => {
-        e.stopPropagation()
-        props.onClick()
-      }}
-      className="rounded p-0.5 text-muted hover:bg-line hover:text-fg disabled:opacity-40"
-    >
-      {props.children}
-    </button>
-  )
-}
 
 const KIND_LETTER: Record<GitChangeKind, string> = {
   modified: 'M',

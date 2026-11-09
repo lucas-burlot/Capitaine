@@ -5,7 +5,7 @@ import { useExplorer } from './explorer-store'
 import { searchFiles, type FileMatch } from './file-search'
 import { isWindows, shortcutLabel } from '@/lib/platform'
 import { useApp } from '@/features/workspace/workspace-store'
-import { PATHS_MIME } from './FileExplorer'
+import { PATHS_MIME } from '@/lib/drag'
 import { EntryIcon } from './FileIcon'
 
 const MAX_RESULTS = 200

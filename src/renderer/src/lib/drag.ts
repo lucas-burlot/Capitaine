@@ -1,3 +1,6 @@
+/** Drag payload understood by terminals: a JSON array of absolute paths. */
+export const PATHS_MIME = 'application/x-capitaine-paths'
+
 /**
  * Starts a pointer drag (sidebar or split resize). A full-window shield keeps xterm from
  * selecting text or eating events while the pointer crosses terminals.

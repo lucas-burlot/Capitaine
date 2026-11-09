@@ -1,19 +1,8 @@
 import { create } from 'zustand'
 import type { DirEntry, GitFileStatus, GitStatus } from '@shared/types'
-
-const OPEN_KEY = 'capitaine.explorerOpen'
-const VIEW_KEY = 'capitaine.rightPanelView'
-const SIDEBAR_KEY = 'capitaine.sidebarOpen'
-
-export type RightPanelView = 'files' | 'git' | 'docker'
+import { usePanels } from '@/app/panels-store'
 
 interface ExplorerState {
-  open: boolean
-  /** Which view the right panel shows. */
-  view: RightPanelView
-  /** Left sidebar (projects) shown or collapsed. */
-  sidebarOpen: boolean
-  toggleSidebar(): void
   /** Expanded directories (absolute paths) per project. The root is always shown. */
   expanded: Record<string, string[]>
   /** Directory listings by absolute path. */
@@ -22,9 +11,6 @@ interface ExplorerState {
   selected: Record<string, string | null>
   git: Record<string, GitStatus | null>
 
-  toggleOpen(): void
-  /** Shows the panel on that view (opening it if hidden). */
-  showView(view: RightPanelView): void
   /** Bumped to put the keyboard in the file search. */
   searchFocusRequest: number
   /** Opens the files view and focuses its search field. */
@@ -55,72 +41,17 @@ function unwatchUnder(dir: string) {
   }
 }
 
-function readFlag(key: string, fallback: boolean): boolean {
-  try {
-    const value = localStorage.getItem(key)
-    return value === null ? fallback : value === '1'
-  } catch {
-    return fallback
-  }
-}
-
-function writeFlag(key: string, value: boolean) {
-  try {
-    localStorage.setItem(key, value ? '1' : '0')
-  } catch {
-    // Not remembered; still applies for this session.
-  }
-}
-
-function initialOpen(): boolean {
-  try {
-    return localStorage.getItem(OPEN_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
-
-function initialView(): RightPanelView {
-  try {
-    const view = localStorage.getItem(VIEW_KEY)
-    return view === 'git' || view === 'docker' ? view : 'files'
-  } catch {
-    return 'files'
-  }
-}
-
 export const useExplorer = create<ExplorerState>((set, get) => ({
-  open: initialOpen(),
-  view: initialView(),
-  sidebarOpen: readFlag(SIDEBAR_KEY, true),
-
-  toggleSidebar() {
-    const sidebarOpen = !get().sidebarOpen
-    writeFlag(SIDEBAR_KEY, sidebarOpen)
-    set({ sidebarOpen })
-  },
   expanded: {},
   children: {},
   errors: {},
   selected: {},
   git: {},
 
-  toggleOpen() {
-    const open = !get().open
-    localStorage.setItem(OPEN_KEY, open ? '1' : '0')
-    set({ open })
-  },
-
-  showView(view) {
-    localStorage.setItem(VIEW_KEY, view)
-    localStorage.setItem(OPEN_KEY, '1')
-    set({ view, open: true })
-  },
-
   searchFocusRequest: 0,
 
   focusSearch() {
-    get().showView('files')
+    usePanels.getState().showView('files')
     set((s) => ({ searchFocusRequest: s.searchFocusRequest + 1 }))
   },
 

@@ -2,11 +2,12 @@ import { useEffect } from 'react'
 import { Container, FolderTree, GitBranch, PanelRightClose, RefreshCw } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { belongsTo, useDocker } from '@/features/docker/docker-store'
-import { useExplorer, type RightPanelView } from '@/features/files/explorer-store'
+import { usePanels, type RightPanelView } from './panels-store'
 import { useGit } from '@/features/git/git-store'
 import { shortcutLabel } from '@/lib/platform'
 import { DockerPanel } from '@/features/docker/DockerPanel'
-import { FileExplorer, FileExplorerActions, IconButton } from '@/features/files/FileExplorer'
+import { FileExplorer, FileExplorerActions } from '@/features/files/FileExplorer'
+import { IconButton } from '@/ui/IconButton'
 import { ResizeHandle, usePanelWidth } from '@/ui/ResizeHandle'
 import { SourceControlPanel } from '@/features/git/SourceControlPanel'
 import { customTitleBar, titleBarHeightClass, WindowControlsSpacer } from './TitleBar'
@@ -26,8 +27,8 @@ export function RightPanel({ project }: { project: Project }) {
     min: customTitleBar ? 300 : 180,
     max: 720
   })
-  const view = useExplorer((s) => s.view)
-  const toggleOpen = useExplorer((s) => s.toggleOpen)
+  const view = usePanels((s) => s.rightView)
+  const toggleOpen = usePanels((s) => s.toggleRight)
   useGitPolling(project.id)
 
   return (
@@ -72,7 +73,7 @@ function ViewTab(props: { view: RightPanelView; current: RightPanelView; icon: R
       aria-selected={active}
       aria-label={props.label}
       title={props.label}
-      onClick={() => useExplorer.getState().showView(props.view)}
+      onClick={() => usePanels.getState().showView(props.view)}
       className={`flex h-7 items-center gap-1 rounded px-1.5 text-[11px] font-medium ${
         active ? 'bg-panel-2 text-accent' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
       }`}

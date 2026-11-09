@@ -15,11 +15,10 @@ import { isMac } from '@/lib/platform'
 import { pathsForTerminal } from '@/lib/shell-quote'
 import { useApp } from '@/features/workspace/workspace-store'
 import { focusedTerminalId, pasteIntoTerminal } from '@/features/terminals/terminal-registry'
+import { PATHS_MIME } from '@/lib/drag'
+import { IconButton } from '@/ui/IconButton'
 import { EntryIcon } from './FileIcon'
 import { FileSearch } from './FileSearch'
-
-/** Drag payload understood by terminals: a JSON array of absolute paths. */
-export const PATHS_MIME = 'application/x-capitaine-paths'
 
 const GIT_POLL_MS = 4000
 
@@ -269,14 +268,6 @@ function Item(props: { icon: React.ReactNode; label: string; hint?: string; disa
       {props.icon}
       <span className="flex-1">{props.label}</span>
       {props.hint && <span className="text-[10px] text-faint">{props.hint}</span>}
-    </button>
-  )
-}
-
-export function IconButton({ title, onClick, children }: { title: string; onClick(): void; children: React.ReactNode }) {
-  return (
-    <button title={title} onClick={onClick} className="no-drag rounded p-1 text-muted hover:bg-panel-2 hover:text-fg">
-      {children}
     </button>
   )
 }
