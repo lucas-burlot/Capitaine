@@ -2,7 +2,7 @@ import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { SavedAgent } from '../shared/types'
+import type { SavedAgent } from '../../shared/types'
 
 /**
  * Finds the Claude Code sessions running in Capitaine's terminals, still without hooks: every

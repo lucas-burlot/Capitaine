@@ -2,7 +2,8 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import type { Project } from '../shared/types'
+import type { Project } from '../../shared/types'
+import { isInside } from '../system/paths'
 
 interface StoreFile {
   version: 1
@@ -24,6 +25,16 @@ export class ProjectStore {
 
   get(id: string): Project | undefined {
     return this.projects.find((p) => p.id === id)
+  }
+
+  /**
+   * The project's folder, or null when the project is unknown or `target` lies outside it: the
+   * renderer only ever reaches files inside a registered project.
+   */
+  rootFor(id: string, target?: string): string | null {
+    const root = this.get(id)?.path
+    if (!root || (target !== undefined && !isInside(root, target))) return null
+    return root
   }
 
   add(path: string): Project {

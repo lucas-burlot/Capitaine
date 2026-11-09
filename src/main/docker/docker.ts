@@ -1,8 +1,8 @@
 import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
-import type { DockerAction, DockerContainer, DockerHealth, DockerListResult, DockerPort, DockerState } from '../shared/types'
-import { loginShellPath } from './shell'
+import type { DockerAction, DockerContainer, DockerHealth, DockerListResult, DockerPort, DockerState } from '../../shared/types'
+import { loginShellPath } from '../system/shell'
 
 /**
  * Read-mostly view of the local Docker engine through the `docker` CLI: it already knows the

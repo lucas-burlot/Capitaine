@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, type Input, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import type { MenuCommand } from '../shared/types'
-import { checkForUpdates, openReleasesPage } from './updater'
+import { checkForUpdates, openReleasesPage } from './updater/updater'
 
 const isMac = process.platform === 'darwin'
 

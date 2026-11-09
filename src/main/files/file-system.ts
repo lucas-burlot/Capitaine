@@ -1,15 +1,9 @@
 import { execFile } from 'node:child_process'
 import { watch, type FSWatcher } from 'node:fs'
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import type { WebContents } from 'electron'
-import type { DirEntry, FileContent, GitFileStatus, GitStatus } from '../shared/types'
-
-/** True when `target` is `root` itself or somewhere beneath it. */
-export function isInside(root: string, target: string): boolean {
-  const rel = relative(root, target)
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
-}
+import type { DirEntry, FileContent, GitFileStatus, GitStatus } from '../../shared/types'
 
 function toRelPath(root: string, target: string): string {
   return relative(root, target).split(sep).join('/')

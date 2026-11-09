@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
-import { loginShellPath } from './shell'
+import { loginShellPath } from '../system/shell'
 
 /**
  * One-shot calls to Claude through the Claude Code CLI (`claude -p`): it brings the user's own

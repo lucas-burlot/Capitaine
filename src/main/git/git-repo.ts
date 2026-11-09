@@ -10,7 +10,7 @@ import type {
   GitStashFile,
   RepoOperation,
   RepoStatus
-} from '../shared/types'
+} from '../../shared/types'
 
 interface GitResult {
   ok: boolean

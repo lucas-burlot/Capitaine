@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { app, BrowserWindow, shell } from 'electron'
 import electronUpdater, { type UpdateInfo } from 'electron-updater'
-import type { UpdateState } from '../shared/types'
+import type { UpdateState } from '../../shared/types'
 
 const { autoUpdater } = electronUpdater
 

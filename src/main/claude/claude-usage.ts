@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { net } from 'electron'
-import type { ClaudeUsage, ClaudeUsageWindow } from '../shared/types'
+import type { ClaudeUsage, ClaudeUsageWindow } from '../../shared/types'
 
 // Same endpoint and headers as Claude Code's /usage and Orca's rate-limit panel.
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'

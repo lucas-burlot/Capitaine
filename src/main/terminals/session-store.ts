@@ -1,8 +1,8 @@
 import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { SavedAgent, SavedSession, SavedTerminal, SessionSaveInput } from '../shared/types'
-import { findClaudeAgents, findClaudeAgentsSync, hasTranscript, sanitizeAgent } from './claude-sessions'
+import type { SavedAgent, SavedSession, SavedTerminal, SessionSaveInput } from '../../shared/types'
+import { findClaudeAgents, findClaudeAgentsSync, hasTranscript, sanitizeAgent } from '../claude/claude-sessions'
 import type { PtyManager } from './pty-manager'
 
 // A runaway scrollback (e.g. a huge `cat`) must not bloat the file read at every launch.

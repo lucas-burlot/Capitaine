@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises'
-import type { CommitOptions, GitActionResult, GitBranch, StashOptions } from '../shared/types'
-import { branchInfo, git, gitError, gitOrThrow, insideRepo, operationInProgress, type GitOptions } from './source-control'
+import type { CommitOptions, GitActionResult, GitBranch, StashOptions } from '../../shared/types'
+import { branchInfo, git, gitError, gitOrThrow, insideRepo, operationInProgress, type GitOptions } from './git-repo'
 
 /** Network operations get far longer than the local ones (slow remotes, big fetches, hooks). */
 const NETWORK_TIMEOUT = 180_000

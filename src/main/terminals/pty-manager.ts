@@ -5,9 +5,9 @@ import { readlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import type { WebContents } from 'electron'
 import * as pty from 'node-pty'
-import type { PtyCreateOptions, PtyCreateResult, SavedAgent } from '../shared/types'
-import { resumeCommand, sanitizeAgent } from './claude-sessions'
-import { buildShellEnv, resolveDefaultShell } from './shell'
+import type { PtyCreateOptions, PtyCreateResult, SavedAgent } from '../../shared/types'
+import { resumeCommand, sanitizeAgent } from '../claude/claude-sessions'
+import { buildShellEnv, resolveDefaultShell } from '../system/shell'
 
 interface Session {
   process: pty.IPty

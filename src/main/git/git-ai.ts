@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises'
-import type { ConflictResolution } from '../shared/types'
-import { askClaude } from './claude-cli'
-import { git, insideRepo, operationInProgress } from './source-control'
+import type { ConflictResolution } from '../../shared/types'
+import { askClaude } from '../claude/claude-cli'
+import { git, insideRepo, operationInProgress } from './git-repo'
 
 const COMMIT_MODEL = 'sonnet'
 const RESOLVE_MODEL = 'sonnet'
