@@ -21,6 +21,11 @@ writeFileSync(join(gitDemo, 'my file.txt'), 'with a space\n')
 writeFileSync(join(gitDemo, 'src/app.ts'), 'export {}\n')
 writeFileSync(join(gitDemo, '.gitignore'), 'dist/\n*.out\n')
 writeFileSync(join(gitDemo, 'dist/bundle.js'), '//\n')
+writeFileSync(
+  join(gitDemo, 'notes.md'),
+  '---\nname: notes\n---\n# Titre principal\n\nDu **gras**, un [lien relatif](other.md) et une [ancre](#tableau).\n\n- [x] fait\n- [ ] à faire\n\n## Tableau\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```ts\nconst x: number = 1\n```\n\n<img src=x onerror="window.__xss=1">\n'
+)
+writeFileSync(join(gitDemo, 'other.md'), '# Autre fichier\n')
 git('init', '-q')
 git('add', '.')
 git('commit', '-qm', 'init')
@@ -264,6 +269,51 @@ await page.click('button:has-text("Annuler")')
 await page.keyboard.press('Control+z')
 editorChecks.undoClearsDirty = await waitFor(async () => !(await dirtyTab()))
 console.log('  editor:', 'undoClearsDirty', editorChecks.undoClearsDirty)
+
+// Markdown: edit / side by side / preview, live while typing, Ctrl+Shift+V, links.
+const markdownChecks = {}
+const previewText = (selector) =>
+  page.evaluate((sel) => document.querySelector(`[data-editor-tab].flex .markdown-body ${sel}`)?.textContent ?? null, selector)
+await page.dblclick('[role=treeitem]:has-text("notes.md")')
+markdownChecks.modeBar = await waitFor(() => page.$('[data-editor-tab].flex [role=tab]:has-text("Aperçu")').then(Boolean), 20000)
+await page.click('[data-editor-tab].flex [role=tab]:has-text("Aperçu")')
+markdownChecks.rendersHeading = await waitFor(async () => (await previewText('h1')) === 'Titre principal')
+markdownChecks.editorHidden = await page.$eval('[data-editor-tab].flex', (el) => !el.querySelector('.monaco-editor')?.checkVisibility())
+markdownChecks.table = (await previewText('td')) === '1'
+markdownChecks.taskList = await page.$$eval('[data-editor-tab].flex .markdown-body input[type=checkbox]', (els) => els.length === 2)
+markdownChecks.frontMatterAsCode = (await previewText('pre code'))?.includes('name: notes') ?? false
+markdownChecks.codeColorized = await waitFor(() => page.$('[data-editor-tab].flex .markdown-body pre code span[class*="mtk"]').then(Boolean))
+markdownChecks.sanitized = await page.evaluate(() => !window.__xss && !document.querySelector('.markdown-body img[onerror]'))
+await shot('08-markdown-preview')
+await page.click('[data-editor-tab].flex [role=tab]:has-text("Côte à côte")')
+await page.click('[data-editor-tab].flex .view-lines')
+await page.keyboard.press('Control+End')
+await page.keyboard.type('\n## Ajout en direct', { delay: 5 })
+markdownChecks.liveUpdate = await waitFor(async () =>
+  page.evaluate(() => [...document.querySelectorAll('[data-editor-tab].flex .markdown-body h2')].some((h) => h.textContent === 'Ajout en direct'))
+)
+markdownChecks.splitShowsBoth = await page.$eval('[data-editor-tab].flex', (el) =>
+  !!el.querySelector('.monaco-editor')?.checkVisibility() && !!el.querySelector('.markdown-body')?.checkVisibility()
+)
+await shot('09-markdown-split')
+await page.click('[data-editor-tab].flex [role=tab]:has-text("Éditer")')
+await page.click('[data-editor-tab].flex .view-lines')
+await page.keyboard.press('Control+Shift+v')
+markdownChecks.shortcutToPreview = await waitFor(() => page.$('[data-editor-tab].flex [role=tab][aria-selected=true]:has-text("Aperçu")').then(Boolean))
+await page.click('[data-editor-tab].flex .markdown-body a:has-text("lien relatif")')
+markdownChecks.relativeLinkOpensFile = await waitFor(async () => (await previewText('h1')) === 'Autre fichier')
+console.log('markdown checks:', markdownChecks)
+if (Object.values(markdownChecks).includes(false)) {
+  console.error('FAIL: markdown preview')
+  process.exit(1)
+}
+// Back to plain editing for the rest of the run, and close the Markdown tabs without saving.
+await page.click('[data-editor-tab].flex [role=tab]:has-text("Éditer")')
+for (const name of ['other.md', 'notes.md']) {
+  await page.click(`main header [title$="${name}"] button`)
+  if (await waitFor(() => page.$('text=Ne pas enregistrer').then(Boolean), 1500)) await page.click('text=Ne pas enregistrer')
+  await waitFor(async () => !(await page.$(`main header [title$="${name}"]`)))
+}
 // Git panel: changes / staged / stash, diffs, staging.
 const gitChecks = {}
 const gitPanel = page.locator('[aria-label="Changements git"]')

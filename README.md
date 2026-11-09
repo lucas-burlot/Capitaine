@@ -88,6 +88,8 @@ Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les ligne
 ### 📝 Éditeur intégré
 Double-clic sur un fichier : il s'ouvre dans Monaco, l'éditeur de VS Code. Si un agent le modifie pendant que tu le lis, il se recharge tout seul.
 
+Les fichiers **Markdown** ont trois modes : **Éditer**, **Côte à côte** (l'aperçu suit ta frappe et ton défilement) et **Aperçu**. <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>V</kbd> bascule entre l'éditeur et l'aperçu. Les liens vers d'autres fichiers du projet s'ouvrent dans un onglet, et le dernier mode choisi est repris au prochain fichier.
+
 </td>
 </tr>
 <tr>
@@ -212,6 +214,7 @@ Pour l'installer comme une vraie application : `npm run dist:linux` puis `sudo a
 | Barre latérale | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>S</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd> |
 | Panneau de droite (fichiers, git) | <kbd>⌘</kbd> <kbd>B</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd> |
 | Enregistrer (éditeur) | <kbd>⌘</kbd> <kbd>S</kbd> | <kbd>Ctrl</kbd> <kbd>S</kbd> |
+| Aperçu Markdown | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>V</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>V</kbd> |
 | Copier / coller (terminal) | <kbd>⌘</kbd> <kbd>C</kbd> / <kbd>V</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>C</kbd> / <kbd>V</kbd> |
 
 Sur Windows et Linux, <kbd>Ctrl</kbd> + lettre reste au shell (<kbd>Ctrl</kbd> <kbd>C</kbd>, <kbd>Ctrl</kbd> <kbd>R</kbd>, <kbd>Ctrl</kbd> <kbd>W</kbd>…), d'où les raccourcis en <kbd>Ctrl</kbd> <kbd>Shift</kbd>.
@@ -292,6 +295,7 @@ En bas à droite, tu vois toujours **ta version** (`v0.1.1 · à jour`) ou celle
 - [x] Suivi des sessions Claude Code et de leurs sous-agents, notifications
 - [x] Explorateur de fichiers avec statut git, recherche de fichier et glisser-déposer vers les terminaux
 - [x] Éditeur intégré (Monaco), rechargé quand un agent modifie le fichier
+- [x] Aperçu Markdown (éditer, côte à côte, aperçu)
 - [x] Panneau Git : changements, index, diffs et stash
 - [x] Quota Claude dans le footer
 - [x] Installeurs macOS, Windows, Linux et mises à jour automatiques
