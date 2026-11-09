@@ -74,7 +74,8 @@ const api: CapitaineApi = {
     }
   },
   claude: {
-    usage: (force) => ipcRenderer.invoke('claude:usage', force)
+    usage: (force) => ipcRenderer.invoke('claude:usage', force),
+    config: (projectId) => ipcRenderer.invoke('claude:config', projectId)
   },
   docker: {
     list: () => ipcRenderer.invoke('docker:list'),

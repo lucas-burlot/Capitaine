@@ -29,7 +29,7 @@ app.whenReady().then(() => {
   registerFilesIpc(projects, watchers)
   registerGitIpc(projects)
   registerTerminalsIpc(ptys, session)
-  registerClaudeIpc()
+  registerClaudeIpc(projects)
   registerDockerIpc()
   registerUpdaterIpc()
   registerWindowIpc()

@@ -15,7 +15,7 @@ import type {
   RepoStatus,
   StashOptions
 } from './git'
-import type { ClaudeUsage } from './claude'
+import type { ClaudeConfig, ClaudeUsage } from './claude'
 import type { UpdateState } from './updater'
 import type { DockerListResult, DockerAction } from './docker'
 
@@ -115,6 +115,8 @@ export interface CapitaineApi {
   claude: {
     /** `force`: the refresh button (still throttled to protect the rate-limited endpoint). */
     usage(force: boolean): Promise<ClaudeUsage>
+    /** Skills, agents, commands, rules and memory files that apply to the project. */
+    config(projectId: string): Promise<ClaudeConfig>
   }
   docker: {
     /** Every container on the machine, stopped ones included. */
