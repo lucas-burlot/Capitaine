@@ -88,6 +88,8 @@ Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les ligne
 ### 📝 Éditeur intégré
 Double-clic sur un fichier : il s'ouvre dans Monaco, l'éditeur de VS Code. Si un agent le modifie pendant que tu le lis, il se recharge tout seul.
 
+La coloration couvre les langages de Monaco, plus **Vue** et **Svelte** (avec le `lang` de `<script>` et `<style>`), **`.env`**, **TOML**, **Makefile** et les fichiers **`.gitignore`**. Les variantes courantes sont reconnues aussi : `.jsonc`, `.env.local`, `Dockerfile.dev`, `.zshrc`, `.editorconfig`…
+
 Les fichiers **Markdown** ont trois modes : **Éditer**, **Côte à côte** (l'aperçu suit ta frappe et ton défilement) et **Aperçu**. <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>V</kbd> bascule entre l'éditeur et l'aperçu. Les liens vers d'autres fichiers du projet s'ouvrent dans un onglet, et le dernier mode choisi est repris au prochain fichier.
 
 </td>

@@ -1,13 +1,14 @@
 // Monaco bundled locally (no CDN: works offline and under the app's CSP), loaded only when an
 // editor tab opens. Worker wiring follows Orca's setup.
 import * as monaco from 'monaco-editor'
-import { typescript as monacoTS } from 'monaco-editor'
+import { json as monacoJSON, typescript as monacoTS } from 'monaco-editor'
 import 'monaco-editor/min/vs/editor/editor.main.css'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import { registerLanguages } from './languages'
 
 globalThis.MonacoEnvironment = {
   getWorker(_workerId, label) {
@@ -45,6 +46,11 @@ monacoTS.javascriptDefaults.setDiagnosticsOptions(diagnostics)
 for (const defaults of [monacoTS.typescriptDefaults, monacoTS.javascriptDefaults]) {
   defaults.setCompilerOptions({ ...defaults.getCompilerOptions(), jsx: monacoTS.JsxEmit.Preserve, allowJs: true })
 }
+
+// tsconfig.json, .jsonc, VS Code settings…: comments and trailing commas are everywhere, don't flag them.
+monacoJSON.jsonDefaults.setDiagnosticsOptions({ validate: true, allowComments: true, trailingCommas: 'ignore' })
+
+registerLanguages()
 
 // Same palette as the app shell and the terminal theme.
 monaco.editor.defineTheme('capitaine', {

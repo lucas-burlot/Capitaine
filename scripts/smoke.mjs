@@ -26,6 +26,8 @@ writeFileSync(
   '---\nname: notes\n---\n# Titre principal\n\nDu **gras**, un [lien relatif](other.md) et une [ancre](#tableau).\n\n- [x] fait\n- [ ] à faire\n\n## Tableau\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```ts\nconst x: number = 1\n```\n\n<img src=x onerror="window.__xss=1">\n'
 )
 writeFileSync(join(gitDemo, 'other.md'), '# Autre fichier\n')
+writeFileSync(join(gitDemo, 'App.vue'), '<template>\n  <p :title="t">{{ t }}</p>\n</template>\n<script setup lang="ts">\nconst t: string = "x"\n</script>\n')
+writeFileSync(join(gitDemo, '.env.local'), '# local\nPORT=3000\nURL="http://${HOST}"\n')
 git('init', '-q')
 git('add', '.')
 git('commit', '-qm', 'init')
@@ -306,6 +308,22 @@ console.log('markdown checks:', markdownChecks)
 if (Object.values(markdownChecks).includes(false)) {
   console.error('FAIL: markdown preview')
   process.exit(1)
+}
+// Syntax colors for languages Monaco doesn't ship (Vue, .env): more than plain gray.
+const tokenColors = () =>
+  page.evaluate(() => new Set([...document.querySelectorAll('[data-editor-tab].flex .view-lines span span')].map((el) => getComputedStyle(el).color)).size)
+for (const [name, key] of [['App.vue', 'vue'], ['.env.local', 'dotenv']]) {
+  await page.dblclick(`[role=treeitem]:has(span.truncate:text-is("${name}"))`)
+  markdownChecks[`${key}Colored`] = await waitFor(async () => (await tokenColors()) >= 4, 10000)
+}
+console.log('language checks:', { vue: markdownChecks.vueColored, dotenv: markdownChecks.dotenvColored })
+if (!markdownChecks.vueColored || !markdownChecks.dotenvColored) {
+  console.error('FAIL: syntax colors')
+  process.exit(1)
+}
+for (const name of ['App.vue', '.env.local']) {
+  await page.click(`main header [title$="${name}"] button`)
+  await waitFor(async () => !(await page.$(`main header [title$="${name}"]`)))
 }
 // Back to plain editing for the rest of the run, and close the Markdown tabs without saving.
 await page.click('[data-editor-tab].flex [role=tab]:has-text("Éditer")')
