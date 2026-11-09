@@ -76,6 +76,11 @@ const api: CapitaineApi = {
   claude: {
     usage: (force) => ipcRenderer.invoke('claude:usage', force)
   },
+  docker: {
+    list: () => ipcRenderer.invoke('docker:list'),
+    action: (id, action) => ipcRenderer.invoke('docker:action', id, action),
+    logs: (id, tail) => ipcRenderer.invoke('docker:logs', id, tail)
+  },
   window: {
     customTitleBar: process.platform !== 'darwin',
     minimize: () => ipcRenderer.send('window:minimize'),

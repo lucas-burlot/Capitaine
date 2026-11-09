@@ -5,7 +5,7 @@ const OPEN_KEY = 'capitaine.explorerOpen'
 const VIEW_KEY = 'capitaine.rightPanelView'
 const SIDEBAR_KEY = 'capitaine.sidebarOpen'
 
-export type RightPanelView = 'files' | 'git'
+export type RightPanelView = 'files' | 'git' | 'docker'
 
 interface ExplorerState {
   open: boolean
@@ -82,7 +82,8 @@ function initialOpen(): boolean {
 
 function initialView(): RightPanelView {
   try {
-    return localStorage.getItem(VIEW_KEY) === 'git' ? 'git' : 'files'
+    const view = localStorage.getItem(VIEW_KEY)
+    return view === 'git' || view === 'docker' ? view : 'files'
   } catch {
     return 'files'
   }

@@ -1,7 +1,8 @@
-import { execFile, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
+import { loginShellPath } from './shell'
 
 /**
  * One-shot calls to Claude through the Claude Code CLI (`claude -p`): it brings the user's own
@@ -19,17 +20,6 @@ export interface ClaudeRequest {
 }
 
 let resolved: Promise<{ file: string; env: NodeJS.ProcessEnv } | null> | null = null
-
-/** PATH as the user's login shell sets it: apps launched from a dock or menu don't inherit it. */
-function loginShellPath(): Promise<string> {
-  if (process.platform === 'win32') return Promise.resolve('')
-  const shell = process.env.SHELL && existsSync(process.env.SHELL) ? process.env.SHELL : '/bin/sh'
-  return new Promise((resolve) => {
-    execFile(shell, ['-lc', 'printf "%s" "$PATH"'], { timeout: 5000, encoding: 'utf8' }, (error, stdout) =>
-      resolve(error ? '' : String(stdout).trim())
-    )
-  })
-}
 
 function findClaude(pathValue: string): string | null {
   const names = process.platform === 'win32' ? ['claude.exe', 'claude.cmd'] : ['claude']

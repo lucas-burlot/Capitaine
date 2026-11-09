@@ -1,5 +1,17 @@
+import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
+
+/** PATH as the user's login shell sets it: apps launched from a dock or menu don't inherit it. */
+export function loginShellPath(): Promise<string> {
+  if (process.platform === 'win32') return Promise.resolve('')
+  const shell = process.env.SHELL && existsSync(process.env.SHELL) ? process.env.SHELL : '/bin/sh'
+  return new Promise((resolve) => {
+    execFile(shell, ['-lc', 'printf "%s" "$PATH"'], { timeout: 5000, encoding: 'utf8' }, (error, stdout) =>
+      resolve(error ? '' : String(stdout).trim())
+    )
+  })
+}
 
 export interface ShellSpec {
   file: string

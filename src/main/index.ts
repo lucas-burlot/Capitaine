@@ -4,6 +4,7 @@ import type { PtyCreateOptions, SessionSaveInput } from '../shared/types'
 import { DirectoryWatchers, gitStatus, isInside, listDirectory, listProjectFiles, readTextFile, writeTextFile } from './file-system'
 import { installAppMenu, installShortcutHandler, popupAppMenu } from './menu'
 import { claudeUsage } from './claude-usage'
+import { containerAction, containerLogs, listContainers } from './docker'
 import { checkForUpdates, downloadUpdate, installUpdate, openReleasesPage, setupUpdater, updateState } from './updater'
 import { branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './source-control'
 import type { CommitOptions, DiffSide, StashOptions } from '../shared/types'
@@ -217,6 +218,11 @@ function registerIpc(): void {
   )
   ipcMain.handle('git:ai-resolve', async (_e, projectId: string, path: unknown) => resolveConflict(await repoOf(projectId), text(path)))
   ipcMain.handle('claude:usage', (_e, force: unknown) => claudeUsage(force === true))
+  ipcMain.handle('docker:list', () => listContainers())
+  ipcMain.handle('docker:action', (_e, id: unknown, action: unknown) =>
+    containerAction(text(id), action === 'stop' ? 'stop' : action === 'restart' ? 'restart' : 'start')
+  )
+  ipcMain.handle('docker:logs', (_e, id: unknown, tail: unknown) => containerLogs(text(id), Number(tail)))
   ipcMain.handle('updater:state', () => updateState())
   ipcMain.on('updater:check', () => void checkForUpdates(true))
   ipcMain.on('updater:download', () => void downloadUpdate())
