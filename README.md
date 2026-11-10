@@ -80,7 +80,7 @@ L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Retrouv
 <td valign="top">
 
 ### 🔀 Git, de la branche au push
-Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées. **Change de branche ou crée-en une** depuis le sélecteur, **commite, pousse et récupère** (pull, sync) sans quitter l'app. Le ✨ fait **écrire le message de commit par Claude**, dans le style de tes commits. En cas de conflit, **Claude propose une résolution** que tu relis (et retouches) dans un diff avant de l'accepter. **Mets tes changements de côté** dans un stash (tout, un seul fichier ou l'index), puis applique-le en le gardant, ou supprime-le.
+Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées, **rangé par dossiers** (ou en liste à plat) ; indexe un dossier entier d'un clic. **Change de branche ou crée-en une** depuis le sélecteur, **commite, pousse et récupère** (pull, sync) sans quitter l'app. Le ✨ fait **écrire le message de commit par Claude**, dans le style de tes commits. En cas de conflit, **Claude propose une résolution** que tu relis (et retouches) dans un diff avant de l'accepter. **Mets tes changements de côté** dans un stash (tout, un seul fichier ou l'index), puis applique-le en le gardant, ou supprime-le.
 
 </td>
 <td valign="top">

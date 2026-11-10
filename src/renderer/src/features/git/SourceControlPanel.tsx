@@ -1,5 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
-import { Archive, ArchiveArrowDown, ArchiveRestore, ChevronRight, FilePen, LoaderCircle, Minus, PackageOpen, Plus, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Archive,
+  ArchiveArrowDown,
+  ArchiveRestore,
+  ChevronRight,
+  ChevronsDownUp,
+  FilePen,
+  List,
+  ListTree,
+  LoaderCircle,
+  Minus,
+  PackageOpen,
+  Plus,
+  Sparkles,
+  Trash2,
+  TriangleAlert
+} from 'lucide-react'
 import type { GitChange, GitChangeKind, GitStash, Project, RepoStatus } from '@shared/types'
 import { changeDiff, repoAbsolutePath, resolutionDiff, stashFileDiff } from './diff-targets'
 import { resolutionKey, useGit } from './git-store'
@@ -12,6 +28,7 @@ import { PATHS_MIME } from '@/lib/drag'
 import { HoverAction } from '@/ui/HoverAction'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { EntryIcon } from '@/features/files/FileIcon'
+import { buildChangeTree, collapseKey, folderPaths, useChangeView, type ChangeFolder, type ChangeNode } from './change-tree'
 
 /** Changes (unstaged), staged files and stashes of the project's repo. */
 export function SourceControlPanel({ project }: { project: Project }) {
@@ -73,11 +90,28 @@ interface SectionProps {
 
 function ChangeSection({ project, status, area, title, changes, onStash }: SectionProps) {
   const [open, setOpen] = useState(true)
+  const mode = useChangeView((s) => s.mode)
+  const tree = useMemo(() => (mode === 'tree' ? buildChangeTree(changes) : null), [mode, changes])
   const { stage, unstage } = useGit.getState()
+  const { setMode, collapseAll } = useChangeView.getState()
   const paths = changes.map((c) => c.path)
+  const folders = tree ? folderPaths(tree) : []
   return (
     <section className="mb-1">
       <SectionHeader open={open} onToggle={() => setOpen(!open)} title={title} count={changes.length}>
+        {tree && folders.length > 0 && (
+          <HoverAction title="Replier tous les dossiers" onClick={() => collapseAll(folders.map((f) => collapseKey(project.id, area, f)))}>
+            <ChevronsDownUp size={13} />
+          </HoverAction>
+        )}
+        {changes.length > 0 && (
+          <HoverAction
+            title={mode === 'tree' ? 'Afficher en liste' : 'Afficher par dossiers'}
+            onClick={() => setMode(mode === 'tree' ? 'list' : 'tree')}
+          >
+            {mode === 'tree' ? <List size={13} /> : <ListTree size={13} />}
+          </HoverAction>
+        )}
         {onStash && changes.length > 0 && (
           <HoverAction title="Mettre les modifications de côté (stash)…" onClick={onStash}>
             <ArchiveArrowDown size={13} />
@@ -94,12 +128,100 @@ function ChangeSection({ project, status, area, title, changes, onStash }: Secti
           </HoverAction>
         )}
       </SectionHeader>
-      {open && changes.map((change) => <ChangeRow key={`${area}:${change.path}`} project={project} status={status} area={area} change={change} />)}
+      {open && tree && <ChangeNodes project={project} status={status} area={area} nodes={tree} depth={0} />}
+      {open && !tree && changes.map((change) => <ChangeRow key={`${area}:${change.path}`} project={project} status={status} area={area} change={change} />)}
     </section>
   )
 }
 
-function ChangeRow({ project, status, area, change }: { project: Project; status: RepoStatus; area: SectionProps['area']; change: GitChange }) {
+interface NodesProps {
+  project: Project
+  status: RepoStatus
+  area: SectionProps['area']
+  nodes: ChangeNode[]
+  depth: number
+}
+
+function ChangeNodes({ nodes, ...props }: NodesProps) {
+  return (
+    <>
+      {nodes.map((node) =>
+        node.kind === 'folder' ? (
+          <FolderRow key={`d:${node.path}`} {...props} folder={node} />
+        ) : (
+          <ChangeRow key={`f:${node.change.path}`} {...props} change={node.change} />
+        )
+      )}
+    </>
+  )
+}
+
+/** Indent of a tree row: one step per level, under the section chevron at the root. */
+const treeIndent = (depth: number) => ({ paddingLeft: 10 + depth * 12 })
+
+function FolderRow({ project, status, area, folder, depth }: Omit<NodesProps, 'nodes'> & { folder: ChangeFolder }) {
+  const key = collapseKey(project.id, area, folder.path)
+  const expanded = useChangeView((s) => !s.collapsed[key])
+  const busy = useGit((s) => folder.changes.some((c) => s.busy[`${project.id}:${c.path}`]))
+  const { stage, unstage } = useGit.getState()
+  const paths = folder.changes.map((c) => c.path)
+  const absolute = repoAbsolutePath(status.repoRoot, folder.path)
+  const count = folder.changes.length
+
+  return (
+    <>
+      <div
+        role="treeitem"
+        aria-expanded={expanded}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(PATHS_MIME, JSON.stringify([absolute]))
+          e.dataTransfer.setData('text/plain', absolute)
+          e.dataTransfer.effectAllowed = 'copy'
+        }}
+        onClick={() => useChangeView.getState().toggleFolder(key)}
+        title={`${folder.path}\n${count} fichier${count > 1 ? 's' : ''} modifié${count > 1 ? 's' : ''}`}
+        className={`group flex h-[22px] cursor-pointer items-center gap-1 pr-2 text-[12.5px] text-muted hover:bg-panel-2/60 hover:text-fg ${busy ? 'opacity-50' : ''}`}
+        style={treeIndent(depth)}
+      >
+        <ChevronRight size={12} className={`shrink-0 text-faint transition-transform ${expanded ? 'rotate-90' : ''}`} />
+        <EntryIcon entry={{ name: folder.name, isDirectory: true }} expanded={expanded} />
+        <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+        <span className="shrink-0 text-[10.5px] text-faint tabular-nums group-hover:hidden">{count}</span>
+        <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+          {area !== 'conflict' && (
+            <HoverAction
+              title="Stasher ce dossier seul (le reste ne bouge pas)"
+              disabled={busy}
+              onClick={() => void useGit.getState().stashPush(project.id, { message: folder.path, includeUntracked: true, stagedOnly: false, paths })}
+            >
+              <ArchiveArrowDown size={12} />
+            </HoverAction>
+          )}
+          {area === 'staged' ? (
+            <HoverAction title="Désindexer le dossier" disabled={busy} onClick={() => void unstage(project.id, paths)}>
+              <Minus size={13} />
+            </HoverAction>
+          ) : (
+            <HoverAction
+              title={area === 'conflict' ? 'Marquer tout le dossier comme résolu (indexer les fichiers tels quels)' : 'Indexer le dossier'}
+              disabled={busy}
+              onClick={() => void stage(project.id, paths)}
+            >
+              <Plus size={13} />
+            </HoverAction>
+          )}
+        </span>
+      </div>
+      {expanded && <ChangeNodes project={project} status={status} area={area} nodes={folder.children} depth={depth + 1} />}
+    </>
+  )
+}
+
+function ChangeRow(props: { project: Project; status: RepoStatus; area: SectionProps['area']; change: GitChange; depth?: number }) {
+  const { project, status, area, change, depth } = props
+  /** In the folder tree: indented, without the folder path beside the name. */
+  const inTree = depth !== undefined
   const busy = useGit((s) => !!s.busy[`${project.id}:${change.path}`])
   const active = useApp((s) => {
     const tab = s.tabs[s.activeTabByProject[project.id] ?? '']
@@ -123,15 +245,17 @@ function ChangeRow({ project, status, area, change }: { project: Project; status
       onClick={() => useApp.getState().openDiff(project.id, changeDiff(status.repoRoot, change, area))}
       onDoubleClick={() => change.kind !== 'deleted' && useApp.getState().openFile(project.id, absolute)}
       title={`${change.origPath ? `${change.origPath} → ` : ''}${change.path}\nClic : voir le diff · double-clic : ouvrir le fichier`}
-      className={`group flex h-[22px] cursor-pointer items-center gap-1.5 pr-2 pl-6 text-[12.5px] ${
+      className={`group flex h-[22px] cursor-pointer items-center pr-2 text-[12.5px] ${inTree ? 'gap-1' : 'gap-1.5 pl-6'} ${
         active ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
       } ${busy ? 'opacity-50' : ''}`}
+      style={inTree ? treeIndent(depth) : undefined}
     >
+      {inTree && <span className="w-3 shrink-0" />}
       <EntryIcon entry={{ name: fileName(change.path), isDirectory: false }} />
-      <span className={`min-w-0 shrink truncate ${KIND_COLOR[change.kind]} ${change.kind === 'deleted' ? 'line-through' : ''}`}>
+      <span className={`min-w-0 truncate ${inTree ? 'flex-1' : 'shrink'} ${KIND_COLOR[change.kind]} ${change.kind === 'deleted' ? 'line-through' : ''}`}>
         {fileName(change.path)}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[11px] text-faint">{dir}</span>
+      {!inTree && <span className="min-w-0 flex-1 truncate text-[11px] text-faint">{dir}</span>}
       {resolution && <ResolutionBadge projectId={project.id} repoRoot={status.repoRoot} path={change.path} state={resolution} />}
       <span className="flex shrink-0 items-center gap-0.5 group-hover:hidden">
         <LineCounts change={change} />
