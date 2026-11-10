@@ -72,7 +72,7 @@ Des onglets par projet, que tu divises à droite ou en bas autant que tu veux. L
 <td valign="top">
 
 ### 🌳 Explorateur de fichiers
-L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Retrouve n'importe quel fichier** en tapant quelques lettres de son nom (`⌘P` / `Ctrl+Shift+P`), et **glisse-le dans un terminal** pour donner son chemin à Claude.
+L'arborescence du projet, rafraîchie toute seule, colorée selon git, avec une **icône par langage et par dossier** comme dans VS Code. **Retrouve n'importe quel fichier** en tapant quelques lettres de son nom (`⌘P` / `Ctrl+Shift+P`), et **glisse-le dans un terminal** pour donner son chemin à Claude.
 
 </td>
 </tr>
@@ -80,7 +80,7 @@ L'arborescence du projet, rafraîchie toute seule, colorée selon git. **Retrouv
 <td valign="top">
 
 ### 🔀 Git, de la branche au push
-Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées. **Change de branche ou crée-en une** depuis le sélecteur, **commite, pousse et récupère** (pull, sync) sans quitter l'app. Le ✨ fait **écrire le message de commit par Claude**, dans le style de tes commits. En cas de conflit, **Claude propose une résolution** que tu relis (et retouches) dans un diff avant de l'accepter. **Mets tes changements de côté** dans un stash (tout, un seul fichier ou l'index), puis applique-le en le gardant, ou supprime-le.
+Le panneau Git montre ce qui est modifié, indexé ou en conflit, avec les lignes ajoutées et supprimées, **rangé par dossiers** (ou en liste à plat) ; indexe un dossier entier d'un clic. **Change de branche ou crée-en une** depuis le sélecteur, **commite, pousse et récupère** (pull, sync) sans quitter l'app. Le ✨ fait **écrire le message de commit par Claude**, dans le style de tes commits. En cas de conflit, **Claude propose une résolution** que tu relis (et retouches) dans un diff avant de l'accepter. **Mets tes changements de côté** dans un stash (tout, un seul fichier ou l'index), puis applique-le en le gardant, ou supprime-le.
 
 </td>
 <td valign="top">
@@ -372,7 +372,7 @@ Les contributions sont les bienvenues : crée une branche, vérifie que `npm run
 
 ## 🙏 Remerciements
 
-Capitaine s'inspire d'[Orca](https://github.com/stablyai/orca) et repose sur [Electron](https://www.electronjs.org), [electron-vite](https://electron-vite.org), [React](https://react.dev), [xterm.js](https://xtermjs.org), [node-pty](https://github.com/microsoft/node-pty), [Monaco Editor](https://microsoft.github.io/monaco-editor/), [zustand](https://github.com/pmndrs/zustand), [Tailwind CSS](https://tailwindcss.com) et [Lucide](https://lucide.dev).
+Capitaine s'inspire d'[Orca](https://github.com/stablyai/orca) et repose sur [Electron](https://www.electronjs.org), [electron-vite](https://electron-vite.org), [React](https://react.dev), [xterm.js](https://xtermjs.org), [node-pty](https://github.com/microsoft/node-pty), [Monaco Editor](https://microsoft.github.io/monaco-editor/), [zustand](https://github.com/pmndrs/zustand), [Tailwind CSS](https://tailwindcss.com), [Lucide](https://lucide.dev) et les icônes de fichiers de [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme).
 
 <div align="center">
 
