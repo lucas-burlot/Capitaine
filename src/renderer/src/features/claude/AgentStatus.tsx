@@ -62,16 +62,20 @@ function formatElapsed(ms: number): string {
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`
 }
 
-/** Agents running in a project's terminals, shown under the project in the sidebar. */
+/** A chat with nothing to signal has no agent entry (its tab shows the chat icon), but it's still an agent. */
+const IDLE_CHAT: AgentSession = { app: 'claude-code', state: 'idle', since: 0, children: [] }
+
+/** Agents running in a project's terminals and chats, shown under the project in the sidebar. */
 export function ProjectAgentList({ projectId }: { projectId: string }) {
   const order = useApp((s) => s.terminalOrder[projectId])
   const agents = useApp((s) => s.agents)
-  const terminalIds = (order ?? []).filter((id) => agents[id])
+  const terminals = useApp((s) => s.terminals)
+  const terminalIds = (order ?? []).filter((id) => agents[id] || terminals[id]?.view === 'chat')
   if (terminalIds.length === 0) return null
   return (
     <ul className="mb-1 ml-4 border-l border-line pl-1.5">
       {terminalIds.map((id) => (
-        <AgentSessionRow key={id} terminalId={id} session={agents[id]} />
+        <AgentSessionRow key={id} terminalId={id} session={agents[id] ?? IDLE_CHAT} />
       ))}
     </ul>
   )
@@ -137,7 +141,9 @@ function SubagentRow({ child }: { child: AgentChild }) {
 /** One-line overview of every agent across projects, pinned to the sidebar bottom. */
 export function AgentSummary() {
   const agents = useApp((s) => s.agents)
-  const sessions = Object.values(agents)
+  const terminals = useApp((s) => s.terminals)
+  const idleChats = Object.entries(terminals).filter(([id, pane]) => pane.view === 'chat' && !agents[id]).length
+  const sessions = [...Object.values(agents), ...Array<AgentSession>(idleChats).fill(IDLE_CHAT)]
   if (sessions.length === 0) return null
   const working = sessions.filter((s) => s.state === 'working').length
   const waiting = sessions.filter((s) => s.state === 'blocked').length
