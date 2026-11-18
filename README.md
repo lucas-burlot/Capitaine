@@ -65,6 +65,20 @@ Une notification système quand un agent t'attend ou a fini, sauf si tu regardes
 <tr>
 <td valign="top">
 
+### 💬 Chat ou terminal, au choix
+Lance Claude **en chat** (fil de messages en Markdown, outils repliables, diffs, images collées, commandes `/` avec autocomplétion, choix du modèle, de l'effort et du mode d'autorisation) ou **dans un terminal**, comme tu préfères (`⌘N` / `Ctrl+Shift+N`, choix par défaut dans le menu du bouton *Agent*). Passe une conversation de l'un à l'autre sans perdre le contexte (`⌘⇧M` / `Ctrl+Shift+M`) : c'est la même session Claude, reprise avec `--resume`.
+
+</td>
+<td valign="top">
+
+### 🛡️ Autorisations dans le chat
+Quand Claude veut lancer une commande ou modifier un fichier, il te le demande dans le chat, avec la commande ou le diff sous les yeux : *Autoriser*, *Toujours autoriser* (pour la conversation) ou *Refuser* en lui disant quoi faire à la place. Ses questions (`AskUserQuestion`) et ses plans (mode *Plan*) s'affichent en cartes à remplir ou approuver.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
 ### 🪟 Terminaux côte à côte
 Des onglets par projet, que tu divises à droite ou en bas autant que tu veux. Les shells restent vivants quand tu changes d'onglet ou de projet : tes agents continuent de travailler. Ferme l'app et rouvre-la : tes onglets reviennent, chaque terminal dans le dossier où tu l'avais laissé, avec son historique, et tes sessions Claude reprennent leur conversation (`claude --resume`).
 
@@ -207,6 +221,8 @@ Pour l'installer comme une vraie application : `npm run dist:linux` puis `sudo a
 | Action | macOS | Windows / Linux |
 | :--- | :---: | :---: |
 | Nouvel onglet | <kbd>⌘</kbd> <kbd>T</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>T</kbd> |
+| Nouvel agent Claude (chat ou terminal, selon ton choix) | <kbd>⌘</kbd> <kbd>N</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>N</kbd> |
+| Basculer l'agent entre chat et terminal | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>M</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>M</kbd> |
 | Fermer le terminal ou l'onglet | <kbd>⌘</kbd> <kbd>W</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>W</kbd> |
 | Diviser à droite | <kbd>⌘</kbd> <kbd>D</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>D</kbd> |
 | Diviser en bas | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>D</kbd> | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>E</kbd> |
@@ -245,7 +261,7 @@ src/
 │                      La logique du domaine + <domaine>-ipc.ts, ses handlers IPC
 └── renderer/src/      Interface (React)
     ├── app/           Le cadre de la fenêtre : barre de titre, panneau de droite, état des panneaux et des pages
-    ├── features/      projects · workspace · terminals · claude · files · editor · git · docker · updates
+    ├── features/      projects · workspace · terminals · chat · claude · files · editor · git · docker · updates
     ├── ui/            Composants génériques (boutons, en-têtes de section, poignée de redimensionnement, pages plein écran)
     └── lib/           Utilitaires sans état (plateforme, dates relatives, glisser-déposer…)
 ```
@@ -264,6 +280,8 @@ Côté interface, `@/` pointe vers `src/renderer/src`, `@shared/` vers `src/shar
 | [`src/main/files/file-system.ts`](src/main/files/file-system.ts) | Listing des dossiers, surveillance des changements, lecture et écriture |
 | [`src/renderer/src/features/editor/`](src/renderer/src/features/editor) | Monaco, chargé à la demande, et les sessions d'édition |
 | [`src/main/docker/docker.ts`](src/main/docker/docker.ts) | Les conteneurs Docker : liste, statut, démarrage / arrêt, logs |
+| [`src/main/claude/claude-chat.ts`](src/main/claude/claude-chat.ts) | Claude en chat : un `claude -p` en stream-json par conversation, demandes d'autorisation comprises |
+| [`src/renderer/src/features/chat/chat-fold.ts`](src/renderer/src/features/chat/chat-fold.ts) | Le flux de Claude (direct ou historique relu) transformé en messages, outils et résumés de tour |
 | [`src/main/claude/claude-config.ts`](src/main/claude/claude-config.ts) | Les skills, agents, commands, rules et CLAUDE.md d'un projet (projet, global, plugins) |
 | [`src/main/claude/claude-usage.ts`](src/main/claude/claude-usage.ts) | Le quota Claude, via la connexion de Claude Code |
 | [`src/main/updater/updater.ts`](src/main/updater/updater.ts) | Les mises à jour automatiques (releases GitHub) |

@@ -69,13 +69,26 @@ export function findClaudeAgentsSync(shells: Map<string, number>): Map<string, S
 
 /** Claude can only resume a conversation it wrote down, i.e. one with at least one message. */
 export function hasTranscript(sessionId: string): boolean {
-  if (!SESSION_ID_RE.test(sessionId)) return false
+  return transcriptPath(sessionId) !== null
+}
+
+/** Where Claude keeps a conversation (`<config>/projects/<folder>/<id>.jsonl`), or null. */
+export function transcriptPath(sessionId: string): string | null {
+  if (!SESSION_ID_RE.test(sessionId)) return null
   const dir = join(claudeConfigDir(), 'projects')
   try {
-    return readdirSync(dir).some((project) => existsSync(join(dir, project, `${sessionId}.jsonl`)))
+    for (const project of readdirSync(dir)) {
+      const file = join(dir, project, `${sessionId}.jsonl`)
+      if (existsSync(file)) return file
+    }
   } catch {
-    return false
+    // No conversation saved yet.
   }
+  return null
+}
+
+export function isSessionId(value: unknown): value is string {
+  return typeof value === 'string' && SESSION_ID_RE.test(value)
 }
 
 /** Checks a saved agent (it comes back through the renderer); null when it can't be relaunched. */

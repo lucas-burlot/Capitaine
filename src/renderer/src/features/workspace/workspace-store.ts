@@ -2,14 +2,19 @@ import { create } from 'zustand'
 import type { DiffSide, Project } from '@shared/types'
 import { applyAgentReport, stripStatusGlyph, type AgentReport, type AgentSession, type AgentState } from '@/features/claude/agent-status'
 import { setTerminalStartup } from '@/features/terminals/terminal-startup'
+import { defaultAgentView } from '@/features/chat/agent-settings'
 import { pane, paneIds, removePane, resizeSplit, splitPane, type LayoutNode, type SplitDirection } from './layout'
 
-/** One shell. Lives in a pane of a tab's layout. */
+/** How a pane shows its agent: a terminal (shell, Claude's own TUI) or Capitaine's chat. */
+export type PaneView = 'shell' | 'chat'
+
+/** One shell, or one Claude chat. Lives in a pane of a tab's layout. */
 export interface TerminalPane {
   id: string
   projectId: string
   tabId: string
   number: number
+  view: PaneView
   /** Title pushed by the shell via OSC escape sequences. */
   shellTitle: string | null
   /** Title set by the user; wins over the shell title. */
@@ -68,6 +73,10 @@ interface AppState {
   selectProject(id: string): void
 
   newTab(projectId?: string): void
+  /** New tab running Claude, as a chat or in a terminal. */
+  newAgent(projectId?: string, view?: PaneView): void
+  /** Shows a pane as a chat or a terminal; the caller hands the conversation over (agent-launch). */
+  setPaneView(terminalId: string, view: PaneView): void
   /** New tab whose shell opens a shell inside a running container (`docker exec`). */
   openContainerShell(projectId: string, container: string, title: string): void
   /** Opens a file in an editor tab, or brings its existing tab forward. */
@@ -104,6 +113,7 @@ function cleanShellTitle(title: string): string {
 }
 
 export function terminalLabel(terminal: TerminalPane): string {
+  if (terminal.view === 'chat') return terminal.customTitle || terminal.shellTitle || `Claude ${terminal.number}`
   return terminal.customTitle || (terminal.shellTitle && cleanShellTitle(terminal.shellTitle)) || `Terminal ${terminal.number}`
 }
 
@@ -147,13 +157,14 @@ function without<T>(record: Record<string, T>, keys: Iterable<string>): Record<s
   return next
 }
 
-function newPane(state: AppState, projectId: string, tabId: string): { terminal: TerminalPane; nextNumber: number } {
+function newPane(state: AppState, projectId: string, tabId: string, view: PaneView = 'shell'): { terminal: TerminalPane; nextNumber: number } {
   const number = state.nextTerminalNumber[projectId] ?? 1
   const terminal: TerminalPane = {
     id: crypto.randomUUID(),
     projectId,
     tabId,
     number,
+    view,
     shellTitle: null,
     customTitle: null,
     unread: false,
@@ -249,27 +260,29 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   newTab(projectId) {
+    openPaneTab(projectId, 'shell')
+  },
+
+  newAgent(projectId, view) {
     const target = projectId ?? get().activeProjectId
     if (!target) return
+    const paneView = view ?? defaultAgentView()
+    const terminalId = openPaneTab(target, paneView)
+    // In a terminal, Claude is typed into the new shell once it's ready.
+    if (terminalId && paneView === 'shell') {
+      const project = get().projects.find((p) => p.id === target)
+      if (project) setTerminalStartup(terminalId, { resumeAgent: { sessionId: null, cwd: project.path, args: [] } })
+    }
+    if (get().activeProjectId !== target) get().selectProject(target)
+  },
+
+  setPaneView(terminalId, view) {
     set((state) => {
-      const tabId = crypto.randomUUID()
-      const { terminal, nextNumber } = newPane(state, target, tabId)
-      const tab: Tab = {
-        id: tabId,
-        projectId: target,
-        kind: 'terminal',
-        filePath: null,
-        layout: pane(terminal.id),
-        activePaneId: terminal.id,
-        customTitle: null
-      }
+      const terminal = state.terminals[terminalId]
+      if (!terminal || terminal.view === view) return state
       return {
-        terminals: { ...state.terminals, [terminal.id]: terminal },
-        terminalOrder: { ...state.terminalOrder, [target]: [...(state.terminalOrder[target] ?? []), terminal.id] },
-        tabs: { ...state.tabs, [tabId]: tab },
-        tabOrder: { ...state.tabOrder, [target]: [...(state.tabOrder[target] ?? []), tabId] },
-        activeTabByProject: { ...state.activeTabByProject, [target]: tabId },
-        nextTerminalNumber: { ...state.nextTerminalNumber, [target]: nextNumber }
+        terminals: { ...state.terminals, [terminalId]: { ...terminal, view, shellTitle: null, exitCode: null } },
+        agents: without(state.agents, [terminalId])
       }
     })
   },
@@ -477,6 +490,36 @@ export const useApp = create<AppState>((set, get) => ({
     get().focusPane(terminalId)
   }
 }))
+
+/** Opens a tab holding one new pane (shell or chat) at the end of the project's tabs; returns the pane id. */
+function openPaneTab(projectId: string | undefined, view: PaneView): string | null {
+  const target = projectId ?? useApp.getState().activeProjectId
+  if (!target) return null
+  let paneId: string | null = null
+  useApp.setState((state) => {
+    const tabId = crypto.randomUUID()
+    const { terminal, nextNumber } = newPane(state, target, tabId, view)
+    paneId = terminal.id
+    const tab: Tab = {
+      id: tabId,
+      projectId: target,
+      kind: 'terminal',
+      filePath: null,
+      layout: pane(terminal.id),
+      activePaneId: terminal.id,
+      customTitle: null
+    }
+    return {
+      terminals: { ...state.terminals, [terminal.id]: terminal },
+      terminalOrder: { ...state.terminalOrder, [target]: [...(state.terminalOrder[target] ?? []), terminal.id] },
+      tabs: { ...state.tabs, [tabId]: tab },
+      tabOrder: { ...state.tabOrder, [target]: [...(state.tabOrder[target] ?? []), tabId] },
+      activeTabByProject: { ...state.activeTabByProject, [target]: tabId },
+      nextTerminalNumber: { ...state.nextTerminalNumber, [target]: nextNumber }
+    }
+  })
+  return paneId
+}
 
 /** Editor and diff tabs: reuse a matching tab, or insert a new one right after the current tab. */
 function openDocumentTab(projectId: string, matches: (tab: Tab) => boolean, fields: Pick<Tab, 'kind' | 'filePath' | 'diff'>) {

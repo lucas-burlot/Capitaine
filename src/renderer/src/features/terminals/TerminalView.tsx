@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { SquareTerminal, X } from 'lucide-react'
+import { MessageSquare, SquareTerminal, X } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SerializeAddon } from '@xterm/addon-serialize'
@@ -44,7 +44,7 @@ function isAppShortcut(event: KeyboardEvent): boolean {
   if (isMac) return event.metaKey
   if (event.ctrlKey && key === 'tab') return true
   if (event.ctrlKey && event.altKey && (key === 'arrowleft' || key === 'arrowright')) return true
-  return event.ctrlKey && event.shiftKey && ['t', 'w', 'o', 'c', 'v', 'a', 'd', 'e', 'b', 'p'].includes(key)
+  return event.ctrlKey && event.shiftKey && ['t', 'w', 'o', 'c', 'v', 'a', 'd', 'e', 'b', 'p', 'n', 'm'].includes(key)
 }
 
 export function TerminalView({ terminalId, cwd, rect, visible, focused, showHeader }: Props) {
@@ -104,8 +104,8 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
     // Reopened after a restart: show what the terminal had on screen, then start the shell below it.
     // A resumed Claude conversation prints itself again, so its old screen would only repeat it.
     const restored = restoredTerminal(terminalId)
-    const resumeAgent = restored?.agent ?? undefined
     const startup = takeTerminalStartup(terminalId)
+    const resumeAgent = startup?.resumeAgent ?? restored?.agent ?? undefined
     if (restored?.scrollback && !resumeAgent?.sessionId) term.write(restored.scrollback + RESTORED_MARKER)
 
     const onFocus = () => useApp.getState().focusPane(terminalId)
@@ -236,7 +236,8 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
   )
 }
 
-function PaneHeader({ terminalId, focused }: { terminalId: string; focused: boolean }) {
+/** Title strip of a pane in a split tab (terminal or chat). */
+export function PaneHeader({ terminalId, focused }: { terminalId: string; focused: boolean }) {
   const terminal = useApp((s) => s.terminals[terminalId])
   const agent = useApp((s) => s.agents[terminalId])
   const focusPane = useApp((s) => s.focusPane)
@@ -251,6 +252,8 @@ function PaneHeader({ terminalId, focused }: { terminalId: string; focused: bool
     >
       {agent ? (
         <AgentStatusIcon state={agent.state} kind={agent.kind} size={11} />
+      ) : terminal.view === 'chat' ? (
+        <MessageSquare size={11} className={focused ? 'text-accent' : ''} />
       ) : (
         <SquareTerminal size={11} className={focused ? 'text-accent' : ''} />
       )}

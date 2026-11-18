@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useRef, useState } from 'react'
-import { Columns2, FolderPlus, GitCompare, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
+import { Columns2, FolderPlus, GitCompare, MessageSquare, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import { useEditors } from '@/features/editor/editor-store'
 import { usePanels } from '@/app/panels-store'
 import { startDrag } from '@/lib/drag'
@@ -9,6 +9,8 @@ import { mostUrgentAgent, tabLabel, useApp, type Tab } from './workspace-store'
 import { AgentStatusIcon } from '@/features/claude/AgentStatus'
 import { EntryIcon } from '@/features/files/FileIcon'
 import { TerminalView } from '@/features/terminals/TerminalView'
+import { ChatView } from '@/features/chat/ChatView'
+import { AgentButton, ViewToggleButton } from '@/features/chat/AgentButton'
 import { TitleBarBrand, titleBarHeightClass, WindowControlsSpacer } from '@/app/TitleBar'
 import logo from '@resources/icon.svg'
 
@@ -48,16 +50,18 @@ export function Workspace() {
           const tab = tabs[terminal.tabId]
           const layout = layouts.get(terminal.tabId)
           const visible = terminal.tabId === activeTabId
-          return (
-            <TerminalView
-              key={terminal.id}
-              terminalId={terminal.id}
-              cwd={projectPaths.get(terminal.projectId) ?? ''}
-              rect={layout?.panes.get(terminal.id) ?? FULL}
-              visible={visible}
-              focused={visible && tab?.activePaneId === terminal.id}
-              showHeader={(layout?.panes.size ?? 1) > 1}
-            />
+          const props = {
+            cwd: projectPaths.get(terminal.projectId) ?? '',
+            rect: layout?.panes.get(terminal.id) ?? FULL,
+            visible,
+            focused: visible && tab?.activePaneId === terminal.id,
+            showHeader: (layout?.panes.size ?? 1) > 1
+          }
+          // A pane switching between chat and terminal remounts as the other view.
+          return terminal.view === 'chat' ? (
+            <ChatView key={`${terminal.id}:chat`} chatId={terminal.id} {...props} />
+          ) : (
+            <TerminalView key={`${terminal.id}:shell`} terminalId={terminal.id} {...props} />
           )
         })}
         {activeTab &&
@@ -145,6 +149,10 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
   const tabs = useApp((s) => s.tabs)
   const activeId = useApp((s) => s.activeTabByProject[projectId])
   const activeIsTerminal = useApp((s) => s.tabs[s.activeTabByProject[projectId] ?? '']?.kind === 'terminal')
+  const activePaneId = useApp((s) => {
+    const tab = s.tabs[s.activeTabByProject[projectId] ?? '']
+    return tab?.kind === 'terminal' ? tab.activePaneId : null
+  })
   const newTab = useApp((s) => s.newTab)
   const splitActivePane = useApp((s) => s.splitActivePane)
   const explorerOpen = usePanels((s) => s.rightOpen)
@@ -152,7 +160,7 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
   const sidebarOpen = usePanels((s) => s.sidebarOpen)
 
   return (
-    <header className={`drag-region flex shrink-0 items-end gap-3 border-b border-line bg-panel ${explorerOpen ? 'pr-2' : ''} ${titleBarHeightClass}`}>
+    <header className={`drag-region @container flex shrink-0 items-end gap-3 border-b border-line bg-panel ${explorerOpen ? 'pr-2' : ''} ${titleBarHeightClass}`}>
       {!sidebarOpen && (
         <div className="flex shrink-0 self-stretch">
           <TitleBarBrand compact />
@@ -183,6 +191,9 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
       {/* Empty title-bar space: grab here to move the window (the tab strip itself is no-drag). */}
       <div className="min-w-[96px] flex-1 self-stretch" data-window-drag />
       <div className="no-drag mb-1.5 flex shrink-0 items-center gap-0.5">
+        <AgentButton projectId={projectId} />
+        {activePaneId && <ViewToggleButton terminalId={activePaneId} />}
+        <div className="mx-1 h-4 w-px bg-line" />
         {activeIsTerminal && (
           <>
             <button
@@ -229,6 +240,7 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
   const agent = useApp((s) => mostUrgentAgent(s.agents, ids))
   const unread = useApp((s) => ids.some((id) => s.terminals[id]?.unread))
   const exited = useApp((s) => s.terminals[tab.activePaneId]?.exitCode != null)
+  const chat = useApp((s) => tab.kind === 'terminal' && s.terminals[tab.activePaneId]?.view === 'chat')
   const selectTab = useApp((s) => s.selectTab)
   const closeTerminalTab = useApp((s) => s.closeTab)
   // Editor tabs go through the unsaved-changes prompt.
@@ -268,6 +280,8 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
         <GitCompare size={13} className="shrink-0 text-violet-300/80" />
       ) : agent ? (
         <AgentStatusIcon state={agent.state} kind={agent.kind} />
+      ) : chat ? (
+        <MessageSquare size={13} className={active ? 'text-accent' : ''} />
       ) : (
         <SquareTerminal size={13} className={exited ? 'text-red-400' : active ? 'text-accent' : ''} />
       )}
@@ -338,23 +352,33 @@ function NoProject() {
 
 function NoTerminal() {
   const newTab = useApp((s) => s.newTab)
+  const newAgent = useApp((s) => s.newAgent)
   return (
     <EmptyState
       title="Aucun terminal ouvert"
-      text={`Les terminaux s'ouvrent dans le dossier du projet. ${shortcutLabel('splitRight')} pour en mettre deux côte à côte.`}
+      text={`Les terminaux et les agents s'ouvrent dans le dossier du projet. ${shortcutLabel('splitRight')} pour en mettre deux côte à côte.`}
       action={{ label: 'Nouveau terminal', shortcut: shortcutLabel('newTerminal'), icon: <Plus size={14} />, onClick: () => newTab() }}
+      secondary={{ label: 'Nouvel agent Claude', shortcut: shortcutLabel('newAgent'), icon: <MessageSquare size={14} />, onClick: () => newAgent() }}
     />
   )
+}
+
+interface EmptyStateAction {
+  label: string
+  shortcut: string
+  icon: React.ReactNode
+  onClick(): void
 }
 
 interface EmptyStateProps {
   logo?: boolean
   title: string
   text: string
-  action: { label: string; shortcut: string; icon: React.ReactNode; onClick(): void }
+  action: EmptyStateAction
+  secondary?: EmptyStateAction
 }
 
-function EmptyState({ logo: showLogo, title, text, action }: EmptyStateProps) {
+function EmptyState({ logo: showLogo, title, text, action, secondary }: EmptyStateProps) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
       {showLogo && <img src={logo} alt="" className="mb-2 h-24 w-24" draggable={false} />}
@@ -368,6 +392,16 @@ function EmptyState({ logo: showLogo, title, text, action }: EmptyStateProps) {
         {action.label}
         <kbd className="ml-1 rounded bg-bg/15 px-1.5 py-0.5 font-sans text-[11px]">{action.shortcut}</kbd>
       </button>
+      {secondary && (
+        <button
+          onClick={secondary.onClick}
+          className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-[13px] font-medium text-fg hover:bg-panel-2"
+        >
+          {secondary.icon}
+          {secondary.label}
+          <kbd className="ml-1 rounded bg-panel-2 px-1.5 py-0.5 font-sans text-[11px] text-muted">{secondary.shortcut}</kbd>
+        </button>
+      )}
     </div>
   )
 }

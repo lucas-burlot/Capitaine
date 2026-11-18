@@ -10,7 +10,7 @@ import { useApp, type Tab, type TerminalPane } from './workspace-store'
 import { snapshotTerminal } from '@/features/terminals/terminal-registry'
 
 interface SavedWorkspace {
-  terminals: Record<string, Pick<TerminalPane, 'id' | 'projectId' | 'tabId' | 'number' | 'shellTitle' | 'customTitle'>>
+  terminals: Record<string, Pick<TerminalPane, 'id' | 'projectId' | 'tabId' | 'number' | 'view' | 'shellTitle' | 'customTitle'>>
   terminalOrder: Record<string, string[]>
   tabs: Record<string, Pick<Tab, 'id' | 'projectId' | 'kind' | 'filePath' | 'layout' | 'activePaneId' | 'customTitle'>>
   tabOrder: Record<string, string[]>
@@ -105,8 +105,9 @@ function captureSession(state: AppSnapshot): SessionSaveInput {
   const terminals: SavedWorkspace['terminals'] = {}
   const screens: SessionSaveInput['terminals'] = {}
   for (const terminal of Object.values(state.terminals)) {
-    const { id, projectId, tabId, number, shellTitle, customTitle } = terminal
-    terminals[id] = { id, projectId, tabId, number, shellTitle, customTitle }
+    const { id, projectId, tabId, number, view, shellTitle, customTitle } = terminal
+    // A chat keeps its title (its first message); a shell's is pushed again by the new shell.
+    terminals[id] = { id, projectId, tabId, number, view, shellTitle, customTitle }
     // A terminal not mounted yet still has its saved screen: keep it rather than lose it.
     const pending = restored.get(id)
     screens[id] = snapshotTerminal(id) ?? { ptyId: null, scrollback: pending?.scrollback ?? '', agent: pending?.agent ?? null }
@@ -138,6 +139,7 @@ function sanitizeWorkspace(raw: unknown, projects: Project[]): RestoredWorkspace
       projectId: value.projectId,
       tabId: value.tabId,
       number: typeof value.number === 'number' ? value.number : 1,
+      view: value.view === 'chat' ? 'chat' : 'shell',
       shellTitle: typeof value.shellTitle === 'string' ? value.shellTitle : null,
       customTitle: typeof value.customTitle === 'string' ? value.customTitle : null,
       unread: false,
