@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
-import type { CapitaineApi, MenuCommand, UpdateState } from '../shared/types'
+import type { CapitaineApi, ChatWireMessage, MenuCommand, UpdateState } from '../shared/types'
 
 function subscribe<Args extends unknown[]>(channel: string, listener: (...args: Args) => void): () => void {
   const handler = (_event: IpcRendererEvent, ...args: unknown[]) => listener(...(args as Args))
@@ -76,6 +76,18 @@ const api: CapitaineApi = {
   claude: {
     usage: (force) => ipcRenderer.invoke('claude:usage', force),
     config: (projectId) => ipcRenderer.invoke('claude:config', projectId)
+  },
+  chat: {
+    start: (options) => ipcRenderer.invoke('chat:start', options),
+    send: (chatId, uuid, content) => ipcRenderer.send('chat:send', chatId, uuid, content),
+    respond: (chatId, requestId, response) => ipcRenderer.send('chat:respond', chatId, requestId, response),
+    control: (chatId, request) => ipcRenderer.invoke('chat:control', chatId, request),
+    stop: (chatId) => ipcRenderer.send('chat:stop', chatId),
+    history: (sessionId) => ipcRenderer.invoke('chat:history', sessionId),
+    agentInTerminal: (ptyId) => ipcRenderer.invoke('chat:agent-in-terminal', ptyId),
+    terminalCwd: (ptyId) => ipcRenderer.invoke('chat:terminal-cwd', ptyId),
+    onMessages: (listener) => subscribe<[string, ChatWireMessage[]]>('chat:messages', listener),
+    onExit: (listener) => subscribe<[string, number | null, string | null]>('chat:exit', listener)
   },
   docker: {
     list: () => ipcRenderer.invoke('docker:list'),

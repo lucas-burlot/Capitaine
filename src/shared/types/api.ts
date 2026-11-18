@@ -1,5 +1,6 @@
 import type { Project } from './projects'
-import type { PtyCreateOptions, PtyCreateResult, SessionSaveInput, SavedSession } from './terminals'
+import type { PtyCreateOptions, PtyCreateResult, SavedAgent, SessionSaveInput, SavedSession } from './terminals'
+import type { ChatControlRequest, ChatHistory, ChatPermissionResponse, ChatStartOptions, ChatUserContent, ChatWireMessage } from './chat'
 import type { DirEntry, FileContent } from './files'
 import type {
   BlobContent,
@@ -32,6 +33,8 @@ export type MenuCommand =
   | 'toggle-explorer'
   | 'toggle-sidebar'
   | 'find-file'
+  | 'new-agent'
+  | 'toggle-agent-view'
 
 /** API exposed to the renderer by the preload script as `window.capitaine`. */
 export interface CapitaineApi {
@@ -117,6 +120,25 @@ export interface CapitaineApi {
     usage(force: boolean): Promise<ClaudeUsage>
     /** Skills, agents, commands, rules and memory files that apply to the project. */
     config(projectId: string): Promise<ClaudeConfig>
+  }
+  chat: {
+    /** Starts Claude for a chat pane (replacing any process it had). Rejects when Claude can't run. */
+    start(options: ChatStartOptions): Promise<void>
+    /** `uuid` comes back on Claude's echo of the message (queued → taken). */
+    send(chatId: string, uuid: string, content: ChatUserContent): void
+    /** Answers a permission prompt (`can_use_tool`). */
+    respond(chatId: string, requestId: string, response: ChatPermissionResponse): void
+    /** `initialize`, `interrupt`, `set_model`, `set_permission_mode`…: resolves with Claude's answer. */
+    control(chatId: string, request: ChatControlRequest): Promise<unknown>
+    stop(chatId: string): void
+    /** The saved conversation, to show a resumed session. */
+    history(sessionId: string): Promise<ChatHistory>
+    /** The Claude session running in a terminal's shell, if any. */
+    agentInTerminal(ptyId: string): Promise<SavedAgent | null>
+    terminalCwd(ptyId: string): Promise<string | null>
+    onMessages(listener: (chatId: string, messages: ChatWireMessage[]) => void): () => void
+    /** Claude exited on its own; `error` explains why when it wasn't a clean exit. */
+    onExit(listener: (chatId: string, code: number | null, error: string | null) => void): () => void
   }
   docker: {
     /** Every container on the machine, stopped ones included. */

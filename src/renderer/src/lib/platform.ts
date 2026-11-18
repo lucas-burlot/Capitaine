@@ -3,6 +3,8 @@ export const isWindows = window.capitaine.platform === 'win32'
 
 const labels = {
   newTerminal: isMac ? '⌘T' : 'Ctrl+Shift+T',
+  newAgent: isMac ? '⌘N' : 'Ctrl+Shift+N',
+  toggleAgentView: isMac ? '⌘⇧M' : 'Ctrl+Shift+M',
   closeTerminal: isMac ? '⌘W' : 'Ctrl+Shift+W',
   addProject: isMac ? '⌘O' : 'Ctrl+Shift+O',
   nextTerminal: isMac ? '⌘⇧]' : 'Ctrl+Tab',

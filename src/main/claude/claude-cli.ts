@@ -43,7 +43,8 @@ function findClaude(pathValue: string): string | null {
   return null
 }
 
-function resolveClaude() {
+/** The `claude` executable and the environment to run it with; null when it isn't installed. */
+export function resolveClaude(): Promise<{ file: string; env: NodeJS.ProcessEnv } | null> {
   resolved ??= (async () => {
     const login = await loginShellPath()
     const pathValue = [login, process.env.PATH ?? process.env.Path ?? ''].filter(Boolean).join(delimiter)

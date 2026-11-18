@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron'
+import { ChatManager } from './claude/claude-chat'
 import { registerClaudeIpc } from './claude/claude-ipc'
 import { registerDockerIpc } from './docker/docker-ipc'
 import { DirectoryWatchers } from './files/file-system'
@@ -17,6 +18,7 @@ import icon from '../../resources/icon.png?asset'
 
 const isDev = !app.isPackaged
 const ptys = new PtyManager()
+const chats = new ChatManager()
 const watchers = new DirectoryWatchers()
 
 app.whenReady().then(() => {
@@ -29,17 +31,17 @@ app.whenReady().then(() => {
   registerFilesIpc(projects, watchers)
   registerGitIpc(projects)
   registerTerminalsIpc(ptys, session)
-  registerClaudeIpc(projects)
+  registerClaudeIpc(projects, chats, ptys)
   registerDockerIpc()
   registerUpdaterIpc()
   registerWindowIpc()
 
   installAppMenu(isDev)
-  createWindow({ ptys, watchers, isDev })
+  createWindow({ ptys, chats, watchers, isDev })
   setupUpdater()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow({ ptys, watchers, isDev })
+    if (BrowserWindow.getAllWindows().length === 0) createWindow({ ptys, chats, watchers, isDev })
   })
 })
 
@@ -50,4 +52,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => markQuitRequested())
 
 // Only once every window agreed to close (no unsaved files left) do the shells go.
-app.on('will-quit', () => ptys.killAll())
+app.on('will-quit', () => {
+  ptys.killAll()
+  chats.stopAll()
+})

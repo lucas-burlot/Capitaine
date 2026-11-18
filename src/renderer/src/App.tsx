@@ -14,6 +14,7 @@ import { Workspace } from '@/features/workspace/Workspace'
 import { startAgentNotifications } from '@/features/claude/agent-notifications'
 import { restoreSession, startSessionPersistence } from '@/features/workspace/session'
 import { useApp } from '@/features/workspace/workspace-store'
+import { togglePaneView } from '@/features/chat/agent-launch'
 
 export function App() {
   const explorerOpen = usePanels((s) => s.rightOpen)
@@ -55,6 +56,13 @@ export function App() {
       switch (command) {
         case 'new-terminal':
           return app.newTab()
+        case 'new-agent':
+          return app.newAgent()
+        case 'toggle-agent-view': {
+          const tab = app.activeProjectId ? app.tabs[app.activeTabByProject[app.activeProjectId] ?? ''] : undefined
+          if (tab?.kind === 'terminal') void togglePaneView(tab.activePaneId)
+          return
+        }
         case 'close-terminal': {
           const tab = app.activeProjectId ? app.tabs[app.activeTabByProject[app.activeProjectId] ?? ''] : undefined
           if (tab?.kind === 'editor') return useEditors.getState().requestClose(tab.id)

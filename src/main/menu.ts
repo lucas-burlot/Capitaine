@@ -18,6 +18,8 @@ interface Shortcut {
 const SHORTCUTS: Shortcut[] = [
   { action: 'add-project', mac: 'Cmd+O', other: 'Ctrl+Shift+O' },
   { action: 'new-terminal', mac: 'Cmd+T', other: 'Ctrl+Shift+T' },
+  { action: 'new-agent', mac: 'Cmd+N', other: 'Ctrl+Shift+N' },
+  { action: 'toggle-agent-view', mac: 'Cmd+Shift+M', other: 'Ctrl+Shift+M' },
   { action: 'close-terminal', mac: 'Cmd+W', other: 'Ctrl+Shift+W' },
   { action: 'split-right', mac: 'Cmd+D', other: 'Ctrl+Shift+D' },
   { action: 'split-down', mac: 'Cmd+Shift+D', other: 'Ctrl+Shift+E' },
@@ -143,6 +145,7 @@ export function installAppMenu(isDev: boolean): void {
         item('Rechercher un fichier…', 'find-file'),
         { type: 'separator' },
         item('Nouvel onglet', 'new-terminal'),
+        item('Nouvel agent Claude', 'new-agent'),
         item('Fermer le terminal', 'close-terminal'),
         { type: 'separator' },
         item('Diviser à droite', 'split-right'),
@@ -165,7 +168,9 @@ export function installAppMenu(isDev: boolean): void {
         item('Onglet précédent', 'prev-terminal'),
         { type: 'separator' },
         item('Panneau suivant', 'next-pane'),
-        item('Panneau précédent', 'prev-pane')
+        item('Panneau précédent', 'prev-pane'),
+        { type: 'separator' },
+        item('Basculer Chat ↔ Terminal', 'toggle-agent-view')
       ]
     },
     {

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { DirectoryWatchers } from './files/file-system'
 import { installShortcutHandler, popupAppMenu } from './menu'
 import type { PtyManager } from './terminals/pty-manager'
+import type { ChatManager } from './claude/claude-chat'
 import icon from '../../resources/icon.png?asset'
 
 // Set while a quit is in progress, so a close the renderer vetoed (unsaved files) can resume it.
@@ -12,8 +13,8 @@ export function markQuitRequested(): void {
   quitRequested = true
 }
 
-export function createWindow(options: { ptys: PtyManager; watchers: DirectoryWatchers; isDev: boolean }): BrowserWindow {
-  const { ptys, watchers, isDev } = options
+export function createWindow(options: { ptys: PtyManager; chats: ChatManager; watchers: DirectoryWatchers; isDev: boolean }): BrowserWindow {
+  const { ptys, chats, watchers, isDev } = options
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -55,13 +56,18 @@ export function createWindow(options: { ptys: PtyManager; watchers: DirectoryWat
   })
   win.on('closed', () => {
     ptys.killAllFor(contents)
+    chats.stopAllFor(contents)
     watchers.removeOwner(contents)
   })
-  contents.on('render-process-gone', () => ptys.killAllFor(contents))
+  contents.on('render-process-gone', () => {
+    ptys.killAllFor(contents)
+    chats.stopAllFor(contents)
+  })
   // A renderer reload drops every xterm instance, so their shells must go too.
   contents.on('did-start-navigation', (details) => {
     if (details.isMainFrame && !details.isSameDocument) {
       ptys.killAllFor(contents)
+      chats.stopAllFor(contents)
       watchers.removeOwner(contents)
     }
   })
