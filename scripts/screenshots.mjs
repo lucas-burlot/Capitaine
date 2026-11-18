@@ -159,22 +159,6 @@ const scenarios = {
     line()
     line(c.gold + '✻ Réflexion…' + c.reset + c.dim + ' (2 min · esc pour interrompre)' + c.reset)
   },
-  review() {
-    out('\x1b]0;Revue de sécurité des routes\x07')
-    osc('state=blocked:app=claude-code:kind=question:msg=' + b64("answer: Supprimer l'ancienne table users_legacy ? (Oui · Non)"))
-    line(c.gold + '✻ ' + c.reset + c.bold + 'Revue de sécurité des routes' + c.reset)
-    line()
-    line(c.blue + '● ' + c.reset + 'Lecture de ' + c.bold + 'src/routes/*.ts' + c.reset + c.dim + ' (6 fichiers)' + c.reset)
-    line(c.green + '● ' + c.reset + 'Validation des paramètres ajoutée avec zod')
-    line(c.gold + '● ' + c.reset + 'La table ' + c.bold + 'users_legacy' + c.reset + " n'est plus lue nulle part")
-    line()
-    box([
-      ["Supprimer l'ancienne table users_legacy ?", c.bold],
-      [''],
-      ['❯ 1. Oui, l’ajouter à la migration', c.gold],
-      ['  2. Non, la garder pour l’instant']
-    ])
-  },
   done() {
     out('\x1b]0;Refonte de la page d’accueil\x07')
     osc('state=done:app=claude-code')
@@ -193,11 +177,92 @@ setInterval(() => {}, 1 << 30)
 `
 )
 
+// --- Fake `claude` for the chat: speaks stream-json, replays one scripted turn -----------------
+// It answers `initialize`, then on the first message reads, edits and asks to run the tests.
+const fakeBin = join(root, 'bin')
+mkdirSync(fakeBin)
+writeFileSync(
+  join(fakeBin, 'claude'),
+  `#!${process.execPath}\n` +
+    String.raw`
+const { randomUUID } = require('node:crypto')
+const api = ${JSON.stringify(api)}
+const session = randomUUID()
+const send = (m) => process.stdout.write(JSON.stringify(m) + '\n')
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+let n = 0
+const usage = { input_tokens: 4200, cache_read_input_tokens: 38000, output_tokens: 900 }
+const say = (content) => send({ type: 'assistant', uuid: randomUUID(), session_id: session, parent_tool_use_id: null, message: { id: 'msg_' + ++n, role: 'assistant', model: 'claude-opus-5-5', content, usage } })
+const result = (id, text) => send({ type: 'user', uuid: randomUUID(), session_id: session, parent_tool_use_id: null, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: text }] } })
+const commands = [
+  ['compact', 'Résume la conversation pour libérer du contexte'],
+  ['review', 'Relit les changements en cours'],
+  ['init', 'Écrit un CLAUDE.md pour le projet']
+].map(([name, description]) => ({ name, description, argumentHint: '' }))
+
+async function turn() {
+  send({ type: 'system', subtype: 'init', session_id: session, model: 'claude-opus-5-5', permissionMode: 'default', slash_commands: commands.map((c) => c.name) })
+  await sleep(200)
+  say([{ type: 'text', text: 'Je regarde d’abord comment la route et la requête sont écrites.' }])
+  say([{ type: 'tool_use', id: 'read1', name: 'Read', input: { file_path: api + '/src/routes/users.ts' } }])
+  result('read1', '12 lignes')
+  say([{ type: 'tool_use', id: 'grep1', name: 'Grep', input: { pattern: 'listUsers', path: 'src' } }])
+  result('grep1', 'src/db/schema.ts\nsrc/routes/users.ts')
+  await sleep(200)
+  say([{ type: 'text', text: '` + '`listUsers`' + String.raw` accepte déjà une limite : il suffit de la valider dans la route. J’ajoute un schéma **zod** pour ` + '`limit`' + String.raw`, borné entre 1 et 200, et une 404 lisible.' }])
+  say([{ type: 'tool_use', id: 'edit1', name: 'Edit', input: {
+    file_path: api + '/src/routes/users.ts',
+    old_string: "users.get('/', async (_req, res) => {\n  res.json(await listUsers())\n})",
+    new_string: "const query = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) })\n\nusers.get('/', async (req, res) => {\n  const { limit } = query.parse(req.query)\n  res.json(await listUsers(limit))\n})"
+  } }])
+  result('edit1', 'The file has been updated.')
+  await sleep(200)
+  say([{ type: 'text', text: 'La route est prête. Je lance les tests pour vérifier.' }])
+  const input = { command: 'npm test -- users', description: 'Lancer les tests des routes utilisateurs' }
+  say([{ type: 'tool_use', id: 'bash1', name: 'Bash', input }])
+  send({ type: 'system', subtype: 'session_state_changed', state: 'requires_action', session_id: session })
+  send({ type: 'control_request', request_id: 'perm1', request: { subtype: 'can_use_tool', tool_name: 'Bash', input, tool_use_id: 'bash1',
+    permission_suggestions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm test:*' }], behavior: 'allow', destination: 'session' }] } })
+}
+
+let buffer = ''
+let started = false
+process.stdin.setEncoding('utf8').on('data', (chunk) => {
+  buffer += chunk
+  let i
+  while ((i = buffer.indexOf('\n')) !== -1) {
+    const line = buffer.slice(0, i).trim()
+    buffer = buffer.slice(i + 1)
+    if (!line) continue
+    const m = JSON.parse(line)
+    if (m.type === 'control_request') {
+      const response = m.request?.subtype === 'initialize'
+        ? { commands, models: [{ value: 'default', displayName: 'Opus 5.5', description: 'Le plus capable', supportedEffortLevels: ['low', 'medium', 'high', 'xhigh'] }], account: { tokenSource: 'claude.ai' }, capabilities: [] }
+        : {}
+      send({ type: 'control_response', response: { subtype: 'success', request_id: m.request_id, response } })
+    } else if (m.type === 'user') {
+      send({ ...m, isReplay: true, session_id: session })
+      if (!started) (started = true), turn()
+    }
+  }
+})
+setInterval(() => {}, 1 << 30)
+`,
+  { mode: 0o755 }
+)
+
 // --- Drive the app -----------------------------------------------------------------------------
 const app = await electron.launch({
   executablePath: join(appDir, 'node_modules/electron/dist/electron'),
   args: ['--ozone-platform=headless', '--force-device-scale-factor=2', appDir, `--user-data-dir=${userData}`],
-  env: { ...process.env, HOME: home, SHELL: '/bin/bash', CAPITAINE_USAGE_FIXTURE: usageFixture, CLAUDE_CONFIG_DIR: join(root, 'no-claude') },
+  env: {
+    ...process.env,
+    PATH: `${fakeBin}:${process.env.PATH}`,
+    HOME: home,
+    SHELL: '/bin/bash',
+    CAPITAINE_USAGE_FIXTURE: usageFixture,
+    CLAUDE_CONFIG_DIR: join(root, 'no-claude')
+  },
   timeout: 30000
 })
 const page = await app.firstWindow()
@@ -208,6 +273,7 @@ await page.evaluate(() => {
   localStorage.setItem('capitaine.explorerWidth', '340')
   localStorage.setItem('capitaine.rightPanelView', 'git')
   localStorage.setItem('capitaine.explorerOpen', '1')
+  localStorage.setItem('capitaine.agentView', 'chat')
 })
 await page.reload()
 await page.waitForSelector('aside nav >> text=acme-api')
@@ -220,10 +286,15 @@ await page.click('aside nav >> text=web-dashboard')
 await page.click('button:has-text("Nouveau terminal")')
 await run('done')
 await page.click('aside nav >> text=acme-api')
-await page.click('button:has-text("Nouveau terminal")')
-await run('migrate')
+// Left: Claude as a chat, waiting on a permission. Right: Claude in a terminal, with subagents.
+await page.click('button[title^="Nouvel agent Claude"]')
+const composer = page.locator('textarea[placeholder^="Écris à Claude"]')
+await composer.waitFor({ timeout: 20000 })
+await composer.fill('Ajoute une pagination à GET /users, plafonnée à 200, et vérifie avec les tests.')
+await composer.press('Enter')
+await page.waitForSelector('button:has-text("Autoriser")', { timeout: 20000 })
 await page.click('button[title^="Diviser à droite"]')
-await run('review')
+await run('migrate')
 await wait(4000)
 
 const shot = async (name, width = 2400) => {
