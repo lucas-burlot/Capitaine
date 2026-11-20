@@ -585,6 +585,21 @@ await say('/help')
 chatChecks.terminalOnly = await chatHas('/help ne fonctionne que dans le terminal.')
 chatChecks.terminalButton = (await chat.locator('button:has-text("Passer en terminal")').count()) === 1
 chatChecks.notLeftWaiting = await waitFor(async () => (await chatText()).includes('Prêt') && !(await chatText()).includes('En attente'))
+// "Tout autoriser" asks first, every time, and never becomes the mode new agents start in.
+const modeSelect = chat.locator('select:has(option[value="bypassPermissions"])')
+const bypassConfirm = chat.locator('[role=alertdialog][aria-label="Tout autoriser ?"]')
+await modeSelect.selectOption('bypassPermissions')
+chatChecks.bypassAsks = await waitFor(async () => (await bypassConfirm.count()) === 1 && (await modeSelect.inputValue()) !== 'bypassPermissions')
+await page.waitForTimeout(300)
+await shot('12c-chat-bypass-confirm')
+await bypassConfirm.locator('button:has-text("Annuler")').click()
+chatChecks.bypassCancelled = await waitFor(async () => (await bypassConfirm.count()) === 0 && (await modeSelect.inputValue()) !== 'bypassPermissions')
+await modeSelect.selectOption('bypassPermissions')
+await bypassConfirm.locator('button:has-text("Tout autoriser")').click()
+chatChecks.bypassConfirmed = await waitFor(async () => (await modeSelect.inputValue()) === 'bypassPermissions')
+chatChecks.bypassNotDefault = (await page.evaluate(() => localStorage.getItem('capitaine.chatPermissionMode'))) !== 'bypassPermissions'
+await modeSelect.selectOption('default')
+chatChecks.bypassLeft = await waitFor(async () => (await modeSelect.inputValue()) === 'default')
 await shot('12-chat')
 // A long session: only the last blocks are in the page; scrolling up loads the earlier ones in place.
 await say('Longue conversation')

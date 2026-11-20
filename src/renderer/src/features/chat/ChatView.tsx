@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown, LoaderCircle, RotateCcw, Sparkles } from 'lucide-react'
+import { ArrowDown, LoaderCircle, RotateCcw, ShieldAlert, Sparkles } from 'lucide-react'
 import type { ChatPermissionMode } from '@shared/types'
 import type { Rect } from '@/features/workspace/layout'
 import { forgetRestoredTerminal, restoredTerminal } from '@/features/workspace/session'
@@ -41,6 +41,12 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
   const [atBottom, setAtBottom] = useState(true)
   // Ctrl/⌘+F presses while the chat is the active pane; null while the find bar is closed.
   const [findRequest, setFindRequest] = useState<number | null>(null)
+  // "Tout autoriser" waits for this confirmation, each time it is picked.
+  const [confirmingBypass, setConfirmingBypass] = useState(false)
+  const confirmBypass = () => {
+    setConfirmingBypass(false)
+    void setPermissionMode(chatId, 'bypassPermissions')
+  }
   const rootRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
   const place = useChatPlace(chatId, chat?.cwd ?? cwd)
@@ -153,7 +159,13 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
             <PermissionCard key={permission.requestId} chatId={chatId} permission={permission} cwd={chat.cwd} active={i === 0 && focused} />
           ))}
           {chat.status === 'exited' && <ExitedBanner chat={chat} />}
-          <ChatComposer chat={chat} focused={focused && chat.permissions.length === 0} blocked={chat.permissions.length > 0} toolbar={<Toolbar chat={chat} />} />
+          {confirmingBypass && <BypassConfirm onConfirm={confirmBypass} onCancel={() => setConfirmingBypass(false)} />}
+          <ChatComposer
+            chat={chat}
+            focused={focused && chat.permissions.length === 0 && !confirmingBypass}
+            blocked={chat.permissions.length > 0}
+            toolbar={<Toolbar chat={chat} onAskBypass={() => setConfirmingBypass(true)} />}
+          />
         </div>
       )}
     </div>
@@ -196,7 +208,7 @@ function StatusBar({ chat }: { chat: ChatSession }) {
   )
 }
 
-function Toolbar({ chat }: { chat: ChatSession }) {
+function Toolbar({ chat, onAskBypass }: { chat: ChatSession; onAskBypass(): void }) {
   const models = chat.models.length ? chat.models : FALLBACK_MODELS.map((m) => ({ ...m, description: '', effortLevels: [] }))
   const modelValue = chat.model ?? 'default'
   const modelInfo = models.find((m) => m.value === modelValue)
@@ -228,7 +240,7 @@ function Toolbar({ chat }: { chat: ChatSession }) {
       <Select
         value={chat.permissionMode}
         title={PERMISSION_MODES.find((m) => m.value === chat.permissionMode)?.hint ?? 'Autorisations'}
-        onChange={(value) => void setPermissionMode(chat.id, value as ChatPermissionMode)}
+        onChange={(value) => (value === 'bypassPermissions' ? onAskBypass() : void setPermissionMode(chat.id, value as ChatPermissionMode))}
         options={[
           ...PERMISSION_MODES.map((m) => ({ value: m.value, label: m.label })),
           ...(PERMISSION_MODES.some((m) => m.value === chat.permissionMode) ? [] : [{ value: chat.permissionMode, label: chat.permissionMode }])
@@ -286,6 +298,43 @@ function Working({ activity }: { activity: string | null }) {
     <div className="flex items-center gap-2 text-[12px] text-muted">
       <LoaderCircle size={13} className="animate-spin text-sky-400" />
       {activity ?? 'Claude travaille…'}
+    </div>
+  )
+}
+
+/** Asked before a chat stops asking: "Tout autoriser" lets Claude run anything without a word. */
+function BypassConfirm({ onConfirm, onCancel }: { onConfirm(): void; onCancel(): void }) {
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    cancelRef.current?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      onCancel()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [onCancel])
+  return (
+    <div role="alertdialog" aria-label="Tout autoriser ?" className="flex flex-col gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-[12.5px]">
+      <div className="flex items-start gap-2">
+        <ShieldAlert size={15} className="mt-0.5 shrink-0 text-red-300" />
+        <div className="min-w-0 text-fg">
+          <div className="font-medium">Tout autoriser pour ce chat ?</div>
+          <div className="mt-0.5 text-muted">
+            Claude lancera ses commandes et modifiera tes fichiers sans te demander. Seulement ce chat : les prochains agents demanderont toujours.
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button ref={cancelRef} onClick={onCancel} className="rounded-md border border-line px-2.5 py-1 text-fg hover:bg-panel-2">
+          Annuler
+        </button>
+        <button onClick={onConfirm} className="rounded-md border border-red-500/50 bg-red-500/20 px-2.5 py-1 font-medium text-red-200 hover:bg-red-500/30">
+          Tout autoriser
+        </button>
+      </div>
     </div>
   )
 }
