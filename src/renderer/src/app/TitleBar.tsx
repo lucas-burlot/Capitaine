@@ -21,7 +21,7 @@ export function TitleBarBrand({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`flex shrink-0 items-center gap-1 ${isMac ? 'pl-[76px]' : 'pl-2.5'}`}>
       <img src={logo} alt="" aria-hidden draggable={false} className="h-[18px] w-auto shrink-0" />
-      {!compact && <span className="pl-1 text-[13px] font-semibold tracking-tight text-fg select-none">Capitaine</span>}
+      {!compact && <span className="pl-1 text-ui font-semibold tracking-tight text-fg select-none">Capitaine</span>}
       {customTitleBar && (
         <button
           className="no-drag rounded p-1 text-muted hover:bg-panel-2 hover:text-fg"

@@ -47,13 +47,13 @@ export function PageShell(props: {
   return (
     <div className="app-page absolute inset-0 z-30 flex flex-col bg-bg" aria-label={props.label}>
       <header className={`drag-region flex shrink-0 items-center gap-3 border-b border-line pl-4 ${customTitleBar ? '' : 'pr-1.5'} ${titleBarHeightClass}`}>
-        <h1 className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-fg">
+        <h1 className="flex min-w-0 items-center gap-2 text-ui font-semibold text-fg">
           <span className="shrink-0 text-accent">{props.icon}</span>
           {props.title}
-          {props.subtitle && <span className="truncate text-[12px] font-normal text-muted">{props.subtitle}</span>}
+          {props.subtitle && <span className="truncate text-small font-normal text-muted">{props.subtitle}</span>}
         </h1>
         <div className="min-w-[24px] flex-1 self-stretch" data-window-drag />
-        <label className="no-drag flex h-7 w-64 items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-[12px] transition-colors focus-within:border-accent/50">
+        <label className="no-drag flex h-7 w-64 items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-small transition-colors focus-within:border-accent/50">
           <Search size={12} className="shrink-0 text-muted" />
           <input
             ref={searchRef}
@@ -68,7 +68,7 @@ export function PageShell(props: {
               <X size={12} />
             </button>
           ) : (
-            <kbd className="shrink-0 rounded bg-panel-2 px-1 font-sans text-[10px] text-muted">{isMac ? '⌘F' : 'Ctrl F'}</kbd>
+            <kbd className="shrink-0 rounded bg-panel-2 px-1 font-sans text-caption text-muted">{isMac ? '⌘F' : 'Ctrl F'}</kbd>
           )}
         </label>
         <IconButton title="Rafraîchir" onClick={props.onRefresh}>
@@ -106,7 +106,7 @@ export function PageMessage({ title, children }: { title: string; children?: Rea
   return (
     <div className="flex flex-1 items-center justify-center px-8">
       <div className="max-w-md text-center">
-        <h2 className="text-[15px] font-medium text-fg">{title}</h2>
+        <h2 className="text-title font-medium text-fg">{title}</h2>
         {children}
       </div>
     </div>
@@ -185,7 +185,7 @@ export function PrimaryButton({ onClick, disabled, children }: { onClick(): void
     <button
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-[12.5px] font-medium text-bg outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:opacity-50 disabled:hover:brightness-100"
+      className="flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-ui font-medium text-bg outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:opacity-50 disabled:hover:brightness-100"
     >
       {children}
     </button>
@@ -198,7 +198,7 @@ export function TextButton({ onClick, disabled, title, children }: { onClick(): 
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] text-muted outline-none hover:bg-panel-2 hover:text-fg focus-visible:bg-panel-2 focus-visible:text-fg disabled:opacity-50 disabled:hover:bg-transparent"
+      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-ui text-muted outline-none hover:bg-panel-2 hover:text-fg focus-visible:bg-panel-2 focus-visible:text-fg disabled:opacity-50 disabled:hover:bg-transparent"
     >
       {children}
     </button>

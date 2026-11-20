@@ -26,13 +26,13 @@ export function UpdateCard() {
       <div className="flex items-start gap-3">
         <img src={logo} alt="" aria-hidden className="mt-0.5 h-5 w-auto shrink-0" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-[13px] font-semibold text-fg">
+          <h3 className="text-ui font-semibold text-fg">
             {status === 'available' && 'Nouvelle version disponible'}
             {status === 'downloading' && `Téléchargement de la ${version}`}
             {status === 'ready' && 'Mise à jour prête'}
             {status === 'error' && 'La mise à jour a échoué'}
           </h3>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted">
+          <p className="mt-1 text-small leading-relaxed text-muted">
             {status === 'available' && (
               <>
                 Capitaine <span className="font-medium text-fg">{version}</span> est disponible. Tu utilises la {currentVersion}.
@@ -60,7 +60,7 @@ export function UpdateCard() {
       </div>
 
       {status === 'available' && notes.length > 0 && (
-        <ul className="mt-3 space-y-1 border-l border-line pl-3 text-[12px] text-fg">
+        <ul className="mt-3 space-y-1 border-l border-line pl-3 text-small text-fg">
           {notes.slice(0, MAX_NOTES).map((note) => (
             <li key={note} className="line-clamp-2 leading-snug">
               {note}
@@ -75,7 +75,7 @@ export function UpdateCard() {
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow={state.percent ?? 0}>
             <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${state.percent ?? 0}%` }} />
           </div>
-          <span className="text-[11px] text-muted tabular-nums">{state.percent ?? 0} %</span>
+          <span className="text-caption text-muted tabular-nums">{state.percent ?? 0} %</span>
         </div>
       )}
 
@@ -113,7 +113,7 @@ export function UpdateCard() {
         {status === 'available' && (
           <button
             onClick={() => api.openReleases(version)}
-            className="ml-auto shrink-0 text-[11.5px] text-muted underline-offset-2 hover:text-fg hover:underline"
+            className="ml-auto shrink-0 text-small text-muted underline-offset-2 hover:text-fg hover:underline"
           >
             Notes de version
           </button>
@@ -127,7 +127,7 @@ function PrimaryButton(props: { onClick(): void; children: React.ReactNode }) {
   return (
     <button
       onClick={props.onClick}
-      className="flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12.5px] font-medium whitespace-nowrap text-bg hover:brightness-110"
+      className="flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-ui font-medium whitespace-nowrap text-bg hover:brightness-110"
     >
       {props.children}
     </button>
@@ -139,7 +139,7 @@ function SecondaryButton(props: { onClick(): void; title?: string; children: Rea
     <button
       onClick={props.onClick}
       title={props.title}
-      className="shrink-0 rounded-md px-2.5 py-1.5 text-[12.5px] whitespace-nowrap text-muted hover:bg-line hover:text-fg"
+      className="shrink-0 rounded-md px-2.5 py-1.5 text-ui whitespace-nowrap text-muted hover:bg-line hover:text-fg"
     >
       {props.children}
     </button>

@@ -69,12 +69,12 @@ export function ClaudeConfigPage({ project }: { project: Project }) {
             role="tab"
             aria-selected={active}
             onClick={() => setKind(k.kind)}
-            className={`-mb-px flex h-9 items-center gap-1.5 border-b-2 text-[12.5px] transition-colors outline-none focus-visible:text-fg ${
+            className={`-mb-px flex h-9 items-center gap-1.5 border-b-2 text-ui transition-colors outline-none focus-visible:text-fg ${
               active ? 'border-accent text-fg' : `border-transparent hover:text-fg focus-visible:border-line ${empty ? 'text-muted/70' : 'text-muted'}`
             }`}
           >
             {k.label}
-            <span className={`text-[11px] tabular-nums ${active ? 'text-accent' : 'text-muted/80'}`}>{counts[k.kind]}</span>
+            <span className={`text-caption tabular-nums ${active ? 'text-accent' : 'text-muted/80'}`}>{counts[k.kind]}</span>
           </button>
         )
       })}
@@ -96,7 +96,7 @@ export function ClaudeConfigPage({ project }: { project: Project }) {
       toolbar={tabs}
     >
       {!config ? (
-        <p className="px-4 py-3 text-[12px] text-muted">{error ? `Lecture impossible : ${error}` : 'Lecture de la configuration Claude…'}</p>
+        <p className="px-4 py-3 text-small text-muted">{error ? `Lecture impossible : ${error}` : 'Lecture de la configuration Claude…'}</p>
       ) : counts[kind] === 0 ? (
         <EmptyKind info={kindInfo} />
       ) : groups.length === 0 ? (
@@ -138,8 +138,8 @@ function GroupSection(props: {
               onSelect={() => props.onSelect(item)}
               onOpen={() => props.onOpen(item)}
             >
-              <div className={`truncate text-[12.5px] leading-[18px] ${active ? 'font-medium text-fg' : 'text-fg/85'}`}>{shortName(item)}</div>
-              {item.description && <div className="truncate text-[11.5px] leading-4 text-muted">{item.description}</div>}
+              <div className={`truncate text-ui leading-[18px] ${active ? 'font-medium text-fg' : 'text-fg/85'}`}>{shortName(item)}</div>
+              {item.description && <div className="truncate text-small leading-4 text-muted">{item.description}</div>}
             </PageListRow>
           )
         })}
@@ -163,34 +163,34 @@ function ItemDetail({ item, config, project, onOpen }: { item: ClaudeConfigItem;
   return (
     <article className="max-w-[880px] px-8 pt-7 pb-12">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 className="text-[20px] leading-tight font-semibold tracking-[-0.01em] break-words text-fg select-text">{item.name}</h2>
-        {item.disabled && <span className="rounded-full border border-line px-2 py-px text-[11px] text-muted">Plugin désactivé</span>}
+        <h2 className="text-display leading-tight font-semibold tracking-[-0.01em] break-words text-fg select-text">{item.name}</h2>
+        {item.disabled && <span className="rounded-full border border-line px-2 py-px text-caption text-muted">Plugin désactivé</span>}
       </div>
-      {item.description && <p className="mt-2 max-w-[70ch] text-[13px] leading-relaxed text-muted select-text">{item.description}</p>}
+      {item.description && <p className="mt-2 max-w-[70ch] text-ui leading-relaxed text-muted select-text">{item.description}</p>}
 
       <div className="mt-5 flex flex-wrap items-center gap-1.5">
         <PrimaryButton onClick={onOpen}>
           Ouvrir dans l’éditeur
-          <kbd className="rounded bg-bg/15 px-1.5 py-px font-sans text-[10.5px]">Entrée</kbd>
+          <kbd className="rounded bg-bg/15 px-1.5 py-px font-sans text-caption">Entrée</kbd>
         </PrimaryButton>
         <TextButton onClick={() => window.capitaine.files.reveal(project.id, item.path)}>Afficher dans le dossier</TextButton>
         <TextButton onClick={() => window.capitaine.files.copyText(item.path)}>Copier le chemin</TextButton>
       </div>
 
       {twin && (
-        <p className="mt-5 flex max-w-[70ch] gap-2 rounded-md border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2 text-[12px] leading-relaxed text-amber-200">
+        <p className="mt-5 flex max-w-[70ch] gap-2 rounded-md border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2 text-small leading-relaxed text-amber-200">
           <TriangleAlert size={13} className="mt-0.5 shrink-0" />
           <span>
             Le même nom existe aussi {twin.scope === 'user' ? 'dans tes fichiers globaux' : 'dans le projet'} (
-            <span className="font-mono text-[11px]">{displayPath(twin.path, project.path, config.homeDir)}</span>) : un des deux masque l’autre.
+            <span className="font-mono text-caption">{displayPath(twin.path, project.path, config.homeDir)}</span>) : un des deux masque l’autre.
           </span>
         </p>
       )}
 
-      <dl className="mt-7 border-t border-line text-[12px]">
+      <dl className="mt-7 border-t border-line text-small">
         {command && (
           <Property label="Appel">
-            <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[11.5px] text-accent">{command}</code>
+            <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-small text-accent">{command}</code>
           </Property>
         )}
         <Property label="Chargement">{loading(item)}</Property>
@@ -198,7 +198,7 @@ function ItemDetail({ item, config, project, onOpen }: { item: ClaudeConfigItem;
           <Property label="Fichiers">
             <span className="flex flex-wrap gap-1">
               {item.paths.map((glob) => (
-                <code key={glob} className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg/90">
+                <code key={glob} className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-small text-fg/90">
                   {glob}
                 </code>
               ))}
@@ -207,7 +207,7 @@ function ItemDetail({ item, config, project, onOpen }: { item: ClaudeConfigItem;
         )}
         <Property label="Provenance">{sourceLabel(item, project.name)}</Property>
         <Property label="Fichier">
-          <span className="font-mono text-[11.5px] break-all" title={item.path}>
+          <span className="font-mono text-small break-all" title={item.path}>
             {displayPath(item.path, project.path, config.homeDir)}
           </span>
         </Property>
@@ -218,9 +218,9 @@ function ItemDetail({ item, config, project, onOpen }: { item: ClaudeConfigItem;
         ))}
       </dl>
 
-      <h3 className="mt-9 mb-2.5 text-[11px] font-semibold tracking-wider text-muted uppercase">Contenu</h3>
+      <h3 className="mt-9 mb-2.5 text-caption font-semibold tracking-wider text-muted uppercase">Contenu</h3>
       <div className="scrollbar-sleek overflow-x-auto rounded-md border border-line bg-panel px-5 py-4">
-        {body === null ? <p className="text-[12px] text-muted">Lecture…</p> : <MarkdownSource text={body} onOpen={onOpen} />}
+        {body === null ? <p className="text-small text-muted">Lecture…</p> : <MarkdownSource text={body} onOpen={onOpen} />}
       </div>
     </article>
   )
@@ -228,11 +228,11 @@ function ItemDetail({ item, config, project, onOpen }: { item: ClaudeConfigItem;
 
 /** Shown in place of the list when the project has none of this kind. */
 function EmptyKind({ info }: { info: (typeof KINDS)[number] }) {
-  const code = 'rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg/90'
+  const code = 'rounded bg-panel-2 px-1.5 py-0.5 font-mono text-small text-fg/90'
   return (
     <PageMessage title={`${info.none} pour ce projet`}>
-      <p className="mt-2 text-[13px] leading-relaxed text-muted">{info.how}</p>
-      <p className="mt-4 text-[12px] leading-loose text-muted">
+      <p className="mt-2 text-ui leading-relaxed text-muted">{info.how}</p>
+      <p className="mt-4 text-small leading-loose text-muted">
         Dans le projet : <code className={code}>{info.kind === 'memory' ? info.where : `.claude/${info.where}`}</code>
         <br />
         Pour tous tes projets : <code className={code}>~/.claude/{info.where}</code>
@@ -244,10 +244,10 @@ function EmptyKind({ info }: { info: (typeof KINDS)[number] }) {
 function NoMatch({ query, label, onClear }: { query: string; label: string; onClear(): void }) {
   return (
     <PageMessage title="Aucun résultat">
-      <p className="mt-2 text-[13px] text-muted">
+      <p className="mt-2 text-ui text-muted">
         Aucun élément parmi les {label} ne correspond à « <span className="text-fg">{query}</span> ».
       </p>
-      <button onClick={onClear} className="mt-3 rounded-md px-2.5 py-1.5 text-[12.5px] text-accent hover:bg-panel-2">
+      <button onClick={onClear} className="mt-3 rounded-md px-2.5 py-1.5 text-ui text-accent hover:bg-panel-2">
         Effacer le filtre
       </button>
     </PageMessage>
@@ -260,7 +260,7 @@ function MarkdownSource({ text, onOpen }: { text: string; onOpen(): void }) {
   const shown = lines.slice(0, PREVIEW_LINES)
   let inFence = false
   return (
-    <div className="font-mono text-[12px] leading-[1.65] whitespace-pre-wrap text-muted select-text">
+    <div className="font-mono text-small leading-[1.65] whitespace-pre-wrap text-muted select-text">
       {shown.map((line, i) => {
         if (/^\s*(```|~~~)/.test(line)) {
           inFence = !inFence
@@ -307,7 +307,7 @@ function MarkdownSource({ text, onOpen }: { text: string; onOpen(): void }) {
         return <div key={i}>{line ? inline(line) : ' '}</div>
       })}
       {lines.length > PREVIEW_LINES && (
-        <button onClick={onOpen} className="mt-3 font-sans text-[12px] text-accent hover:underline">
+        <button onClick={onOpen} className="mt-3 font-sans text-small text-accent hover:underline">
           {lines.length - PREVIEW_LINES} lignes de plus : ouvrir dans l’éditeur
         </button>
       )}

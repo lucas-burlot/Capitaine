@@ -81,10 +81,15 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
     if (visible && chat?.unseenDone) markSeen(chatId)
   }, [visible, chat?.unseenDone, chatId])
 
-  // Follows the conversation while scrolled to the bottom.
+  // Follows the conversation while scrolled to the bottom. A transcript that shrank (/clear) may
+  // now fit: the "back to the bottom" button goes with what it pointed at.
   useLayoutEffect(() => {
     const el = scrollRef.current
-    if (el && stick.current) el.scrollTop = el.scrollHeight
+    if (!el) return
+    if (stick.current) el.scrollTop = el.scrollHeight
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    if (bottom) stick.current = true
+    setAtBottom(bottom)
   }, [chat?.items, chat?.permissions, chat?.activity, visible])
 
   const onScroll = () => {
@@ -133,9 +138,9 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
         {findRequest !== null && <ChatFind scrollRef={scrollRef} content={chat?.items} focusRequest={findRequest} onClose={() => setFindRequest(null)} />}
         <div ref={scrollRef} onScroll={onScroll} onClick={(event) => onMarkdownClick(event, place)} className="scrollbar-sleek h-full overflow-y-auto">
           <div className="mx-auto flex max-w-[820px] flex-col gap-3 px-5 pt-4 pb-6">
-            {chat?.historyTruncated && <div className="text-center text-[11.5px] text-faint">Les messages les plus anciens ne sont pas affichés.</div>}
+            {chat?.historyTruncated && <div className="text-center text-small text-faint">Les messages les plus anciens ne sont pas affichés.</div>}
             {chat?.historyLoading && (
-              <div className="flex items-center justify-center gap-2 py-6 text-[12.5px] text-muted">
+              <div className="flex items-center justify-center gap-2 py-6 text-ui text-muted">
                 <LoaderCircle size={13} className="animate-spin" /> Chargement de la conversation…
               </div>
             )}
@@ -147,7 +152,7 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
         {!atBottom && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-panel px-2.5 py-1 text-[11.5px] text-muted shadow-lg hover:text-fg"
+            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-panel px-2.5 py-1 text-small text-muted shadow-lg hover:text-fg"
           >
             <ArrowDown size={12} /> Bas de la conversation
           </button>
@@ -186,7 +191,7 @@ function StatusBar({ chat }: { chat: ChatSession }) {
             ? 'En attente'
             : 'Prêt'
   const dot = waiting
-    ? 'bg-amber-400'
+    ? 'bg-waiting animate-pulse'
     : chat.status === 'working' || chat.status === 'starting'
       ? 'bg-sky-400 animate-pulse'
       : chat.status === 'exited'
@@ -196,12 +201,12 @@ function StatusBar({ chat }: { chat: ChatSession }) {
           : 'bg-faint'
   const model = chat.activeModel ?? chat.model
   return (
-    <div className="flex h-7 shrink-0 items-center gap-2 border-b border-line px-3 text-[11.5px]">
+    <div className="flex h-7 shrink-0 items-center gap-2 border-b border-line px-3 text-small">
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
       <span className="shrink-0 text-muted">{label}</span>
       {model && <span className="shrink-0 text-faint">· {model}</span>}
       <div className="flex-1" />
-      <span className="min-w-0 truncate font-mono text-[11px] text-faint" title={chat.cwd}>
+      <span className="min-w-0 truncate font-mono text-caption text-faint" title={chat.cwd}>
         {chat.cwd}
       </span>
     </div>
@@ -249,7 +254,7 @@ function Toolbar({ chat, onAskBypass }: { chat: ChatSession; onAskBypass(): void
       />
       {contextPercent !== null && (
         <span
-          className="ml-1 flex items-center gap-1.5 text-[11px] text-faint"
+          className="ml-1 flex items-center gap-1.5 text-caption text-faint"
           title={`Contexte utilisé : ${formatTokens(chat.contextTokens!)} sur ${formatTokens(chat.contextWindow!)}`}
         >
           <span className="h-1 w-10 overflow-hidden rounded-full bg-line">
@@ -259,7 +264,7 @@ function Toolbar({ chat, onAskBypass }: { chat: ChatSession; onAskBypass(): void
         </span>
       )}
       {chat.costUsd !== null && chat.costUsd > 0 && (
-        <span className="ml-1 text-[11px] text-faint" title="Coût estimé de la session au tarif de l’API (couvert par ton abonnement si tu en as un)">
+        <span className="ml-1 text-caption text-faint" title="Coût estimé de la session au tarif de l’API (couvert par ton abonnement si tu en as un)">
           {chat.costUsd.toLocaleString('fr-FR', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })}
         </span>
       )}
@@ -282,7 +287,7 @@ function Select(props: {
       title={props.title}
       disabled={props.disabled}
       onChange={(e) => props.onChange(e.target.value)}
-      className={`max-w-40 cursor-pointer truncate rounded border-0 bg-transparent px-1.5 py-1 text-[11.5px] outline-none hover:bg-panel-2 hover:text-fg disabled:cursor-default disabled:opacity-50 ${color}`}
+      className={`max-w-40 cursor-pointer truncate rounded border-0 bg-transparent px-1.5 py-1 text-small outline-none hover:bg-panel-2 hover:text-fg disabled:cursor-default disabled:opacity-50 ${color}`}
     >
       {props.options.map((option) => (
         <option key={option.value} value={option.value} className="bg-panel text-fg">
@@ -295,7 +300,7 @@ function Select(props: {
 
 function Working({ activity }: { activity: string | null }) {
   return (
-    <div className="flex items-center gap-2 text-[12px] text-muted">
+    <div className="flex items-center gap-2 text-small text-muted">
       <LoaderCircle size={13} className="animate-spin text-sky-400" />
       {activity ?? 'Claude travaille…'}
     </div>
@@ -317,7 +322,7 @@ function BypassConfirm({ onConfirm, onCancel }: { onConfirm(): void; onCancel():
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onCancel])
   return (
-    <div role="alertdialog" aria-label="Tout autoriser ?" className="flex flex-col gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-[12.5px]">
+    <div role="alertdialog" aria-label="Tout autoriser ?" className="flex flex-col gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-ui">
       <div className="flex items-start gap-2">
         <ShieldAlert size={15} className="mt-0.5 shrink-0 text-red-300" />
         <div className="min-w-0 text-fg">
@@ -341,7 +346,7 @@ function BypassConfirm({ onConfirm, onCancel }: { onConfirm(): void; onCancel():
 
 function ExitedBanner({ chat }: { chat: ChatSession }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-line bg-panel px-3 py-2 text-[12.5px]">
+    <div className="flex items-center gap-3 rounded-lg border border-line bg-panel px-3 py-2 text-ui">
       <span className="min-w-0 flex-1 text-muted">
         {chat.error ? 'Claude s’est arrêté.' : 'Claude est arrêté.'} Ton prochain message le relancera sur cette conversation.
       </span>
@@ -359,9 +364,9 @@ function EmptyChat({ cwd }: { cwd: string }) {
   return (
     <div className="flex flex-col items-center gap-2 py-16 text-center">
       <Sparkles size={22} className="text-accent" />
-      <div className="text-[14px] font-medium text-fg">Nouvelle conversation avec Claude</div>
-      <div className="max-w-md font-mono text-[11.5px] break-all text-faint">{cwd}</div>
-      <div className="mt-2 max-w-md text-[12px] text-muted">
+      <div className="text-title font-medium text-fg">Nouvelle conversation avec Claude</div>
+      <div className="max-w-md font-mono text-small break-all text-faint">{cwd}</div>
+      <div className="mt-2 max-w-md text-small text-muted">
         <kbd className="rounded bg-panel-2 px-1">/</kbd> pour les commandes et skills, <kbd className="rounded bg-panel-2 px-1">@</kbd> pour citer un fichier, colle une image pour la montrer.{' '}
         {shortcutLabel('toggleAgentView')} pour passer la conversation dans un terminal.
       </div>

@@ -61,14 +61,14 @@ export function FileExplorer({ project }: { project: Project }) {
     <>
       <FileSearch project={project} query={query} onQueryChange={setQuery} onContextMenu={setMenu} />
       <div hidden={query.trim() !== ''} className="min-h-0 flex-1 overflow-auto py-1" role="tree" aria-label={`Fichiers de ${project.name}`}>
-        <div className="truncate px-3 pb-1 text-[11px] font-medium text-faint" title={project.path}>
+        <div className="truncate px-3 pb-1 text-caption font-medium text-faint" title={project.path}>
           {project.name}
         </div>
-        {rootError && <p className="px-3 py-1 text-[12px] text-red-400">{rootError}</p>}
+        {rootError && <p className="px-3 py-1 text-small text-red-400">{rootError}</p>}
         {rootEntries?.map((entry) => (
           <TreeNode key={entry.path} entry={entry} projectId={project.id} depth={0} onContextMenu={setMenu} />
         ))}
-        {rootEntries?.length === 0 && <p className="px-3 py-1 text-[12px] text-faint">Dossier vide</p>}
+        {rootEntries?.length === 0 && <p className="px-3 py-1 text-small text-faint">Dossier vide</p>}
       </div>
 
       {menu && <EntryMenu project={project} {...menu} onClose={() => setMenu(null)} />}
@@ -121,7 +121,7 @@ function TreeNode({ entry, projectId, depth, onContextMenu }: NodeProps) {
           onContextMenu({ x: e.clientX, y: e.clientY, entry })
         }}
         title={entry.relPath}
-        className={`group flex h-[22px] cursor-pointer items-center gap-1 pr-2 text-[12.5px] ${
+        className={`group flex h-[22px] cursor-pointer items-center gap-1 pr-2 text-ui ${
           selected ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
         } ${status === 'ignored' ? 'opacity-45' : ''}`}
         style={{ paddingLeft: 8 + depth * 12 }}
@@ -134,7 +134,7 @@ function TreeNode({ entry, projectId, depth, onContextMenu }: NodeProps) {
         <EntryIcon entry={entry} expanded={expanded} />
         <span className={`min-w-0 flex-1 truncate ${statusColor(status)} ${entry.isSymlink ? 'italic' : ''}`}>{entry.name}</span>
         {!entry.isDirectory && status && status !== 'ignored' && (
-          <span className={`shrink-0 text-[10px] font-semibold ${statusColor(status)}`}>{STATUS_LETTER[status]}</span>
+          <span className={`shrink-0 text-caption font-semibold ${statusColor(status)}`}>{STATUS_LETTER[status]}</span>
         )}
         {entry.isDirectory && nested && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(nested)}`} />}
       </div>
@@ -142,7 +142,7 @@ function TreeNode({ entry, projectId, depth, onContextMenu }: NodeProps) {
       {expanded && (
         <div role="group">
           {error && (
-            <p className="py-0.5 text-[11px] text-red-400" style={{ paddingLeft: 24 + (depth + 1) * 12 }}>
+            <p className="py-0.5 text-caption text-red-400" style={{ paddingLeft: 24 + (depth + 1) * 12 }}>
               {error}
             </p>
           )}
@@ -150,7 +150,7 @@ function TreeNode({ entry, projectId, depth, onContextMenu }: NodeProps) {
             <TreeNode key={child.path} entry={child} projectId={projectId} depth={depth + 1} onContextMenu={onContextMenu} />
           ))}
           {children?.length === 0 && (
-            <p className="py-0.5 text-[11px] text-faint italic" style={{ paddingLeft: 24 + (depth + 1) * 12 }}>
+            <p className="py-0.5 text-caption text-faint italic" style={{ paddingLeft: 24 + (depth + 1) * 12 }}>
               vide
             </p>
           )}

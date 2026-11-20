@@ -249,7 +249,9 @@ async function runModelCommand(chatId: string, name: string): Promise<void> {
     patch(chatId, { model: name === 'default' ? null : name, ...(active ? { activeModel: active } : {}) })
     fold.setCommandOutput(row, `Modèle : ${label} (pour cette conversation)`)
   } catch (error) {
-    fold.setCommandOutput(row, messageOf(error))
+    const message = messageOf(error)
+    const unknown = /^Model '(.+)' not found$/.exec(message)
+    fold.setCommandOutput(row, unknown ? `Modèle inconnu : « ${unknown[1]} ». Tape /model pour voir la liste.` : message)
   }
   flushFold(chatId)
 }

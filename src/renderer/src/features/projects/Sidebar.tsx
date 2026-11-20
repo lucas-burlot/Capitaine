@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Container, FolderOpen, FolderPlus, GitBranch, MoreHorizontal, Pencil, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Container, FilePen, FolderOpen, FolderPlus, GitBranch, MoreHorizontal, Pencil, Sparkles, SquareTerminal, Trash2 } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { isMac, shortcutLabel } from '@/lib/platform'
 import { usePanels, type AppPage } from '@/app/panels-store'
@@ -32,7 +32,7 @@ export function Sidebar() {
         <TitleBarBrand />
       </div>
       <div className="flex h-8 shrink-0 items-center justify-between pr-2 pl-3">
-        <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">Projets</span>
+        <span className="text-caption font-semibold tracking-wider text-muted uppercase">Projets</span>
         <button
           className="rounded p-1 text-muted hover:bg-panel-2 hover:text-fg"
           title={`Ajouter un projet (${shortcutLabel('addProject')})`}
@@ -56,7 +56,7 @@ export function Sidebar() {
           </div>
         ))}
         {projects.length === 0 && (
-          <p className="px-2 py-3 text-xs leading-relaxed text-faint">Aucun projet. Ajoutez un dossier pour commencer.</p>
+          <p className="px-2 py-3 text-small leading-relaxed text-faint">Aucun projet. Ajoutez un dossier pour commencer.</p>
         )}
       </nav>
       <PageNav />
@@ -83,7 +83,7 @@ function PageNav() {
         icon={<Container size={14} />}
         label="Docker"
         tooltip="Les conteneurs de la machine, ceux du projet en premier"
-        badge={running > 0 ? <span className="rounded-full bg-emerald-400/15 px-1.5 text-[10px] text-emerald-300 tabular-nums">{running}</span> : null}
+        badge={running > 0 ? <span className="rounded-full bg-emerald-400/15 px-1.5 text-caption text-emerald-300 tabular-nums">{running}</span> : null}
       />
     </div>
   )
@@ -96,7 +96,7 @@ function PageNavButton(props: { page: AppPage; current: AppPage | null; icon: Re
       aria-current={open ? 'page' : undefined}
       onClick={() => usePanels.getState().setPage(open ? null : props.page)}
       title={props.tooltip}
-      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] outline-none focus-visible:ring-1 focus-visible:ring-accent/50 ${
+      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-ui outline-none focus-visible:ring-1 focus-visible:ring-accent/50 ${
         open ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
       }`}
     >
@@ -144,7 +144,7 @@ function BranchLine({ projectId }: { projectId: string }) {
         useApp.getState().selectProject(projectId)
         usePanels.getState().showView('git')
       }}
-      className="flex min-w-0 items-center gap-1 text-[11px] text-faint hover:text-muted"
+      className="flex min-w-0 items-center gap-1 text-caption text-faint hover:text-muted"
     >
       <GitBranch size={10} className="shrink-0" />
       <span className="min-w-0 truncate">{label}</span>
@@ -160,7 +160,12 @@ function BranchLine({ projectId }: { projectId: string }) {
           {info.behind}
         </span>
       )}
-      {info.changes > 0 && <span className="shrink-0 text-amber-300/80">• {info.changes}</span>}
+      {info.changes > 0 && (
+        <span className="flex shrink-0 items-center gap-0.5 text-muted" aria-label={`${info.changes} fichier${info.changes > 1 ? 's' : ''} modifié${info.changes > 1 ? 's' : ''}`}>
+          <FilePen size={9} />
+          {info.changes}
+        </span>
+      )}
     </div>
   )
 }
@@ -203,7 +208,7 @@ function ProjectRow({ project, dragging, onDragStart, onDragEnd, onDrop }: RowPr
       } ${dragging ? 'opacity-40' : ''}`}
     >
       <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold uppercase ${
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-caption font-bold uppercase ${
           active ? 'bg-accent text-bg' : 'bg-line text-muted'
         }`}
       >
@@ -220,7 +225,7 @@ function ProjectRow({ project, dragging, onDragStart, onDragEnd, onDrop }: RowPr
             }}
           />
         ) : (
-          <div className="truncate text-[13px]" onDoubleClick={() => setEditing(true)}>
+          <div className="truncate text-ui" onDoubleClick={() => setEditing(true)}>
             {project.name}
           </div>
         )}
@@ -229,7 +234,16 @@ function ProjectRow({ project, dragging, onDragStart, onDragEnd, onDrop }: RowPr
 
       {agentState && <AgentStatusIcon state={agentState} size={12} />}
       {hasUnread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Nouvelle sortie" />}
-      {count > 0 && <span className="text-[11px] text-faint tabular-nums group-hover:hidden">{count}</span>}
+      {count > 0 && (
+        <span
+          className="flex items-center gap-0.5 text-caption text-faint tabular-nums group-hover:hidden"
+          title={`${count} terminal${count > 1 ? 'aux' : ''} ou chat${count > 1 ? 's' : ''} ouvert${count > 1 ? 's' : ''}`}
+          aria-label={`${count} terminal${count > 1 ? 'aux' : ''} ou chat${count > 1 ? 's' : ''} ouvert${count > 1 ? 's' : ''}`}
+        >
+          <SquareTerminal size={10} />
+          {count}
+        </span>
+      )}
 
       <button
         className={`rounded p-0.5 text-faint hover:text-fg ${menuOpen ? 'block' : 'hidden group-hover:block'}`}
@@ -275,7 +289,7 @@ function RenameInput({ initial, onDone }: { initial: string; onDone(value: strin
         if (e.key === 'Enter') onDone(value)
         if (e.key === 'Escape') onDone(null)
       }}
-      className="w-full rounded border border-line bg-bg px-1 text-[13px] text-fg outline-none focus:border-accent"
+      className="w-full rounded border border-line bg-bg px-1 text-ui text-fg outline-none focus:border-accent"
     />
   )
 }
@@ -312,7 +326,7 @@ function MenuItem(props: { icon: React.ReactNode; label: string; danger?: boolea
   return (
     <button
       onClick={props.onClick}
-      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-line ${
+      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-small hover:bg-line ${
         props.danger ? 'text-red-400' : 'text-fg'
       }`}
     >

@@ -19,7 +19,7 @@ export function GitBranchBar({ project, status }: { project: Project; status: Re
           onClick={() => setPickerOpen(!pickerOpen)}
           disabled={pending === 'switch' || pending === 'branch'}
           title={`${status.upstream ? `Suit ${status.upstream}` : 'Pas de branche distante'}\nClic : changer de branche ou en créer une`}
-          className={`group flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border px-2 text-[12px] transition-colors ${
+          className={`group flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border px-2 text-small transition-colors ${
             pickerOpen ? 'border-accent/50 bg-panel-2 text-fg' : 'border-line bg-bg/40 text-fg hover:border-accent/40 hover:bg-panel-2'
           }`}
         >
@@ -29,7 +29,7 @@ export function GitBranchBar({ project, status }: { project: Project; status: Re
             <GitBranch size={13} className="shrink-0 text-accent" />
           )}
           <span className="min-w-0 flex-1 truncate text-left font-medium">{label}</span>
-          {!status.upstream && status.branch && <span className="shrink-0 text-[10px] text-faint">locale</span>}
+          {!status.upstream && status.branch && <span className="shrink-0 text-caption text-faint">locale</span>}
           <ChevronDown size={12} className={`shrink-0 text-faint transition-transform group-hover:text-muted ${pickerOpen ? 'rotate-180' : ''}`} />
         </button>
         <SyncButtons
@@ -106,7 +106,7 @@ function PillButton(props: { title: string; disabled?: boolean; accent?: boolean
       title={props.title}
       disabled={props.disabled}
       onClick={props.onClick}
-      className={`flex h-7 shrink-0 items-center gap-0.5 rounded-md px-1.5 text-[11.5px] font-medium tabular-nums transition-colors disabled:opacity-50 ${
+      className={`flex h-7 shrink-0 items-center gap-0.5 rounded-md px-1.5 text-small font-medium tabular-nums transition-colors disabled:opacity-50 ${
         props.accent ? 'bg-accent/15 text-accent hover:bg-accent/25' : 'text-muted hover:bg-panel-2 hover:text-fg'
       }`}
     >
@@ -215,18 +215,18 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
           }}
           onKeyDown={onKey}
           placeholder={base ? `Nom de la nouvelle branche (depuis ${base})` : 'Changer de branche, ou nommer une nouvelle…'}
-          className="h-9 min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-faint"
+          className="h-9 min-w-0 flex-1 bg-transparent text-ui text-fg outline-none placeholder:text-faint"
         />
       </div>
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
-        {!branches && <p className="px-3 py-2 text-[12px] text-faint">Chargement des branches…</p>}
+        {!branches && <p className="px-3 py-2 text-small text-faint">Chargement des branches…</p>}
         {branches && rows.length === 0 && (
-          <p className="px-3 py-2 text-[12px] text-faint">{base ? 'Tape le nom de la branche à créer.' : 'Aucune branche ne correspond.'}</p>
+          <p className="px-3 py-2 text-small text-faint">{base ? 'Tape le nom de la branche à créer.' : 'Aucune branche ne correspond.'}</p>
         )}
         {rows.map((row, i) => {
           if (row.kind === 'header') {
             return (
-              <div key={`h:${row.label}`} className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wider text-faint uppercase">
+              <div key={`h:${row.label}`} className="px-3 pt-2 pb-1 text-caption font-semibold tracking-wider text-faint uppercase">
                 {row.label}
               </div>
             )
@@ -241,16 +241,16 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
                 aria-selected={highlighted}
                 onMouseMove={() => setCursor(i)}
                 onClick={() => void choose(row)}
-                className={`mx-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] ${highlighted ? 'bg-accent/15 text-fg' : 'text-muted'}`}
+                className={`mx-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-ui ${highlighted ? 'bg-accent/15 text-fg' : 'text-muted'}`}
               >
                 <GitBranchPlus size={14} className="shrink-0 text-accent" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">
                     Créer <span className="font-medium text-fg">{row.name}</span>
                   </span>
-                  <span className="block truncate text-[10.5px] text-faint">depuis {row.from ?? from} · puis s’y placer</span>
+                  <span className="block truncate text-caption text-faint">depuis {row.from ?? from} · puis s’y placer</span>
                 </span>
-                <kbd className="shrink-0 rounded border border-line px-1 text-[10px] text-faint">↵</kbd>
+                <kbd className="shrink-0 rounded border border-line px-1 text-caption text-faint">↵</kbd>
               </div>
             )
           }
@@ -264,7 +264,7 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
               onMouseMove={() => setCursor(i)}
               onClick={() => void choose(row)}
               title={`${branch.name}\n${branch.subject}${branch.upstream ? `\nSuit ${branch.upstream}` : ''}`}
-              className={`group mx-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[12.5px] ${
+              className={`group mx-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-ui ${
                 highlighted ? 'bg-line/70 text-fg' : 'text-muted'
               }`}
             >
@@ -279,10 +279,10 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
               </span>
               <span className="min-w-0 flex-1">
                 <span className={`block truncate ${branch.current ? 'font-medium text-fg' : ''}`}>{branch.name}</span>
-                <span className="block truncate text-[10.5px] text-faint">{branch.subject}</span>
+                <span className="block truncate text-caption text-faint">{branch.subject}</span>
               </span>
               {(branch.ahead > 0 || branch.behind > 0) && (
-                <span className="flex shrink-0 items-center text-[10.5px] text-faint tabular-nums">
+                <span className="flex shrink-0 items-center text-caption text-faint tabular-nums">
                   {branch.behind > 0 && (
                     <>
                       <ArrowDown size={10} />
@@ -297,7 +297,7 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
                   )}
                 </span>
               )}
-              <span className="shrink-0 text-[10.5px] text-faint group-hover:hidden">{relativeTime(branch.updatedAt, true)}</span>
+              <span className="shrink-0 text-caption text-faint group-hover:hidden">{relativeTime(branch.updatedAt, true)}</span>
               <button
                 title={`Nouvelle branche depuis ${branch.name}`}
                 onClick={(e) => {
@@ -314,7 +314,7 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
           )
         })}
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-[10.5px] text-faint">
+      <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-caption text-faint">
         <span className="truncate">↑↓ · ↵ basculer / créer · Échap</span>
         {!base && (
           <button

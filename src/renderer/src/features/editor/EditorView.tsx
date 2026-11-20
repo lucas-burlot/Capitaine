@@ -142,7 +142,7 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
     >
       <EditorBanner tabId={tabId} />
       {meta?.error && ready && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[12px] text-red-300">
+        <div className="flex shrink-0 items-center gap-2 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 text-small text-red-300">
           <TriangleAlert size={13} /> {meta.error}
         </div>
       )}
@@ -181,8 +181,8 @@ const MODES: { mode: MarkdownMode; label: string; icon: typeof Code }[] = [
 
 function MarkdownModeBar({ mode, onChange }: { mode: MarkdownMode; onChange(mode: MarkdownMode): void }) {
   return (
-    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-line bg-panel px-3 text-[12px]">
-      <span className="flex-1 text-[11px] text-faint">Markdown</span>
+    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-line bg-panel px-3 text-small">
+      <span className="flex-1 text-caption text-faint">Markdown</span>
       <div className="flex items-center gap-0.5 rounded-md border border-line p-0.5" role="tablist">
         {MODES.map(({ mode: value, label, icon: Icon }) => (
           <button
@@ -191,7 +191,7 @@ function MarkdownModeBar({ mode, onChange }: { mode: MarkdownMode; onChange(mode
             aria-selected={mode === value}
             title={value === 'edit' ? label : `${label} (Ctrl+Maj+V pour basculer)`}
             onClick={() => onChange(value)}
-            className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[11.5px] ${
+            className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-small ${
               mode === value ? 'bg-panel-2 text-fg' : 'text-muted hover:text-fg'
             }`}
           >
@@ -223,7 +223,7 @@ function EditorBanner({ tabId }: { tabId: string }) {
 
   if (external === 'changed') {
     return (
-      <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[12px] text-amber-200">
+      <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-small text-amber-200">
         <TriangleAlert size={13} className="shrink-0" />
         <span className="flex-1">Le fichier a été modifié sur le disque alors que tu as des modifications non enregistrées.</span>
         <BannerButton onClick={() => void act('reloadFromDisk')}>Prendre la version du disque</BannerButton>
@@ -233,7 +233,7 @@ function EditorBanner({ tabId }: { tabId: string }) {
   }
   if (external === 'deleted') {
     return (
-      <div className="flex shrink-0 items-center gap-2 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[12px] text-red-300">
+      <div className="flex shrink-0 items-center gap-2 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 text-small text-red-300">
         <TriangleAlert size={13} className="shrink-0" />
         <span className="flex-1">Le fichier a été supprimé du disque. Enregistrer le recréera.</span>
       </div>
@@ -241,7 +241,7 @@ function EditorBanner({ tabId }: { tabId: string }) {
   }
   if (flash) {
     return (
-      <div className="flex shrink-0 items-center gap-2 border-b border-sky-500/20 bg-sky-500/10 px-3 py-1 text-[11px] text-sky-200">
+      <div className="flex shrink-0 items-center gap-2 border-b border-sky-500/20 bg-sky-500/10 px-3 py-1 text-caption text-sky-200">
         <RotateCcw size={12} className="shrink-0" />
         Rechargé : le fichier a été modifié sur le disque.
       </div>
@@ -268,7 +268,7 @@ const PLACEHOLDER_TEXT: Record<string, string> = {
 function EditorPlaceholder(props: { projectId: string; path: string; status: string; error: string | null }) {
   const canOpenExternally = props.status === 'binary' || props.status === 'too-large'
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-[13px] text-muted">
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-ui text-muted">
       <p>{props.status === 'error' ? `Lecture impossible : ${props.error}` : PLACEHOLDER_TEXT[props.status]}</p>
       {canOpenExternally && (
         <button

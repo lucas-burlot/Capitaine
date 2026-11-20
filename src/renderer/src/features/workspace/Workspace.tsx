@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Columns2, FolderPlus, GitCompare, MessageSquare, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import { useEditors } from '@/features/editor/editor-store'
 import { usePanels } from '@/app/panels-store'
@@ -159,6 +159,8 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
   const explorerOpen = usePanels((s) => s.rightOpen)
   const toggleExplorer = usePanels((s) => s.toggleRight)
   const sidebarOpen = usePanels((s) => s.sidebarOpen)
+  const strip = useRef<HTMLDivElement>(null)
+  const edges = useStripEdges(strip, order.length)
 
   return (
     <header className={`drag-region @container flex shrink-0 items-end gap-3 border-b border-line bg-panel ${explorerOpen ? 'pr-2' : ''} ${titleBarHeightClass}`}>
@@ -168,10 +170,12 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
         </div>
       )}
       <div className={`flex min-w-0 shrink-0 flex-col justify-center self-stretch ${sidebarOpen ? 'pl-4' : ''}`} title={path}>
-        <span className="max-w-56 truncate text-[13px] font-medium text-fg">{title}</span>
+        <span className="max-w-56 truncate text-ui font-medium text-fg">{title}</span>
       </div>
       <div
-        className="scrollbar-none no-drag flex min-w-0 shrink items-end gap-0.5 overflow-x-auto"
+        ref={strip}
+        className="scrollbar-none no-drag flex min-w-0 shrink snap-x snap-proximity items-end gap-0.5 overflow-x-auto"
+        style={{ maskImage: stripMask(edges), WebkitMaskImage: stripMask(edges) }}
         onWheel={(e) => {
           // Vertical wheel scrolls the tab strip sideways.
           if (e.deltaY && !e.deltaX) e.currentTarget.scrollLeft += e.deltaY
@@ -232,7 +236,52 @@ function TabBar({ projectId, title, path }: { projectId: string; title: string; 
   )
 }
 
+const STRIP_FADE = 28
+
+/** Which ends of the tab strip hide tabs, kept up to date as it scrolls, resizes or gains tabs. */
+function useStripEdges(ref: React.RefObject<HTMLDivElement | null>, tabCount: number) {
+  const [edges, setEdges] = useState({ start: false, end: false })
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const start = el.scrollLeft > 1
+      const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+    }
+    measure()
+    el.addEventListener('scroll', measure, { passive: true })
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener('scroll', measure)
+      observer.disconnect()
+    }
+  }, [ref, tabCount])
+  return edges
+}
+
+/** Fades the ends that hide tabs, so a cut tab reads as "more this way". */
+function stripMask(edges: { start: boolean; end: boolean }): string | undefined {
+  if (!edges.start && !edges.end) return undefined
+  const from = edges.start ? `transparent, black ${STRIP_FADE}px` : 'black'
+  const to = edges.end ? `black calc(100% - ${STRIP_FADE}px), transparent` : 'black'
+  return `linear-gradient(to right, ${from}, ${to})`
+}
+
 function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
+  // The tab you're on is always in view, whole.
+  useLayoutEffect(() => {
+    const el = ref.current
+    const strip = el?.parentElement
+    if (!active || !el || !strip) return
+    // The strip alone scrolls: scrollIntoView could also shift the clipped containers above it.
+    const box = el.getBoundingClientRect()
+    const view = strip.getBoundingClientRect()
+    if (box.left < view.left) strip.scrollLeft -= view.left - box.left
+    else if (box.right > view.right) strip.scrollLeft += box.right - view.right
+  }, [active])
   const isEditor = tab.kind === 'editor'
   const isDiff = tab.kind === 'diff'
   const ids = tab.kind === 'terminal' ? paneIds(tab.layout) : []
@@ -262,6 +311,7 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
 
   return (
     <div
+      ref={ref}
       onMouseDown={(e) => {
         // Middle click closes, like browser tabs.
         if (e.button === 1) {
@@ -278,7 +328,7 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
         if (tab.kind === 'terminal') startRename()
       }}
       title={isEditor ? (tab.filePath ?? label) : isDiff ? `Diff · ${tab.diff?.path ?? label}` : label}
-      className={`group flex h-8 max-w-56 min-w-28 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-[12px] ${
+      className={`group flex h-8 max-w-56 min-w-28 shrink-0 cursor-pointer snap-start items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-small ${
         active ? 'border-line bg-bg text-fg' : 'border-transparent text-muted hover:bg-panel-2 hover:text-fg'
       }`}
     >
@@ -304,13 +354,13 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
             if (e.key === 'Enter') finish(true)
             if (e.key === 'Escape') finish(false)
           }}
-          className="w-full min-w-0 rounded border border-line bg-panel px-1 text-[12px] text-fg outline-none focus:border-accent"
+          className="w-full min-w-0 rounded border border-line bg-panel px-1 text-small text-fg outline-none focus:border-accent"
         />
       ) : (
         <span className="min-w-0 flex-1 truncate">{label}</span>
       )}
       {ids.length > 1 && (
-        <span className="flex shrink-0 items-center gap-0.5 text-[10px] text-faint" title={`${ids.length} terminaux`}>
+        <span className="flex shrink-0 items-center gap-0.5 text-caption text-faint" title={`${ids.length} terminaux`}>
           <Columns2 size={10} />
           {ids.length}
         </span>
@@ -391,24 +441,24 @@ function EmptyState({ logo: showLogo, title, text, action, secondary }: EmptySta
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
       {showLogo && <img src={logo} alt="" className="mb-2 h-24 w-24" draggable={false} />}
-      <h2 className="text-base font-medium text-fg">{title}</h2>
-      <p className="max-w-sm text-[13px] text-muted">{text}</p>
+      <h2 className="text-title font-medium text-fg">{title}</h2>
+      <p className="max-w-sm text-ui text-muted">{text}</p>
       <button
         onClick={action.onClick}
-        className="mt-2 flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-bg hover:brightness-110"
+        className="mt-2 flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-ui font-medium text-bg hover:brightness-110"
       >
         {action.icon}
         {action.label}
-        <kbd className="ml-1 rounded bg-bg/15 px-1.5 py-0.5 font-sans text-[11px]">{action.shortcut}</kbd>
+        <kbd className="ml-1 rounded bg-bg/15 px-1.5 py-0.5 font-sans text-caption">{action.shortcut}</kbd>
       </button>
       {secondary && (
         <button
           onClick={secondary.onClick}
-          className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-[13px] font-medium text-fg hover:bg-panel-2"
+          className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-ui font-medium text-fg hover:bg-panel-2"
         >
           {secondary.icon}
           {secondary.label}
-          <kbd className="ml-1 rounded bg-panel-2 px-1.5 py-0.5 font-sans text-[11px] text-muted">{secondary.shortcut}</kbd>
+          <kbd className="ml-1 rounded bg-panel-2 px-1.5 py-0.5 font-sans text-caption text-muted">{secondary.shortcut}</kbd>
         </button>
       )}
     </div>

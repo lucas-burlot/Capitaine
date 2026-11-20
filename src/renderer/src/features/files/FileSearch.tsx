@@ -97,7 +97,7 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu }: Pro
             aria-label="Rechercher un fichier"
             aria-controls="file-search-results"
             spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent text-[12px] text-fg outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent text-small text-fg outline-none placeholder:text-faint"
           />
           {query && (
             <button
@@ -116,8 +116,8 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu }: Pro
 
       {searching && (
         <div ref={listRef} id="file-search-results" role="listbox" aria-label="Fichiers trouvés" className="min-h-0 flex-1 overflow-auto py-1">
-          {files === null && <p className="px-3 py-1 text-[12px] text-faint">Recherche…</p>}
-          {files !== null && matches.length === 0 && <p className="px-3 py-1 text-[12px] text-faint">Aucun fichier ne correspond</p>}
+          {files === null && <p className="px-3 py-1 text-small text-faint">Recherche…</p>}
+          {files !== null && matches.length === 0 && <p className="px-3 py-1 text-small text-faint">Aucun fichier ne correspond</p>}
           {matches.map((match, index) => (
             <ResultRow
               key={match.path}
@@ -131,7 +131,7 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu }: Pro
             />
           ))}
           {matches.length === MAX_RESULTS && (
-            <p className="px-3 py-1 text-[11px] text-faint">Les {MAX_RESULTS} meilleurs résultats : précise ta recherche pour voir les autres.</p>
+            <p className="px-3 py-1 text-caption text-faint">Les {MAX_RESULTS} meilleurs résultats : précise ta recherche pour voir les autres.</p>
           )}
         </div>
       )}
@@ -172,14 +172,14 @@ function ResultRow({ match, index, active, absolutePath, onHover, onOpen, onCont
         onContextMenu({ x: e.clientX, y: e.clientY, entry })
       }}
       title={match.path}
-      className={`flex h-[22px] cursor-pointer items-center gap-1.5 px-3 text-[12.5px] ${active ? 'bg-panel-2 text-fg' : 'text-muted'}`}
+      className={`flex h-[22px] cursor-pointer items-center gap-1.5 px-3 text-ui ${active ? 'bg-panel-2 text-fg' : 'text-muted'}`}
     >
       <EntryIcon entry={entry} />
       <span className="shrink-0 truncate">
         <Highlighted text={name} offset={nameStart} positions={match.positions} />
       </span>
       {folder && (
-        <span className="min-w-0 flex-1 truncate text-[11px] text-faint" dir="rtl">
+        <span className="min-w-0 flex-1 truncate text-caption text-faint" dir="rtl">
           {/* rtl keeps the end of a long folder path visible; the bdi keeps the path itself in order. */}
           <bdi>
             <Highlighted text={folder} offset={0} positions={match.positions} />

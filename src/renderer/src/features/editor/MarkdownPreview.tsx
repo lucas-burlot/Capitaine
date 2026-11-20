@@ -83,6 +83,22 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, Props>(function
     }
   }))
 
+  // An image that doesn't load (a missing file, a path outside the app) shows what it was, not a broken icon.
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    const onError = (event: Event) => {
+      const img = event.target
+      if (!(img instanceof HTMLImageElement)) return
+      const missing = document.createElement('span')
+      missing.className = 'md-missing-image'
+      missing.textContent = `Image introuvable : ${img.getAttribute('alt') || img.getAttribute('src') || 'sans nom'}`
+      img.replaceWith(missing)
+    }
+    body.addEventListener('error', onError, true)
+    return () => body.removeEventListener('error', onError, true)
+  }, [])
+
   useEffect(() => {
     const paint = () => {
       const body = bodyRef.current

@@ -31,13 +31,13 @@ export function GitOperationBanner({ project, status }: { project: Project; stat
       <div className="flex items-start gap-2 px-2.5 pt-2">
         <GitMerge size={14} className="mt-0.5 shrink-0 text-amber-300" />
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-medium text-amber-200">{TITLE[status.operation]}</p>
+          <p className="text-small font-medium text-amber-200">{TITLE[status.operation]}</p>
           {status.operationLabel && (
-            <p className="truncate text-[11px] text-muted" title={status.operationLabel}>
+            <p className="truncate text-caption text-muted" title={status.operationLabel}>
               {status.operationLabel}
             </p>
           )}
-          <p className="mt-0.5 text-[11px] text-faint">
+          <p className="mt-0.5 text-caption text-faint">
             {conflicts.length === 0
               ? 'Tous les conflits sont résolus : tu peux continuer.'
               : `${conflicts.length} conflit${conflicts.length > 1 ? 's' : ''} à résoudre`}
@@ -51,7 +51,7 @@ export function GitOperationBanner({ project, status }: { project: Project; stat
           <button
             onClick={() => void resolveAll()}
             title="Claude propose une résolution pour chaque fichier ; tu relis et valides chaque proposition dans un diff"
-            className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/15 px-2 text-[12px] font-medium text-accent hover:bg-accent/25"
+            className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/15 px-2 text-small font-medium text-accent hover:bg-accent/25"
           >
             <Sparkles size={13} />
             {untouched.length > 1 ? `Résoudre les ${untouched.length} conflits avec l’IA` : 'Résoudre le conflit avec l’IA'}
@@ -60,7 +60,7 @@ export function GitOperationBanner({ project, status }: { project: Project; stat
       )}
       <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-2">
         {working > 0 && untouched.length === 0 && (
-          <span className="flex h-6 items-center gap-1 text-[11.5px] text-accent">
+          <span className="flex h-6 items-center gap-1 text-small text-accent">
             <LoaderCircle size={12} className="animate-spin" /> Claude travaille…
           </span>
         )}
@@ -69,7 +69,7 @@ export function GitOperationBanner({ project, status }: { project: Project; stat
           disabled={!!pending}
           onClick={() => void git.finishOperation(project.id, 'abort')}
           title={`Tout annuler et revenir à l’état d’avant (${status.operation} --abort)`}
-          className="flex h-6 items-center gap-1 rounded-md px-2 text-[11.5px] text-muted hover:bg-line hover:text-fg disabled:opacity-50"
+          className="flex h-6 items-center gap-1 rounded-md px-2 text-small text-muted hover:bg-line hover:text-fg disabled:opacity-50"
         >
           {pending === 'abort' ? <LoaderCircle size={12} className="animate-spin" /> : <X size={12} />}
           Annuler
@@ -78,7 +78,7 @@ export function GitOperationBanner({ project, status }: { project: Project; stat
           disabled={!!pending || conflicts.length > 0}
           onClick={() => void git.finishOperation(project.id, 'continue')}
           title={conflicts.length ? 'Résous d’abord tous les conflits' : status.operation === 'merge' ? 'Créer le commit de fusion' : 'Passer à la suite'}
-          className="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-[11.5px] font-medium text-bg hover:brightness-110 disabled:bg-line disabled:text-faint disabled:hover:brightness-100"
+          className="flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-small font-medium text-bg hover:brightness-110 disabled:bg-line disabled:text-faint disabled:hover:brightness-100"
         >
           {pending === 'continue' ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />}
           {status.operation === 'merge' ? 'Terminer la fusion' : 'Continuer'}

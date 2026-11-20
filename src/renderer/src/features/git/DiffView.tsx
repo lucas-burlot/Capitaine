@@ -135,10 +135,10 @@ export default function DiffView({ tabId, projectId, diff, visible }: Props) {
       )}
       <div ref={containerRef} className={`min-h-0 flex-1 ${loaded.state === 'ready' || loaded.state === 'loading' ? '' : 'hidden'}`} />
       {loaded.state === 'binary' && (
-        <p className="flex flex-1 items-center justify-center text-[13px] text-muted">Fichier binaire : pas de diff texte.</p>
+        <p className="flex flex-1 items-center justify-center text-ui text-muted">Fichier binaire : pas de diff texte.</p>
       )}
       {loaded.state === 'error' && (
-        <p className="flex flex-1 items-center justify-center text-[13px] text-red-400">Diff impossible : {loaded.message}</p>
+        <p className="flex flex-1 items-center justify-center text-ui text-red-400">Diff impossible : {loaded.message}</p>
       )}
     </div>
   )
@@ -156,14 +156,14 @@ function DiffHeader(props: { projectId: string; diff: DiffTarget; sideBySide: bo
   const absolute = repoAbsolutePath(diff.repoRoot, diff.path)
 
   return (
-    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-line bg-panel px-3 text-[12px]">
-      <span className="shrink-0 rounded bg-line px-1.5 py-0.5 text-[10.5px] text-muted">
+    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-line bg-panel px-3 text-small">
+      <span className="shrink-0 rounded bg-line px-1.5 py-0.5 text-caption text-muted">
         {diff.area === 'stash' ? `Stash ${diff.stashRef}` : AREA_LABEL[diff.area]}
       </span>
       <span className="min-w-0 flex-1 truncate text-fg" title={diff.path}>
         {diff.path}
       </span>
-      {!stillThere && <span className="shrink-0 text-[11px] text-faint">plus dans cette zone</span>}
+      {!stillThere && <span className="shrink-0 text-caption text-faint">plus dans cette zone</span>}
       {diff.area === 'unstaged' && stillThere && (
         <HeaderButton title="Indexer ce fichier" onClick={() => void useGit.getState().stage(projectId, [diff.path])}>
           <Plus size={13} /> Indexer
@@ -192,7 +192,7 @@ function HeaderButton(props: { title: string; onClick(): void; children: React.R
     <button
       title={props.title}
       onClick={props.onClick}
-      className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11.5px] text-muted hover:bg-panel-2 hover:text-fg"
+      className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-small text-muted hover:bg-panel-2 hover:text-fg"
     >
       {props.children}
     </button>
@@ -212,7 +212,7 @@ function ConflictActions({ projectId, path }: { projectId: string; path: string 
           disabled={resolution?.state === 'pending'}
           onClick={() => void git.resolveWithAi(projectId, path)}
           title="Claude propose une version fusionnée, que tu relis avant de l’appliquer"
-          className="flex shrink-0 items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 text-[11.5px] font-medium text-accent hover:bg-accent/25 disabled:opacity-70"
+          className="flex shrink-0 items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 text-small font-medium text-accent hover:bg-accent/25 disabled:opacity-70"
         >
           {resolution?.state === 'pending' ? <LoaderCircle size={12} className="animate-spin" /> : <Sparkles size={12} />}
           {resolution?.state === 'pending' ? 'Claude résout…' : 'Résoudre avec l’IA'}
@@ -238,7 +238,7 @@ function ResolutionBar(props: { projectId: string; path: string; explanation: st
   const busy = useGit((s) => !!s.busy[`${projectId}:${path}`])
   const git = useGit.getState()
   return (
-    <div className="flex shrink-0 items-start gap-2 border-b border-accent/20 bg-accent/[0.06] px-3 py-2 text-[12px]">
+    <div className="flex shrink-0 items-start gap-2 border-b border-accent/20 bg-accent/[0.06] px-3 py-2 text-small">
       <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" />
       <p className="min-w-0 flex-1 leading-relaxed text-muted">
         {state === 'pending'
@@ -252,13 +252,13 @@ function ResolutionBar(props: { projectId: string; path: string; explanation: st
         disabled={state === 'pending'}
         onClick={() => void git.resolveWithAi(projectId, path, { review: false })}
         title="Demander une autre proposition"
-        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px] text-muted hover:bg-line hover:text-fg disabled:opacity-50"
+        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-small text-muted hover:bg-line hover:text-fg disabled:opacity-50"
       >
         <RotateCw size={12} className={state === 'pending' ? 'animate-spin' : ''} /> Régénérer
       </button>
       <button
         onClick={() => git.discardResolution(projectId, path)}
-        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px] text-muted hover:bg-line hover:text-fg"
+        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-small text-muted hover:bg-line hover:text-fg"
       >
         <X size={12} /> Rejeter
       </button>
@@ -266,7 +266,7 @@ function ResolutionBar(props: { projectId: string; path: string; explanation: st
         disabled={state !== 'ready' || busy}
         onClick={() => void git.acceptResolution(projectId, path, props.content())}
         title="Écrire cette version dans le fichier et l’indexer"
-        className="flex shrink-0 items-center gap-1 rounded-md bg-accent px-2.5 py-0.5 text-[11.5px] font-medium text-bg hover:brightness-110 disabled:bg-line disabled:text-faint"
+        className="flex shrink-0 items-center gap-1 rounded-md bg-accent px-2.5 py-0.5 text-small font-medium text-bg hover:brightness-110 disabled:bg-line disabled:text-faint"
       >
         {busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />} Accepter et indexer
       </button>

@@ -46,7 +46,7 @@ export function UsageFooter() {
   const stale = usage?.status !== 'ok'
 
   return (
-    <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-line bg-panel px-3 text-[11px] text-muted" aria-label="Quota Claude">
+    <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-line bg-panel px-3 text-caption text-muted" aria-label="Quota Claude">
       <span className="flex shrink-0 items-center gap-1.5 font-medium text-fg">
         <Gauge size={12} className="text-accent" />
         Claude
@@ -118,9 +118,9 @@ function StatusNote({ usage, hasNumbers }: { usage: ClaudeUsage; hasNumbers: boo
               : null
   if (!text) return null
   return (
-    <span className="flex min-w-0 items-center gap-1 text-amber-300/90" title={text}>
+    <span className="flex min-w-0 items-center gap-1 text-amber-300/90" title={text.replace(/`/g, '')}>
       {usage.status !== 'ok' && <TriangleAlert size={11} className="shrink-0" />}
-      <span className="truncate">{text}</span>
+      <span className="truncate">{withCode(text)}</span>
     </span>
   )
 }
@@ -146,4 +146,17 @@ function sinceLabel(timestamp: number): string {
   if (minutes < 1) return 'à l’instant'
   if (minutes < 60) return `il y a ${minutes} min`
   return `il y a ${Math.floor(minutes / 60)} h`
+}
+
+/** `a command` in a note shows as code, not between backticks. */
+function withCode(text: string): React.ReactNode {
+  return text.split(/`([^`]+)`/).map((part, i) =>
+    i % 2 === 1 ? (
+      <code key={i} className="rounded bg-panel-2 px-1 font-mono text-[0.95em] text-fg/90">
+        {part}
+      </code>
+    ) : (
+      part
+    )
+  )
 }

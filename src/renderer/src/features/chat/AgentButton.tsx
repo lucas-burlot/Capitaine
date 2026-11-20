@@ -36,7 +36,7 @@ export function AgentButton({ projectId }: { projectId: string }) {
   return (
     <div ref={anchor} className="flex items-center rounded hover:bg-panel-2">
       <button
-        className="flex items-center gap-1.5 rounded-l py-1 pr-1 pl-1.5 text-[12px] text-muted hover:text-fg"
+        className="flex items-center gap-1.5 rounded-l py-1 pr-1 pl-1.5 text-small text-muted hover:text-fg"
         title={`Nouvel agent Claude ${VIEW_LABEL[view]} (${shortcutLabel('newAgent')})`}
         onClick={() => newAgent(projectId)}
       >
@@ -50,13 +50,13 @@ export function AgentButton({ projectId }: { projectId: string }) {
         createPortal(
           <div
             onMouseDown={(e) => e.stopPropagation()}
-            className="fixed z-50 w-64 -translate-x-full rounded-lg border border-line bg-panel py-1 text-[12.5px] shadow-xl shadow-black/40"
+            className="fixed z-50 w-64 -translate-x-full rounded-lg border border-line bg-panel py-1 text-ui shadow-xl shadow-black/40"
             style={{ left: menu.x, top: menu.y }}
           >
             <MenuItem icon={<MessageSquare size={13} />} label="Nouvel agent en chat" onClick={() => (setMenu(null), newAgent(projectId, 'chat'))} />
             <MenuItem icon={<SquareTerminal size={13} />} label="Nouvel agent dans un terminal" onClick={() => (setMenu(null), newAgent(projectId, 'shell'))} />
             <div className="my-1 h-px bg-line" />
-            <div className="px-3 pt-1 pb-0.5 text-[10.5px] font-medium tracking-wide text-faint uppercase">Par défaut ({shortcutLabel('newAgent')})</div>
+            <div className="px-3 pt-1 pb-0.5 text-caption font-medium tracking-wide text-faint uppercase">Par défaut ({shortcutLabel('newAgent')})</div>
             {(['chat', 'shell'] as const).map((option) => (
               <MenuItem
                 key={option}
@@ -101,7 +101,7 @@ export function ViewToggleButton({ terminalId }: { terminalId: string }) {
   return (
     <button
       onClick={() => void toggle()}
-      className={`flex items-center gap-1.5 rounded px-1.5 py-1 text-[12px] hover:bg-panel-2 hover:text-fg ${blocker || message ? 'text-faint' : 'text-muted'}`}
+      className={`flex items-center gap-1.5 rounded px-1.5 py-1 text-small hover:bg-panel-2 hover:text-fg ${blocker || message ? 'text-faint' : 'text-muted'}`}
       title={
         message ??
         blocker ??

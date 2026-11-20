@@ -36,9 +36,9 @@ export function SourceControlPanel({ project }: { project: Project }) {
   const error = useGit((s) => s.errors[project.id])
   const [stashFormOpen, setStashFormOpen] = useState(false)
 
-  if (status === undefined) return <p className="px-3 py-3 text-[12px] text-faint">Lecture de git…</p>
+  if (status === undefined) return <p className="px-3 py-3 text-small text-faint">Lecture de git…</p>
   if (status === null) {
-    return <p className="px-3 py-3 text-[12px] leading-relaxed text-faint">Ce projet n’est pas un dépôt git.</p>
+    return <p className="px-3 py-3 text-small leading-relaxed text-faint">Ce projet n’est pas un dépôt git.</p>
   }
 
   const clean = status.staged.length + status.unstaged.length + status.conflicts.length === 0
@@ -48,13 +48,13 @@ export function SourceControlPanel({ project }: { project: Project }) {
       <CommitBox project={project} status={status} />
       <GitOperationBanner project={project} status={status} />
       {error && (
-        <div className="mx-2 mb-1 flex gap-1.5 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[11.5px] text-red-300">
+        <div className="mx-2 mb-1 flex gap-1.5 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-small text-red-300">
           <TriangleAlert size={12} className="mt-0.5 shrink-0" />
           <span className="min-w-0 break-words">{error}</span>
         </div>
       )}
       {status.truncated && (
-        <p className="mx-3 mb-1 text-[11px] text-amber-300">Trop de fichiers modifiés : seuls les 2000 premiers sont listés.</p>
+        <p className="mx-3 mb-1 text-caption text-amber-300">Trop de fichiers modifiés : seuls les 2000 premiers sont listés.</p>
       )}
       {status.conflicts.length > 0 && (
         <ChangeSection project={project} status={status} area="conflict" title="Conflits" changes={status.conflicts} />
@@ -72,7 +72,7 @@ export function SourceControlPanel({ project }: { project: Project }) {
           onStash={() => setStashFormOpen(true)}
         />
       )}
-      {clean && <p className="px-4 pb-2 text-[12px] text-faint">Aucun changement : l’arbre de travail est propre.</p>}
+      {clean && <p className="px-4 pb-2 text-small text-faint">Aucun changement : l’arbre de travail est propre.</p>}
       <StashSection project={project} status={status} formOpen={stashFormOpen} setFormOpen={setStashFormOpen} />
     </div>
   )
@@ -181,13 +181,13 @@ function FolderRow({ project, status, area, folder, depth }: Omit<NodesProps, 'n
         }}
         onClick={() => useChangeView.getState().toggleFolder(key)}
         title={`${folder.path}\n${count} fichier${count > 1 ? 's' : ''} modifié${count > 1 ? 's' : ''}`}
-        className={`group flex h-[22px] cursor-pointer items-center gap-1 pr-2 text-[12.5px] text-muted hover:bg-panel-2/60 hover:text-fg ${busy ? 'opacity-50' : ''}`}
+        className={`group flex h-[22px] cursor-pointer items-center gap-1 pr-2 text-ui text-muted hover:bg-panel-2/60 hover:text-fg ${busy ? 'opacity-50' : ''}`}
         style={treeIndent(depth)}
       >
         <ChevronRight size={12} className={`shrink-0 text-faint transition-transform ${expanded ? 'rotate-90' : ''}`} />
         <EntryIcon entry={{ name: folder.name, isDirectory: true }} expanded={expanded} />
         <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-        <span className="shrink-0 text-[10.5px] text-faint tabular-nums group-hover:hidden">{count}</span>
+        <span className="shrink-0 text-caption text-faint tabular-nums group-hover:hidden">{count}</span>
         <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
           {area !== 'conflict' && (
             <HoverAction
@@ -245,7 +245,7 @@ function ChangeRow(props: { project: Project; status: RepoStatus; area: SectionP
       onClick={() => useApp.getState().openDiff(project.id, changeDiff(status.repoRoot, change, area))}
       onDoubleClick={() => change.kind !== 'deleted' && useApp.getState().openFile(project.id, absolute)}
       title={`${change.origPath ? `${change.origPath} → ` : ''}${change.path}\nClic : voir le diff · double-clic : ouvrir le fichier`}
-      className={`group flex h-[22px] cursor-pointer items-center pr-2 text-[12.5px] ${inTree ? 'gap-1' : 'gap-1.5 pl-6'} ${
+      className={`group flex h-[22px] cursor-pointer items-center pr-2 text-ui ${inTree ? 'gap-1' : 'gap-1.5 pl-6'} ${
         active ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
       } ${busy ? 'opacity-50' : ''}`}
       style={inTree ? treeIndent(depth) : undefined}
@@ -255,11 +255,11 @@ function ChangeRow(props: { project: Project; status: RepoStatus; area: SectionP
       <span className={`min-w-0 truncate ${inTree ? 'flex-1' : 'shrink'} ${KIND_COLOR[change.kind]} ${change.kind === 'deleted' ? 'line-through' : ''}`}>
         {fileName(change.path)}
       </span>
-      {!inTree && <span className="min-w-0 flex-1 truncate text-[11px] text-faint">{dir}</span>}
+      {!inTree && <span className="min-w-0 flex-1 truncate text-caption text-faint">{dir}</span>}
       {resolution && <ResolutionBadge projectId={project.id} repoRoot={status.repoRoot} path={change.path} state={resolution} />}
       <span className="flex shrink-0 items-center gap-0.5 group-hover:hidden">
         <LineCounts change={change} />
-        <span className={`w-3 text-center text-[10px] font-semibold ${KIND_COLOR[change.kind]}`}>{KIND_LETTER[change.kind]}</span>
+        <span className={`w-3 text-center text-caption font-semibold ${KIND_COLOR[change.kind]}`}>{KIND_LETTER[change.kind]}</span>
       </span>
       <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
         {canAiResolve && resolution?.state !== 'pending' && resolution?.state !== 'ready' && (
@@ -305,7 +305,7 @@ function ResolutionBadge(props: { projectId: string; repoRoot: string; path: str
   const { state } = props
   if (state.state === 'pending') {
     return (
-      <span className="flex shrink-0 items-center gap-1 text-[10.5px] text-accent" title="Claude prépare une résolution…">
+      <span className="flex shrink-0 items-center gap-1 text-caption text-accent" title="Claude prépare une résolution…">
         <LoaderCircle size={11} className="animate-spin" /> IA
       </span>
     )
@@ -324,7 +324,7 @@ function ResolutionBadge(props: { projectId: string; repoRoot: string; path: str
         e.stopPropagation()
         useApp.getState().openDiff(props.projectId, resolutionDiff(props.repoRoot, props.path))
       }}
-      className="flex shrink-0 items-center gap-0.5 rounded bg-accent/15 px-1 text-[10px] font-medium text-accent hover:bg-accent/25"
+      className="flex shrink-0 items-center gap-0.5 rounded bg-accent/15 px-1 text-caption font-medium text-accent hover:bg-accent/25"
     >
       <Sparkles size={9} /> à valider
     </button>
@@ -334,7 +334,7 @@ function ResolutionBadge(props: { projectId: string; repoRoot: string; path: str
 function LineCounts({ change }: { change: GitChange }) {
   if (change.added === null && change.removed === null) return null
   return (
-    <span className="mr-1 text-[10.5px] tabular-nums">
+    <span className="mr-1 text-caption tabular-nums">
       {!!change.added && <span className="text-emerald-400">+{change.added}</span>}
       {!!change.added && !!change.removed && ' '}
       {!!change.removed && <span className="text-red-400">−{change.removed}</span>}
@@ -358,7 +358,7 @@ function StashSection(props: { project: Project; status: RepoStatus; formOpen: b
       </SectionHeader>
       {formOpen && <StashForm project={project} status={status} onClose={() => setFormOpen(false)} />}
       {open && stashes.length === 0 && !formOpen && (
-        <p className="px-6 py-1 text-[11.5px] text-faint">
+        <p className="px-6 py-1 text-small text-faint">
           Aucun stash.
           {hasChanges && (
             <>
@@ -408,9 +408,9 @@ function StashForm({ project, status, onClose }: { project: Project; status: Rep
           if (e.key === 'Escape') onClose()
         }}
         placeholder="Message du stash (optionnel)"
-        className="h-7 w-full rounded border border-line bg-bg/60 px-2 text-[12.5px] text-fg outline-none placeholder:text-faint focus:border-violet-300/50"
+        className="h-7 w-full rounded border border-line bg-bg/60 px-2 text-ui text-fg outline-none placeholder:text-faint focus:border-violet-300/50"
       />
-      <div className="mt-1.5 flex flex-col gap-1 text-[11.5px] text-muted">
+      <div className="mt-1.5 flex flex-col gap-1 text-small text-muted">
         {untracked > 0 && (
           <label className={`flex cursor-pointer items-center gap-1.5 ${onlyStaged ? 'opacity-40' : ''}`}>
             <input
@@ -431,16 +431,16 @@ function StashForm({ project, status, onClose }: { project: Project; status: Rep
         )}
       </div>
       <div className="mt-2 flex items-center gap-1.5">
-        <span className="min-w-0 flex-1 truncate text-[11px] text-faint">
+        <span className="min-w-0 flex-1 truncate text-caption text-faint">
           {count === 0 ? 'Rien à mettre de côté' : `${count} fichier${count > 1 ? 's' : ''} mis de côté`}
         </span>
-        <button onClick={onClose} className="h-6 rounded-md px-2 text-[11.5px] text-muted hover:bg-line hover:text-fg">
+        <button onClick={onClose} className="h-6 rounded-md px-2 text-small text-muted hover:bg-line hover:text-fg">
           Annuler
         </button>
         <button
           disabled={busy || count === 0}
           onClick={() => void submit()}
-          className="flex h-6 items-center gap-1 rounded-md bg-violet-300/90 px-2 text-[11.5px] font-medium text-bg hover:bg-violet-300 disabled:bg-line disabled:text-faint"
+          className="flex h-6 items-center gap-1 rounded-md bg-violet-300/90 px-2 text-small font-medium text-bg hover:bg-violet-300 disabled:bg-line disabled:text-faint"
         >
           {busy ? <LoaderCircle size={12} className="animate-spin" /> : <Archive size={12} />}
           Stasher
@@ -474,13 +474,13 @@ function StashRow({ project, status, stash }: { project: Project; status: RepoSt
         role="button"
         onClick={toggle}
         title={`${stash.ref}${stash.branch ? ` · sur ${stash.branch}` : ''}\n${stash.message}`}
-        className="group flex cursor-pointer items-start gap-1 py-1 pr-2 pl-3 text-[12px] text-muted hover:bg-panel-2/60 hover:text-fg"
+        className="group flex cursor-pointer items-start gap-1 py-1 pr-2 pl-3 text-small text-muted hover:bg-panel-2/60 hover:text-fg"
       >
         <ChevronRight size={12} className={`mt-0.5 shrink-0 text-faint transition-transform ${open ? 'rotate-90' : ''}`} />
         <Archive size={13} className="mt-0.5 shrink-0 text-violet-300/80" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-fg">{stash.message || '(sans message)'}</span>
-          <span className="block truncate text-[10.5px] text-faint">
+          <span className="block truncate text-caption text-faint">
             {stash.ref}
             {stash.branch && ` · ${stash.branch}`} · {relativeTime(stash.createdAt)}
           </span>
@@ -500,7 +500,7 @@ function StashRow({ project, status, stash }: { project: Project; status: RepoSt
         )}
       </div>
       {confirmDrop && (
-        <div className="mx-2 mb-1 flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 py-1 pr-1 pl-2 text-[11.5px]">
+        <div className="mx-2 mb-1 flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 py-1 pr-1 pl-2 text-small">
           <span className="min-w-0 flex-1 text-red-200">Supprimer définitivement ce stash ?</span>
           <button onClick={() => setConfirmDrop(false)} className="h-6 rounded px-1.5 text-muted hover:bg-line hover:text-fg">
             Annuler
@@ -530,8 +530,8 @@ function StashRow({ project, status, stash }: { project: Project; status: RepoSt
           </StashTextButton>
         </div>
       )}
-      {open && error && <p className="py-0.5 pl-9 text-[11px] text-red-400">{error}</p>}
-      {open && !files && !error && <p className="py-0.5 pl-9 text-[11px] text-faint">Chargement…</p>}
+      {open && error && <p className="py-0.5 pl-9 text-caption text-red-400">{error}</p>}
+      {open && !files && !error && <p className="py-0.5 pl-9 text-caption text-faint">Chargement…</p>}
       {open &&
         files?.map((file) => (
           <div
@@ -539,17 +539,17 @@ function StashRow({ project, status, stash }: { project: Project; status: RepoSt
             role="button"
             onClick={() => useApp.getState().openDiff(project.id, stashFileDiff(status.repoRoot, stash, file))}
             title={`${file.path}\nClic : voir le diff du stash`}
-            className="flex h-[22px] cursor-pointer items-center gap-1.5 pr-2 pl-9 text-[12px] text-muted hover:bg-panel-2/60 hover:text-fg"
+            className="flex h-[22px] cursor-pointer items-center gap-1.5 pr-2 pl-9 text-small text-muted hover:bg-panel-2/60 hover:text-fg"
           >
             <EntryIcon entry={{ name: fileName(file.path), isDirectory: false }} />
             <span className={`min-w-0 shrink truncate ${KIND_COLOR[file.kind]}`}>{fileName(file.path)}</span>
-            <span className="min-w-0 flex-1 truncate text-[11px] text-faint">
+            <span className="min-w-0 flex-1 truncate text-caption text-faint">
               {file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : ''}
             </span>
-            <span className={`w-3 shrink-0 text-center text-[10px] font-semibold ${KIND_COLOR[file.kind]}`}>{KIND_LETTER[file.kind]}</span>
+            <span className={`w-3 shrink-0 text-center text-caption font-semibold ${KIND_COLOR[file.kind]}`}>{KIND_LETTER[file.kind]}</span>
           </div>
         ))}
-      {open && files?.length === 0 && <p className="py-0.5 pl-9 text-[11px] text-faint">Stash vide.</p>}
+      {open && files?.length === 0 && <p className="py-0.5 pl-9 text-caption text-faint">Stash vide.</p>}
     </div>
   )
 }
@@ -559,7 +559,7 @@ function StashTextButton(props: { disabled?: boolean; danger?: boolean; onClick(
     <button
       disabled={props.disabled}
       onClick={props.onClick}
-      className={`flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-[11px] disabled:opacity-40 ${
+      className={`flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-caption disabled:opacity-40 ${
         props.danger ? 'text-muted hover:bg-red-500/15 hover:text-red-300' : 'text-muted hover:bg-line hover:text-fg'
       }`}
     >

@@ -67,7 +67,7 @@ function ViewTab(props: { view: RightPanelView; current: RightPanelView; icon: R
       aria-label={props.label}
       title={props.label}
       onClick={() => usePanels.getState().showView(props.view)}
-      className={`flex h-7 items-center gap-1 rounded px-1.5 text-[11px] font-medium ${
+      className={`flex h-7 items-center gap-1 rounded px-1.5 text-caption font-medium ${
         active ? 'bg-panel-2 text-accent' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
       }`}
     >
@@ -101,7 +101,7 @@ function GitBadge({ projectId }: { projectId: string }) {
     return status ? status.staged.length + status.unstaged.length + status.conflicts.length : 0
   })
   if (!count) return null
-  return <span className="rounded-full bg-accent/20 px-1.5 text-[10px] text-accent tabular-nums">{count > 999 ? '999+' : count}</span>
+  return <span className="rounded-full bg-accent/20 px-1.5 text-caption text-accent tabular-nums">{count > 999 ? '999+' : count}</span>
 }
 
 /**

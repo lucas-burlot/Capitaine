@@ -42,6 +42,8 @@ export function CommitBox({ project, status }: { project: Project; status: RepoS
   const blockedByConflicts = status.conflicts.length > 0
   const midRebase = status.operation === 'rebase'
   const canCommit = !!draft.trim() && changeCount > 0 && !blockedByConflicts && !midRebase && !pending && !generating
+  // Only the message is missing: the button stays at hand and leads to the message field.
+  const needsMessage = !draft.trim() && changeCount > 0 && !blockedByConflicts && !midRebase && !pending && !generating
   const canPush = status.hasRemote && !!status.branch
   const effectiveFollowUp = canPush ? followUp : 'none'
   const primary = FOLLOW_UPS.find((f) => f.value === effectiveFollowUp) ?? FOLLOW_UPS[0]
@@ -110,7 +112,7 @@ export function CommitBox({ project, status }: { project: Project; status: RepoS
           placeholder={
             generating ? 'Claude rédige le message…' : `Message de commit${status.branch ? ` sur « ${status.branch} »` : ''} (${MOD}+↵)`
           }
-          className="block max-h-[180px] min-h-[46px] w-full resize-none bg-transparent py-1.5 pr-8 pl-2 text-[12.5px] leading-[18px] text-fg outline-none placeholder:text-faint disabled:opacity-70"
+          className="block max-h-[180px] min-h-[46px] w-full resize-none bg-transparent py-1.5 pr-8 pl-2 text-ui leading-[18px] text-fg outline-none placeholder:text-faint disabled:opacity-70"
         />
         <button
           title={generating ? 'Génération en cours…' : `Générer le message avec Claude (${all ? 'tous les changements' : 'fichiers indexés'})`}
@@ -124,10 +126,14 @@ export function CommitBox({ project, status }: { project: Project; status: RepoS
 
       <div ref={menuRef} className="relative mt-1.5 flex">
         <button
-          disabled={!canCommit}
+          disabled={!canCommit && !needsMessage}
           title={disabledReason ?? `${primary.label} ${countLabel} · ${primary.hint}`.replace('  ', ' ')}
-          onClick={() => commit(effectiveFollowUp)}
-          className="flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-l-md bg-accent px-2 text-[12px] font-medium text-bg transition hover:brightness-110 disabled:cursor-default disabled:bg-line disabled:text-faint disabled:hover:brightness-100"
+          onClick={() => (needsMessage ? textareaRef.current?.focus() : commit(effectiveFollowUp))}
+          className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-l-md px-2 text-small font-medium transition ${
+            needsMessage
+              ? 'border border-accent/40 text-accent hover:bg-accent/10'
+              : 'bg-accent text-bg hover:brightness-110 disabled:cursor-default disabled:bg-line disabled:text-faint disabled:hover:brightness-100'
+          }`}
         >
           {busyLabel ? <LoaderCircle size={13} className="animate-spin" /> : primary.icon}
           <span className="truncate">{busyLabel ?? `${primary.label} ${countLabel}`.trim()}</span>
@@ -136,7 +142,11 @@ export function CommitBox({ project, status }: { project: Project; status: RepoS
           disabled={!canCommit || !canPush}
           title="Autres actions de commit"
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-r-md border-l border-bg/30 bg-accent text-bg hover:brightness-110 disabled:cursor-default disabled:border-bg disabled:bg-line disabled:text-faint disabled:hover:brightness-100"
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-r-md ${
+            needsMessage
+              ? 'border border-l-0 border-accent/40 text-accent/50'
+              : 'border-l border-bg/30 bg-accent text-bg hover:brightness-110 disabled:cursor-default disabled:border-bg disabled:bg-line disabled:text-faint disabled:hover:brightness-100'
+          }`}
         >
           <ChevronDown size={13} />
         </button>
@@ -146,20 +156,21 @@ export function CommitBox({ project, status }: { project: Project; status: RepoS
               <button
                 key={option.value}
                 onClick={() => commit(option.value)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-muted hover:bg-line/70 hover:text-fg"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-ui text-muted hover:bg-line/70 hover:text-fg"
               >
                 <span className="flex w-4 justify-center text-accent">{option.icon}</span>
                 <span className="flex-1">{option.label}</span>
-                <span className="text-[10.5px] text-faint">{option.hint}</span>
+                <span className="text-caption text-faint">{option.hint}</span>
               </button>
             ))}
           </div>
         )}
       </div>
 
+      {!notice && disabledReason && changeCount > 0 && <p className="mt-1.5 text-caption leading-snug text-faint">{disabledReason}</p>}
       {notice && (
         <p
-          className={`mt-1.5 flex items-start gap-1.5 text-[11.5px] leading-snug ${notice.tone === 'ok' ? 'text-emerald-300/90' : 'text-amber-300'}`}
+          className={`mt-1.5 flex items-start gap-1.5 text-small leading-snug ${notice.tone === 'ok' ? 'text-emerald-300/90' : 'text-amber-300'}`}
           role="status"
         >
           {notice.tone === 'ok' ? <CircleCheck size={12} className="mt-px shrink-0" /> : <TriangleAlert size={12} className="mt-px shrink-0" />}

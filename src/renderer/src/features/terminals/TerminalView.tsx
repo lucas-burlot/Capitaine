@@ -224,7 +224,7 @@ export function TerminalView({ terminalId, cwd, rect, visible, focused, showHead
       }}
     >
       {dropping && (
-        <div className="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-accent/70 bg-accent/10 text-[12px] font-medium text-accent">
+        <div className="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-accent/70 bg-accent/10 text-small font-medium text-accent">
           Déposer pour insérer le chemin
         </div>
       )}
@@ -246,7 +246,7 @@ export function PaneHeader({ terminalId, focused }: { terminalId: string; focuse
   return (
     <div
       onMouseDown={() => focusPane(terminalId)}
-      className={`flex h-6 shrink-0 items-center gap-1.5 border-b px-2 text-[11px] ${
+      className={`flex h-6 shrink-0 items-center gap-1.5 border-b px-2 text-caption ${
         focused ? 'border-accent/50 bg-panel-2 text-fg' : 'border-line bg-panel text-faint'
       }`}
     >
