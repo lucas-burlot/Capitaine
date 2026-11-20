@@ -370,6 +370,13 @@ function applySignals(chatId: string, signals: FoldSignals): void {
   if (signals.contextWindow !== undefined) update.contextWindow = signals.contextWindow
   if (signals.costUsd !== undefined) update.costUsd = signals.costUsd
   if (signals.activity !== undefined) update.activity = signals.activity
+  if (signals.reset) {
+    update.contextTokens = signals.contextTokens ?? null
+    update.historyTruncated = false
+    // The next message names the new conversation.
+    const pane = useApp.getState().terminals[chatId]
+    if (pane?.view === 'chat' && pane.shellTitle) useApp.getState().setShellTitle(chatId, '')
+  }
   patch(chatId, (chat) => {
     const next: Partial<ChatSession> = { ...update }
     if (signals.cancelledRequests?.length) next.permissions = chat.permissions.filter((p) => !signals.cancelledRequests!.includes(p.requestId))

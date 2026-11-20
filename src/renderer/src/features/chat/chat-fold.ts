@@ -49,6 +49,8 @@ export interface FoldSignals {
   activity?: string | null
   slashCommands?: string[]
   authFailed?: boolean
+  /** `/clear`: the conversation started over. */
+  reset?: boolean
   /** A permission prompt was withdrawn by Claude. */
   cancelledRequests?: string[]
   permissionRequests?: ChatWireMessage[]
@@ -144,6 +146,8 @@ export class ChatFold {
         return this.result(message, parentId, signals)
       case 'system':
         return this.system(message, signals)
+      case 'conversation_reset':
+        return this.reset(message, signals)
       case 'control_request': {
         const request = message.request as { subtype?: string } | undefined
         if (request?.subtype === 'can_use_tool') (signals.permissionRequests ??= []).push(message)
@@ -319,7 +323,8 @@ export class ChatFold {
     const command = /<command-name>\s*\/?([^<]*)<\/command-name>/.exec(trimmed)
     if (command) {
       const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(trimmed)?.[1]?.trim() ?? ''
-      this.push({ kind: 'command', id: `command:${uuid ?? ++this.localCounter}`, parentId: null, name: command[1].trim(), args, output: null })
+      const id = `command:${uuid ?? ++this.localCounter}`
+      if (!this.index.has(id)) this.push({ kind: 'command', id, parentId: null, name: command[1].trim(), args, output: null })
       return
     }
     const stdout = /<local-command-(?:stdout|stderr)>([\s\S]*?)<\/local-command-(?:stdout|stderr)>/.exec(trimmed)
@@ -418,6 +423,23 @@ export class ChatFold {
         return
       }
     }
+  }
+
+  /** `/clear`: the transcript starts over, keeping only messages still waiting for Claude. */
+  private reset(message: ChatWireMessage, signals: FoldSignals): void {
+    const trigger = typeof message.user_message_uuid === 'string' ? message.user_message_uuid : null
+    const queued = this.items.filter((item) => item.kind === 'user' && item.state === 'queued' && item.uuid !== trigger)
+    // The command's own row comes first; its replay, right after, finds it there.
+    const command: ChatItem[] = trigger ? [{ kind: 'command', id: `command:${trigger}`, parentId: null, name: 'clear', args: '', output: null }] : []
+    this.items = [...command, ...queued]
+    this.index = new Map(this.items.map((item, i) => [item.id, i]))
+    this.pendingBlocks.clear()
+    this.streamingMessage.clear()
+    this.blockIds.clear()
+    this.partialJson.clear()
+    this.changed = true
+    delete signals.contextTokens
+    signals.reset = true
   }
 
   private push(item: ChatItem): void {
