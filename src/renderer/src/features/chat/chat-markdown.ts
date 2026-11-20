@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify'
 import { isWindows } from '@/lib/platform'
 import { useApp } from '@/features/workspace/workspace-store'
 import { loadProjectFiles } from '@/features/files/project-files'
+import type { FilePosition } from '@/features/editor/reveal'
 
 const marked = new Marked({ gfm: true, breaks: false })
 
@@ -50,7 +51,9 @@ export function onMarkdownClick(event: React.MouseEvent, place: ChatPlace): void
   }
   const fileCode = target.closest<HTMLElement>('[data-file-path]')
   if (fileCode && place.projectId) {
-    useApp.getState().openFile(place.projectId, fileCode.dataset.filePath!)
+    const line = Number(fileCode.dataset.fileLine)
+    const column = Number(fileCode.dataset.fileColumn)
+    useApp.getState().openFile(place.projectId, fileCode.dataset.filePath!, line > 0 ? { line, ...(column > 0 ? { column } : {}) } : undefined)
     return
   }
   const anchor = target.closest('a')
@@ -60,7 +63,7 @@ export function onMarkdownClick(event: React.MouseEvent, place: ChatPlace): void
   if (/^https?:\/\//i.test(href)) window.open(href)
   else if (place.projectId && !href.startsWith('#') && !/^[a-z][a-z0-9+.-]*:(?![\\/])/i.test(href)) {
     const [file] = locate(safeDecode(href), place)
-    if (file) useApp.getState().openFile(place.projectId, file.absolute)
+    if (file) useApp.getState().openFile(place.projectId, file.absolute, file.position)
   }
 }
 
@@ -73,6 +76,10 @@ export async function linkFilePaths(root: HTMLElement, place: ChatPlace): Promis
     const file = locate(code.textContent!.trim(), place).find((candidate) => candidate.projectPath !== null && files.has(candidate.projectPath))
     if (!file) continue
     code.dataset.filePath = file.absolute
+    if (file.position) {
+      code.dataset.fileLine = String(file.position.line)
+      if (file.position.column) code.dataset.fileColumn = String(file.position.column)
+    }
     code.classList.add('chat-file-link')
     code.title = 'Ouvrir dans l’éditeur'
   }
@@ -99,11 +106,13 @@ function safeDecode(text: string): string {
 }
 
 /**
- * Where a path as Claude writes it (`src/a.ts`, `./a.ts:12`, `/abs/a.ts#L3`) may point, most likely
- * first: against the chat's folder, then the project's root. Its line suffix is dropped.
+ * Where a path as Claude writes it (`src/a.ts`, `./a.ts:12`, `a.ts:12:5`, `/abs/a.ts#L3`) may point,
+ * most likely first: against the chat's folder, then the project's root, with the line it names.
  */
-function locate(raw: string, place: ChatPlace): { absolute: string; projectPath: string | null }[] {
-  const path = raw.replace(/#L\d+(-L?\d+)?$/, '').replace(/(:\d+){1,2}$/, '').replace(/\\/g, '/')
+function locate(raw: string, place: ChatPlace): { absolute: string; projectPath: string | null; position?: FilePosition }[] {
+  const suffix = /#L(\d+)(?:-L?\d+)?$/.exec(raw) ?? /:(\d+)(?::(\d+))?$/.exec(raw)
+  const position: FilePosition | undefined = suffix ? { line: Number(suffix[1]), ...(suffix[2] ? { column: Number(suffix[2]) } : {}) } : undefined
+  const path = (suffix ? raw.slice(0, suffix.index) : raw).replace(/\\/g, '/')
   if (!path || path.startsWith('~')) return []
   const root = place.projectRoot ? place.projectRoot.replace(/\\/g, '/').replace(/\/+$/, '') : null
   const inProject = (absolute: string) => (root && absolute.startsWith(`${root}/`) ? absolute.slice(root.length + 1) : null)
@@ -111,7 +120,7 @@ function locate(raw: string, place: ChatPlace): { absolute: string; projectPath:
   const candidates = [{ absolute, projectPath: inProject(absolute) }]
   // Claude sometimes writes paths from the project's root while the chat runs in a subfolder.
   if (root && !/^(\/|[A-Za-z]:\/)/.test(path)) candidates.push({ absolute: normalize(`${root}/${path}`), projectPath: normalize(path) })
-  return candidates.map((c) => ({ ...c, absolute: isWindows ? c.absolute.replace(/\//g, '\\') : c.absolute }))
+  return candidates.map((c) => ({ ...c, absolute: isWindows ? c.absolute.replace(/\//g, '\\') : c.absolute, ...(position ? { position } : {}) }))
 }
 
 /** Drops `.` and resolves `..` in a `/`-separated path. */

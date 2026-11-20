@@ -3,12 +3,17 @@
 // `set_model`, and plays back the frames Claude Code 2.1 sends for `/context`, `/help`, `/clear`
 // and a plain message (recorded from the real CLI, trimmed to the fields the chat reads).
 import { randomUUID } from 'node:crypto'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 
 const MODELS = { default: 'claude-opus-5-5', opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5' }
 const NAMES = { default: 'Default (recommended)', opus: 'Opus 5.5', sonnet: 'Sonnet 5.5', haiku: 'Haiku 5.5' }
 let model = MODELS.default
+// Two MCP servers: one up, one failing until it is reconnected.
+const mcpServers = [
+  { name: 'docs', status: 'connected', serverInfo: { name: 'docs', version: '1.2.0' } },
+  { name: 'github', status: 'failed', error: 'Connection refused' }
+]
 let sessionId = randomUUID()
 
 const send = (frame) => process.stdout.write(`${JSON.stringify({ ...frame, session_id: sessionId })}\n`)
@@ -39,6 +44,14 @@ function control(message) {
       account: { tokenSource: 'claude.ai' },
       capabilities: []
     })
+  }
+  if (request.subtype === 'mcp_status') return reply({ mcpServers })
+  if (request.subtype === 'mcp_reconnect' || request.subtype === 'mcp_toggle') {
+    const server = mcpServers.find((s) => s.name === request.serverName)
+    if (!server) return send({ type: 'control_response', response: { subtype: 'error', request_id: requestId, error: `Server not found: ${request.serverName}` } })
+    const up = request.subtype === 'mcp_reconnect' || request.enabled
+    Object.assign(server, up ? { status: 'connected', serverInfo: { name: server.name, version: '0.9.0' }, error: undefined } : { status: 'disabled', error: undefined })
+    return reply({})
   }
   if (request.subtype === 'set_model') {
     if (!MODELS[request.model]) {
@@ -122,9 +135,14 @@ async function toolTurn(message) {
   const slow = call('Bash', { command: 'npm run smoke', description: 'Lance le test de bout en bout' })
   await sleep(Number(process.env.FAKE_CLAUDE_SLOW_MS ?? 2500))
   done(slow, 'OK — screenshots in smoke-shots')
-  // A real file of the folder, so the chat can make its path a link.
-  const file = readdirSync(cwd, { withFileTypes: true }).find((entry) => entry.isFile() && !entry.name.startsWith('.'))?.name ?? 'package.json'
-  say(`Corrigé : \`/clear\` vide maintenant le chat, et le test de bout en bout passe. Voir \`${file}\`.\n\n\`\`\`ts\nconst fixed: boolean = true\n\`\`\``)
+  // A real file of the folder, at its second line, so the chat can make its path a link to that place.
+  const file =
+    readdirSync(cwd, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && !entry.name.startsWith('.') && !entry.name.includes(' '))
+      .map((entry) => entry.name)
+      .sort()
+      .find((name) => readFileSync(`${cwd}/${name}`, 'utf8').split('\n').length > 2) ?? 'package.json'
+  say(`Corrigé : \`/clear\` vide maintenant le chat, et le test de bout en bout passe. Voir \`${file}:2\`.\n\n\`\`\`ts\nconst fixed: boolean = true\n\`\`\``)
   result(1, 48_000)
   state('idle')
 }

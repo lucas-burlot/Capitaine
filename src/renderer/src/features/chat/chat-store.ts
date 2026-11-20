@@ -4,7 +4,7 @@
  * prompts, the pickers' options, and reports the agent's status like a terminal Claude would.
  */
 import { create } from 'zustand'
-import type { ChatPermissionMode, ChatPermissionResponse, ChatUserContent, ChatWireMessage, SavedAgent } from '@shared/types'
+import type { ChatControlRequest, ChatPermissionMode, ChatPermissionResponse, ChatUserContent, ChatWireMessage, SavedAgent } from '@shared/types'
 import type { AgentChild, AgentReport } from '@/features/claude/agent-status'
 import { useApp } from '@/features/workspace/workspace-store'
 import { useAgentSettings } from './agent-settings'
@@ -65,6 +65,17 @@ export interface ChatSession {
   /** The last turn ended while the chat wasn't looked at. */
   unseenDone: boolean
   capabilities: string[]
+  /** The MCP servers Claude knows for this chat and how each is doing; null until first read. */
+  mcpServers: McpServer[] | null
+}
+
+export type McpServerStatus = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled'
+
+export interface McpServer {
+  name: string
+  status: McpServerStatus
+  version: string | null
+  error: string | null
 }
 
 interface ChatsState {
@@ -124,7 +135,8 @@ export function openChat(chatId: string, options: { cwd: string; sessionId: stri
         historyLoading: !!options.sessionId,
         historyTruncated: false,
         unseenDone: false,
-        capabilities: []
+        capabilities: [],
+        mcpServers: null
       }
     }
   }))
@@ -180,6 +192,7 @@ export function ensureStarted(chatId: string): Promise<boolean> {
         models: parseModels(init?.models),
         capabilities: Array.isArray(init?.capabilities) ? init.capabilities.filter((c): c is string => typeof c === 'string') : []
       })
+      void refreshMcp(chatId)
       // Claude re-asks what was pending when it was restarted.
       for (const request of init?.pending_permission_requests ?? []) addPermission(chatId, request as ChatWireMessage)
       if (init?.account && (init.account as { tokenSource?: string }).tokenSource === 'none' && !(init.account as { apiKeySource?: string }).apiKeySource) {
@@ -209,7 +222,11 @@ export async function sendMessage(chatId: string, text: string, images: ChatUser
   const uuid = crypto.randomUUID()
   // Images first, then one text block: Claude reads slash commands from the last text block.
   const content: ChatUserContent = [...images, ...(trimmed.trim() ? [{ type: 'text' as const, text: trimmed }] : [])]
-  fold.addUser(trimmed, images.length, uuid)
+  fold.addUser(
+    trimmed,
+    images.map((image) => ({ src: image.type === 'image' ? `data:${image.source.media_type};base64,${image.source.data}` : null })),
+    uuid
+  )
   flushFold(chatId)
   setTitleFrom(chatId, trimmed)
   idleSeen.delete(chatId)
@@ -338,6 +355,8 @@ export function closeChat(chatId: string): void {
   folds.delete(chatId)
   idleSeen.delete(chatId)
   starting.delete(chatId)
+  clearTimeout(mcpPolls.get(chatId)?.timer)
+  mcpPolls.delete(chatId)
   useChats.setState((state) => {
     if (!state.chats[chatId]) return state
     const chats = { ...state.chats }
@@ -427,6 +446,72 @@ function applySignals(chatId: string, signals: FoldSignals): void {
     return next
   })
   if (signals.authFailed) notice(chatId, 'error', 'Claude Code n’est pas connecté. Bascule ce chat en terminal et lance /login.')
+  // A turn may have changed the servers (a tool call reconnecting one, an /mcp command).
+  if (signals.turnEnded) void refreshMcp(chatId)
+}
+
+const MCP_STATUSES = new Set<McpServerStatus>(['connected', 'failed', 'needs-auth', 'pending', 'disabled'])
+const MCP_POLL_MS = 2000
+const MCP_POLL_LIMIT = 30
+/** Chats whose servers are still connecting: their status is read again shortly. */
+const mcpPolls = new Map<string, { timer: ReturnType<typeof setTimeout>; left: number }>()
+
+/** Reads how the chat's MCP servers are doing; again every few seconds while one is connecting. */
+export async function refreshMcp(chatId: string): Promise<void> {
+  if (!isLive(chatId)) return
+  let servers: McpServer[]
+  try {
+    const answer = (await window.capitaine.chat.control(chatId, { subtype: 'mcp_status' })) as { mcpServers?: unknown } | null
+    servers = parseMcpServers(answer?.mcpServers)
+  } catch {
+    return
+  }
+  if (!chatOf(chatId)) return
+  patch(chatId, { mcpServers: servers })
+  const poll = mcpPolls.get(chatId)
+  if (poll) clearTimeout(poll.timer)
+  const left = (poll?.left ?? MCP_POLL_LIMIT) - 1
+  if (servers.some((server) => server.status === 'pending') && left > 0) {
+    mcpPolls.set(chatId, { timer: setTimeout(() => void refreshMcp(chatId), MCP_POLL_MS), left })
+  } else mcpPolls.delete(chatId)
+}
+
+/** Connects a failed or disconnected server again. */
+export async function reconnectMcp(chatId: string, name: string): Promise<void> {
+  await mcpAction(chatId, name, { subtype: 'mcp_reconnect', serverName: name }, 'Reconnexion')
+}
+
+export async function toggleMcp(chatId: string, name: string, enabled: boolean): Promise<void> {
+  await mcpAction(chatId, name, { subtype: 'mcp_toggle', serverName: name, enabled }, enabled ? 'Activation' : 'Désactivation')
+}
+
+async function mcpAction(chatId: string, name: string, request: ChatControlRequest, what: string): Promise<void> {
+  if (!isLive(chatId)) return
+  // Shown as connecting while Claude works on it; the status read after says how it went.
+  patch(chatId, (chat) => ({ mcpServers: chat.mcpServers?.map((server) => (server.name === name ? { ...server, status: 'pending', error: null } : server)) ?? null }))
+  try {
+    await window.capitaine.chat.control(chatId, request)
+  } catch (error) {
+    notice(chatId, 'warning', `${what} du serveur MCP « ${name} » impossible : ${messageOf(error)}`)
+  }
+  mcpPolls.delete(chatId)
+  await refreshMcp(chatId)
+}
+
+function parseMcpServers(value: unknown): McpServer[] {
+  if (!Array.isArray(value)) return []
+  const servers: McpServer[] = []
+  for (const entry of value as { name?: unknown; status?: unknown; serverInfo?: { version?: unknown }; error?: unknown }[]) {
+    if (typeof entry?.name !== 'string') continue
+    const status = MCP_STATUSES.has(entry.status as McpServerStatus) ? (entry.status as McpServerStatus) : 'failed'
+    servers.push({
+      name: entry.name,
+      status,
+      version: typeof entry.serverInfo?.version === 'string' ? entry.serverInfo.version : null,
+      error: typeof entry.error === 'string' && entry.error ? entry.error : null
+    })
+  }
+  return servers.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Mirrors the chat into the agent status the sidebar, tab icons and notifications use. */

@@ -15,6 +15,7 @@ import { chatAgent, closeChat, ensureStarted, markSeen, openChat, setEffort, set
 import { onMarkdownClick, useChatPlace } from './chat-markdown'
 import { ChatFind } from './ChatFind'
 import { PermissionCard } from './PermissionCard'
+import { McpStatus } from './McpStatus'
 
 interface Props {
   chatId: string
@@ -235,6 +236,7 @@ function Toolbar({ chat }: { chat: ChatSession }) {
         ]}
         tone={chat.permissionMode === 'bypassPermissions' ? 'danger' : chat.permissionMode === 'plan' ? 'accent' : undefined}
       />
+      <McpStatus chat={chat} />
       {contextPercent !== null && (
         <span
           className="ml-1 flex items-center gap-1.5 text-[11px] text-faint"

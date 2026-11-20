@@ -5,6 +5,7 @@ import { togglePaneView } from './agent-launch'
 import { looksLikeMarkdown, type ChatItem, type ChatItemOf } from './chat-fold'
 import { decorateCodeBlocks, linkFilePaths, renderMarkdown, useChatPlace } from './chat-markdown'
 import { lineDiff } from './line-diff'
+import { ChatImages } from './ChatImages'
 import { shortPath, STANDALONE_TOOLS, summarizeTools, toolDisplay } from './tool-display'
 
 interface Props {
@@ -235,9 +236,9 @@ function UserRow({ item }: { item: ChatItemOf<'user'> }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="chat-selectable max-w-[85%] rounded-lg border border-line bg-panel-2 px-3 py-2 text-[13.5px] leading-relaxed whitespace-pre-wrap text-fg">
-        {item.images > 0 && (
-          <div className="mb-1 text-[11px] text-muted">
-            {item.images} image{item.images > 1 ? 's' : ''} jointe{item.images > 1 ? 's' : ''}
+        {item.images.length > 0 && (
+          <div className={item.text ? 'mb-2' : ''}>
+            <ChatImages images={item.images} label="Image jointe" />
           </div>
         )}
         {item.text}
@@ -385,11 +386,15 @@ function ToolDetails({ item, cwd }: { item: ChatItemOf<'tool'>; cwd: string }) {
         <>
           {Object.keys(input).length > 0 && <Pre>{JSON.stringify(input, null, 2)}</Pre>}
           {output && <Pre tone={result?.isError ? 'error' : undefined}>{output}</Pre>}
-          {result && result.images > 0 && <div className="text-[11px] text-faint">{result.images} image(s) renvoyée(s)</div>}
         </>
       )
   }
-  return <div className="mt-1.5 ml-[18px] flex flex-col gap-1.5">{body}</div>
+  return (
+    <div className="mt-1.5 ml-[18px] flex flex-col gap-1.5">
+      {body}
+      {result && result.images.length > 0 && <ChatImages images={result.images} label="Image renvoyée" />}
+    </div>
+  )
 }
 
 function Pre({ children, tone }: { children: React.ReactNode; tone?: 'error' }) {
