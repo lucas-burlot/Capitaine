@@ -4,7 +4,7 @@ import { shortcutLabel } from '@/lib/platform'
 import { togglePaneView } from './agent-launch'
 import { looksLikeMarkdown, type ChatItem, type ChatItemOf } from './chat-fold'
 import { decorateCodeBlocks, renderMarkdown } from './chat-markdown'
-import { shortPath, toolDisplay } from './tool-display'
+import { shortPath, STANDALONE_TOOLS, summarizeTools, toolDisplay } from './tool-display'
 
 interface Props {
   chatId: string
@@ -45,12 +45,115 @@ export function ChatTranscript({ chatId, items, cwd, working }: Props) {
     previous.current = map
     return map
   }, [items])
-  const roots = useMemo(() => items.filter((item) => !item.parentId), [items])
+  const blocks = useMemo(() => blocksOf(items.filter((item) => !item.parentId)), [items])
   return (
     <div className="flex flex-col gap-3">
-      {roots.map((item) => (
-        <Row key={item.id} chatId={chatId} item={item} cwd={cwd} working={working} childrenOf={children} />
-      ))}
+      {blocks.map((block, i) =>
+        block.kind === 'row' ? (
+          <Row key={block.item.id} chatId={chatId} item={block.item} cwd={cwd} working={working} childrenOf={children} />
+        ) : (
+          <ToolGroup key={block.id} chatId={chatId} items={block.items} cwd={cwd} working={working} live={working && i === blocks.length - 1} childrenOf={children} />
+        )
+      )}
+    </div>
+  )
+}
+
+type Block = { kind: 'row'; item: ChatItem } | { kind: 'group'; id: string; items: ChatItem[] }
+
+/**
+ * Tool calls in a row (and Claude's thinking between them) fold into one group once there are two
+ * of them, so the answers stay what the eye follows. Tasks, questions and plans keep their row.
+ */
+function blocksOf(roots: ChatItem[]): Block[] {
+  const blocks: Block[] = []
+  let run: ChatItem[] = []
+  const flush = () => {
+    if (run.filter((item) => item.kind === 'tool').length >= 2) blocks.push({ kind: 'group', id: `group:${run[0].id}`, items: run })
+    else for (const item of run) blocks.push({ kind: 'row', item })
+    run = []
+  }
+  for (const item of roots) {
+    if (item.kind === 'thinking' || (item.kind === 'tool' && !STANDALONE_TOOLS.has(item.name))) {
+      run.push(item)
+      continue
+    }
+    flush()
+    blocks.push({ kind: 'row', item })
+  }
+  flush()
+  return blocks
+}
+
+interface ToolGroupProps {
+  chatId: string
+  items: ChatItem[]
+  cwd: string
+  working: boolean
+  /** The turn's last block while Claude works: the header follows the step in progress. */
+  live: boolean
+  childrenOf: Map<string, ChatItem[]>
+}
+
+const ToolGroup = memo(ToolGroupContent, (a, b) => {
+  if (a.chatId !== b.chatId || a.cwd !== b.cwd || a.working !== b.working || a.live !== b.live || a.items.length !== b.items.length) return false
+  return a.items.every((item, i) => item === b.items[i] && a.childrenOf.get(item.id) === b.childrenOf.get(item.id))
+})
+
+function ToolGroupContent({ chatId, items, cwd, working, live, childrenOf }: ToolGroupProps) {
+  const [open, setOpen] = useState(false)
+  const tools = items.filter((item): item is ChatItemOf<'tool'> => item.kind === 'tool')
+  const failed = tools.filter((tool) => tool.result?.isError).length
+  const last = items[items.length - 1]
+  const pending = live ? [...tools].reverse().find((tool) => !tool.result) : undefined
+  const thinking = live && last.kind === 'thinking' && last.streaming
+  const current = pending ? toolDisplay(pending.name, pending.input, cwd) : null
+  const CurrentIcon = current?.icon
+  const bodyId = `${items[0].id}:steps`
+
+  return (
+    <div className="text-[12.5px]">
+      <button
+        className="group flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left text-muted hover:bg-panel-2/60 hover:text-fg"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={bodyId}
+      >
+        <ChevronRight size={12} className={`shrink-0 text-faint transition-transform ${open ? 'rotate-90' : ''}`} />
+        {current && CurrentIcon ? (
+          <>
+            <LoaderCircle size={13} className="shrink-0 animate-spin text-sky-400" />
+            <span className="shrink-0 text-fg">{current.title}</span>
+            {current.detail && <span className="min-w-0 truncate font-mono text-[11.5px] text-faint">{current.detail}</span>}
+            <span className="ml-auto shrink-0 pl-2 text-[11px] text-faint">{tools.length} actions</span>
+          </>
+        ) : thinking ? (
+          <>
+            <Brain size={13} className="shrink-0 animate-pulse text-faint" />
+            <span className="shrink-0">Réflexion…</span>
+            <span className="ml-auto shrink-0 pl-2 text-[11px] text-faint">{tools.length} actions</span>
+          </>
+        ) : (
+          <span className="min-w-0 truncate">
+            <span className="text-fg/80">{tools.length} actions</span>
+            <span className="text-faint"> · </span>
+            {summarizeTools(tools.map((tool) => tool.name))}
+            {failed > 0 && (
+              <span className="text-red-400">
+                {' '}
+                · {failed} erreur{failed > 1 ? 's' : ''}
+              </span>
+            )}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div id={bodyId} className="mt-1 ml-[9px] flex flex-col gap-1 border-l border-line pl-3">
+          {items.map((item) => (
+            <Row key={item.id} chatId={chatId} item={item} cwd={cwd} working={working} childrenOf={childrenOf} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
