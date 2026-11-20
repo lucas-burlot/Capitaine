@@ -263,14 +263,14 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
                 }}
                 onMouseEnter={() => setMenuIndex(i)}
                 title={match.path}
-                className={`flex w-full items-center gap-1.5 px-3 py-1 text-left text-[12.5px] ${i === menuIndex ? 'bg-panel-2 text-fg' : 'text-muted'}`}
+                className={`flex w-full items-center gap-1.5 px-3 py-1 text-left text-ui ${i === menuIndex ? 'bg-panel-2 text-fg' : 'text-muted'}`}
               >
                 <EntryIcon entry={{ name, isDirectory: false }} />
                 <span className="shrink-0 truncate">
                   <Highlighted text={name} offset={nameStart} positions={match.positions} />
                 </span>
                 {folder && (
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-faint" dir="rtl">
+                  <span className="min-w-0 flex-1 truncate text-caption text-faint" dir="rtl">
                     <bdi>
                       <Highlighted text={folder} offset={0} positions={match.positions} />
                     </bdi>
@@ -296,9 +296,9 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
               onMouseEnter={() => setMenuIndex(i)}
               className={`flex w-full items-baseline gap-2 px-3 py-1 text-left ${i === menuIndex ? 'bg-panel-2' : ''}`}
             >
-              <span className="shrink-0 font-mono text-[12px] text-fg">/{command.name}</span>
-              {command.argumentHint && <span className="max-w-[35%] shrink-0 truncate font-mono text-[11px] text-faint">{command.argumentHint}</span>}
-              <span className="min-w-0 truncate text-[11.5px] text-muted">{command.description}</span>
+              <span className="shrink-0 font-mono text-small text-fg">/{command.name}</span>
+              {command.argumentHint && <span className="max-w-[35%] shrink-0 truncate font-mono text-caption text-faint">{command.argumentHint}</span>}
+              <span className="min-w-0 truncate text-small text-muted">{command.description}</span>
             </button>
           ))}
         </div>
@@ -348,7 +348,7 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           placeholder={blocked ? 'Réponds à Claude ci-dessus, ou écris un message…' : working ? 'Claude travaille — ton message sera lu ensuite (Échap pour interrompre)' : 'Écris à Claude…  ( / pour les commandes, @ pour un fichier )'}
-          className="scrollbar-sleek block w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[13.5px] leading-relaxed text-fg outline-none placeholder:text-faint"
+          className="scrollbar-sleek block w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-reading leading-relaxed text-fg outline-none placeholder:text-faint"
         />
         <div className="flex items-center gap-1 px-2 pb-2">
           {toolbar}

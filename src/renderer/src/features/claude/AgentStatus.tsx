@@ -26,7 +26,7 @@ export function AgentStatusIcon({ state, kind, size = 13 }: { state: AgentState;
       return <LoaderCircle size={size} className="shrink-0 animate-spin text-sky-400" />
     case 'blocked': {
       const Icon = kind === 'permission' ? ShieldAlert : kind === 'auth' ? KeyRound : MessageCircleQuestionMark
-      return <Icon size={size} className="shrink-0 animate-pulse text-amber-400" />
+      return <Icon size={size} className="shrink-0 animate-pulse text-waiting" />
     }
     case 'done':
       return <CircleCheck size={size} className="shrink-0 text-emerald-400" />
@@ -39,7 +39,7 @@ export function AgentStatusIcon({ state, kind, size = 13 }: { state: AgentState;
 
 const stateText: Record<AgentState, string> = {
   working: 'text-sky-300',
-  blocked: 'text-amber-300',
+  blocked: 'text-waiting',
   done: 'text-emerald-300',
   error: 'text-red-300',
   idle: 'text-faint'
@@ -101,14 +101,14 @@ function AgentSessionRow({ terminalId, session }: { terminalId: string; session:
       >
         <span className="flex w-full min-w-0 items-center gap-1.5">
           <AgentStatusIcon state={session.state} kind={session.kind} />
-          <span className="min-w-0 flex-1 truncate text-[12px] text-fg">{name}</span>
+          <span className="min-w-0 flex-1 truncate text-small text-fg">{name}</span>
         </span>
-        <span className={`flex w-full min-w-0 gap-1 pl-[19px] text-[11px] ${stateText[session.state]}`}>
+        <span className={`flex w-full min-w-0 gap-1 pl-[19px] text-caption ${stateText[session.state]}`}>
           <span className="shrink-0">{status}</span>
           {live && <span className="shrink-0 text-faint">· {formatElapsed(now - session.since)}</span>}
         </span>
         {session.state === 'blocked' && session.msg && (
-          <span className="line-clamp-2 pl-[19px] text-[11px] leading-snug text-muted">{agentMessageText(session.msg)}</span>
+          <span className="line-clamp-2 pl-[19px] text-caption leading-snug text-muted">{agentMessageText(session.msg)}</span>
         )}
       </button>
       {session.children.length > 0 && (
@@ -127,7 +127,7 @@ function SubagentRow({ child }: { child: AgentChild }) {
   const label = child.title || child.msg || 'Sous-agent'
   return (
     <li
-      className="flex min-w-0 items-center gap-1 py-0.5 pr-1 text-[11px] text-muted"
+      className="flex min-w-0 items-center gap-1 py-0.5 pr-1 text-caption text-muted"
       style={{ paddingLeft: depth * 10 }}
       title={`Sous-agent — ${label}\n${agentStateLabel(child.state, child.kind)}`}
     >
@@ -150,14 +150,14 @@ export function AgentSummary() {
   const done = sessions.filter((s) => s.state === 'done').length
   const subagents = sessions.reduce((n, s) => n + s.children.length, 0)
   const parts = [
-    waiting > 0 && <span key="w" className="text-amber-300">{waiting} t’attend{waiting > 1 ? 'ent' : ''}</span>,
+    waiting > 0 && <span key="w" className="font-medium text-waiting">{waiting} t’attend{waiting > 1 ? 'ent' : ''}</span>,
     working > 0 && <span key="r" className="text-sky-300">{working} travaille{working > 1 ? 'nt' : ''}</span>,
     done > 0 && <span key="d" className="text-emerald-300">{done} terminé{done > 1 ? 's' : ''}</span>,
     subagents > 0 && <span key="s">{subagents} sous-agent{subagents > 1 ? 's' : ''}</span>,
     waiting + working + done < sessions.length && <span key="i">{sessions.length - waiting - working - done} au repos</span>
   ].filter(Boolean)
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-line px-3 py-2 text-[11px] text-faint">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-line px-3 py-2 text-caption text-faint">
       <span className="font-medium text-muted">Agents</span>
       {parts.map((part, i) => (
         <span key={i} className="flex items-center gap-2">

@@ -86,7 +86,7 @@ export function ChatTranscript({ chatId, items, cwd, working, scrollRef }: Props
     <div className="flex flex-col gap-3">
       {hidden > 0 && (
         <div ref={sentinel} className="flex justify-center">
-          <button onClick={loadEarlier} className="rounded-full border border-line px-2.5 py-0.5 text-[11.5px] text-faint hover:bg-panel-2 hover:text-fg">
+          <button onClick={loadEarlier} className="rounded-full border border-line px-2.5 py-0.5 text-small text-faint hover:bg-panel-2 hover:text-fg">
             Afficher les messages précédents ({hidden})
           </button>
         </div>
@@ -157,7 +157,7 @@ function ToolGroupContent({ chatId, items, cwd, working, live, childrenOf }: Too
   const bodyId = `${items[0].id}:steps`
 
   return (
-    <div className="text-[12.5px]">
+    <div className="text-ui">
       <button
         className="group flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left text-muted hover:bg-panel-2/60 hover:text-fg"
         onClick={() => setOpen(!open)}
@@ -169,14 +169,14 @@ function ToolGroupContent({ chatId, items, cwd, working, live, childrenOf }: Too
           <>
             <LoaderCircle size={13} className="shrink-0 animate-spin text-sky-400" />
             <span className="shrink-0 text-fg">{current.title}</span>
-            {current.detail && <span className="min-w-0 truncate font-mono text-[11.5px] text-faint">{current.detail}</span>}
-            <span className="ml-auto shrink-0 pl-2 text-[11px] text-faint">{tools.length} actions</span>
+            {current.detail && <span className="min-w-0 truncate font-mono text-small text-faint">{current.detail}</span>}
+            <span className="ml-auto shrink-0 pl-2 text-caption text-faint">{tools.length} actions</span>
           </>
         ) : thinking ? (
           <>
             <Brain size={13} className="shrink-0 animate-pulse text-faint" />
             <span className="shrink-0">Réflexion…</span>
-            <span className="ml-auto shrink-0 pl-2 text-[11px] text-faint">{tools.length} actions</span>
+            <span className="ml-auto shrink-0 pl-2 text-caption text-faint">{tools.length} actions</span>
           </>
         ) : (
           <span className="min-w-0 truncate">
@@ -235,7 +235,7 @@ function RowContent({ chatId, item, cwd, working, childrenOf }: RowProps) {
 function UserRow({ item }: { item: ChatItemOf<'user'> }) {
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="chat-selectable max-w-[85%] rounded-lg border border-line bg-panel-2 px-3 py-2 text-[13.5px] leading-relaxed whitespace-pre-wrap text-fg">
+      <div className="chat-selectable max-w-[85%] rounded-lg border border-line bg-panel-2 px-3 py-2 text-reading leading-relaxed whitespace-pre-wrap text-fg">
         {item.images.length > 0 && (
           <div className={item.text ? 'mb-2' : ''}>
             <ChatImages images={item.images} label="Image jointe" />
@@ -243,8 +243,8 @@ function UserRow({ item }: { item: ChatItemOf<'user'> }) {
         )}
         {item.text}
       </div>
-      {item.state === 'queued' && <span className="text-[11px] text-faint">En attente — Claude le lira après l’étape en cours</span>}
-      {item.state === 'cancelled' && <span className="text-[11px] text-faint">Annulé par l’interruption</span>}
+      {item.state === 'queued' && <span className="text-caption text-faint">En attente — Claude le lira après l’étape en cours</span>}
+      {item.state === 'cancelled' && <span className="text-caption text-faint">Annulé par l’interruption</span>}
     </div>
   )
 }
@@ -274,7 +274,7 @@ function ThinkingRow({ item }: { item: ChatItemOf<'thinking'> }) {
   // Withheld thinking (empty once done) has nothing to show.
   if (!item.text.trim() && !item.streaming) return null
   return (
-    <div className="text-[12.5px]">
+    <div className="text-ui">
       <button className="flex items-center gap-1.5 text-faint hover:text-muted" onClick={() => setOpen(!open)}>
         <ChevronRight size={12} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
         <Brain size={12} className={item.streaming ? 'animate-pulse' : ''} />
@@ -296,7 +296,7 @@ function ToolRow({ chatId, item, cwd, working, childrenOf }: { chatId: string; i
   if (item.name === 'TodoWrite') return <TodoRow input={item.input} />
 
   return (
-    <div className="text-[12.5px]">
+    <div className="text-ui">
       <button
         className="group flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-panel-2/60"
         onClick={() => setOpen(!open)}
@@ -305,9 +305,9 @@ function ToolRow({ chatId, item, cwd, working, childrenOf }: { chatId: string; i
         <ChevronRight size={12} className={`shrink-0 text-faint transition-transform ${open ? 'rotate-90' : ''}`} />
         <Icon size={13} className={`shrink-0 ${failed ? 'text-red-400' : 'text-accent/80'}`} />
         <span className="shrink-0 font-medium text-fg">{display.title}</span>
-        {display.detail && <span className="min-w-0 truncate font-mono text-[11.5px] text-muted">{display.detail}</span>}
+        {display.detail && <span className="min-w-0 truncate font-mono text-small text-muted">{display.detail}</span>}
         <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-2">
-          {nested.length > 0 && <span className="text-[11px] text-faint">{nested.filter((n) => n.kind === 'tool').length} étapes</span>}
+          {nested.length > 0 && <span className="text-caption text-faint">{nested.filter((n) => n.kind === 'tool').length} étapes</span>}
           {running ? (
             <LoaderCircle size={12} className="animate-spin text-sky-400" />
           ) : failed ? (
@@ -400,7 +400,7 @@ function ToolDetails({ item, cwd }: { item: ChatItemOf<'tool'>; cwd: string }) {
 function Pre({ children, tone }: { children: React.ReactNode; tone?: 'error' }) {
   return (
     <pre
-      className={`chat-selectable scrollbar-sleek max-h-80 overflow-auto rounded-md border px-3 py-2 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-words ${
+      className={`chat-selectable scrollbar-sleek max-h-80 overflow-auto rounded-md border px-3 py-2 font-mono text-small leading-relaxed whitespace-pre-wrap break-words ${
         tone === 'error' ? 'border-red-500/30 bg-red-500/5 text-red-300' : 'border-line bg-panel text-muted'
       }`}
     >
@@ -416,8 +416,8 @@ export function Diff({ path, before, after }: { path: string | null; before: str
   const shown = lines.slice(0, MAX_DIFF_LINES)
   return (
     <div className="overflow-hidden rounded-md border border-line bg-panel">
-      {path && <div className="border-b border-line px-3 py-1 font-mono text-[11px] text-faint">{path}</div>}
-      <div className="chat-selectable scrollbar-sleek max-h-96 overflow-auto py-1 font-mono text-[11.5px] leading-relaxed">
+      {path && <div className="border-b border-line px-3 py-1 font-mono text-caption text-faint">{path}</div>}
+      <div className="chat-selectable scrollbar-sleek max-h-96 overflow-auto py-1 font-mono text-small leading-relaxed">
         {shown.map((line, i) =>
           line.kind === 'fold' ? (
             <div key={i} className="px-3 text-faint select-none">
@@ -453,8 +453,8 @@ function TodoRow({ input }: { input: Record<string, unknown> }) {
   const todos = Array.isArray(input.todos) ? (input.todos as { content?: string; status?: string; activeForm?: string }[]) : []
   if (todos.length === 0) return null
   return (
-    <div className="rounded-md border border-line bg-panel px-3 py-2 text-[12.5px]">
-      <div className="mb-1 text-[11px] font-medium tracking-wide text-faint uppercase">Tâches</div>
+    <div className="rounded-md border border-line bg-panel px-3 py-2 text-ui">
+      <div className="mb-1 text-caption font-medium tracking-wide text-faint uppercase">Tâches</div>
       <ul className="flex flex-col gap-0.5">
         {todos.map((todo, i) => (
           <li key={i} className="flex items-start gap-2">
@@ -476,9 +476,22 @@ function TodoRow({ input }: { input: Record<string, unknown> }) {
 }
 
 function CommandRow({ item }: { item: ChatItemOf<'command'> }) {
+  // `/clear` starts the conversation over: a divider, not a message.
+  if (item.name === 'clear' && !item.output) {
+    return (
+      <div className="flex items-center gap-3 py-1 text-caption text-faint" role="separator">
+        <span className="h-px flex-1 bg-line" />
+        <span className="flex items-center gap-1">
+          Conversation effacée
+          <span className="font-mono text-muted">/clear</span>
+        </span>
+        <span className="h-px flex-1 bg-line" />
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="chat-selectable max-w-[85%] rounded-md border border-line bg-panel-2 px-2 py-1 font-mono text-[12px] break-words whitespace-pre-wrap text-fg">
+      <div className="chat-selectable max-w-[85%] rounded-md border border-line bg-panel-2 px-2 py-1 font-mono text-small break-words whitespace-pre-wrap text-fg">
         <Slash size={11} className="mr-1 inline-block align-[-1px] text-accent" />
         {item.name}
         {item.args && <span className="text-muted"> {item.args}</span>}
@@ -504,7 +517,7 @@ function NoticeRow({ chatId, item }: { chatId: string; item: ChatItemOf<'notice'
   const color = item.tone === 'error' ? 'text-red-300' : item.tone === 'warning' ? 'text-amber-300' : 'text-muted'
   if (item.action === 'terminal') {
     return (
-      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] ${color}`}>
+      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-ui ${color}`}>
         <Icon size={13} className="shrink-0" />
         <span className="chat-selectable">{item.text}</span>
         <button
@@ -519,7 +532,7 @@ function NoticeRow({ chatId, item }: { chatId: string; item: ChatItemOf<'notice'
     )
   }
   return (
-    <div className={`chat-selectable flex items-start gap-2 text-[12.5px] ${color}`}>
+    <div className={`chat-selectable flex items-start gap-2 text-ui ${color}`}>
       <Icon size={13} className="mt-0.5 shrink-0" />
       {item.markdown ? (
         <div className="min-w-0 flex-1">
@@ -535,7 +548,7 @@ function NoticeRow({ chatId, item }: { chatId: string; item: ChatItemOf<'notice'
 function TurnRow({ item }: { item: ChatItemOf<'turn'> }) {
   if (item.outcome === 'error') {
     return (
-      <div className="chat-selectable flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-[12.5px] text-red-300">
+      <div className="chat-selectable flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-ui text-red-300">
         <OctagonX size={13} className="mt-0.5 shrink-0" />
         <span className="whitespace-pre-wrap">{item.error}</span>
       </div>
@@ -544,7 +557,7 @@ function TurnRow({ item }: { item: ChatItemOf<'turn'> }) {
   // An interruption already shows as its own notice.
   const parts = [item.durationMs !== null ? formatDuration(item.durationMs) : null].filter(Boolean)
   if (parts.length === 0) return null
-  return <div className="text-[11px] text-faint">{parts.join(' · ')}</div>
+  return <div className="text-caption text-faint">{parts.join(' · ')}</div>
 }
 
 export function formatDuration(ms: number): string {

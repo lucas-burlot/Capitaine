@@ -43,9 +43,9 @@ function ToolPermissionCard({ chatId, permission, cwd, active }: Props) {
   useShortcuts(chatId, active && !refusing, { Enter: () => allow(false), Escape: () => setRefusing(true) })
 
   return (
-    <Card icon={<ShieldAlert size={14} className="text-amber-400" />} title={permissionTitle(permission.toolName)} subtitle={permission.agentId ? 'demandé par un sous-agent' : null}>
+    <Card icon={<ShieldAlert size={14} className="text-waiting" />} title={permissionTitle(permission.toolName)} subtitle={permission.agentId ? 'demandé par un sous-agent' : null}>
       {command ? (
-        <pre className="chat-selectable scrollbar-sleek max-h-48 overflow-auto rounded-md border border-line bg-bg px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-fg">{command}</pre>
+        <pre className="chat-selectable scrollbar-sleek max-h-48 overflow-auto rounded-md border border-line bg-bg px-3 py-2 font-mono text-small whitespace-pre-wrap text-fg">{command}</pre>
       ) : edits ? (
         <div className="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
           {edits.map((edit, i) => (
@@ -53,14 +53,14 @@ function ToolPermissionCard({ chatId, permission, cwd, active }: Props) {
           ))}
         </div>
       ) : (
-        display.detail && <div className="chat-selectable font-mono text-[12px] break-all text-fg">{display.detail}</div>
+        display.detail && <div className="chat-selectable font-mono text-small break-all text-fg">{display.detail}</div>
       )}
       {permission.description && permission.description !== command && !sameText(permission.description, display.detail) && (
-        <div className="text-[12px] text-muted">{permission.description}</div>
+        <div className="text-small text-muted">{permission.description}</div>
       )}
-      {permission.decisionReason && <div className="text-[11.5px] text-faint">{permission.decisionReason}</div>}
+      {permission.decisionReason && <div className="text-small text-faint">{permission.decisionReason}</div>}
       {permission.blockedPath && !sameText(shortPath(permission.blockedPath, cwd), display.detail) && (
-        <div className="text-[11.5px] text-faint">Chemin concerné : {shortPath(permission.blockedPath, cwd)}</div>
+        <div className="text-small text-faint">Chemin concerné : {shortPath(permission.blockedPath, cwd)}</div>
       )}
       {refusing ? (
         <div className="flex items-center gap-2">
@@ -73,7 +73,7 @@ function ToolPermissionCard({ chatId, permission, cwd, active }: Props) {
               if (e.key === 'Escape') setRefusing(false)
             }}
             placeholder="Dire à Claude quoi faire à la place (facultatif)"
-            className="min-w-0 flex-1 rounded-md border border-line bg-bg px-2 py-1 text-[12.5px] text-fg outline-none placeholder:text-faint focus:border-accent"
+            className="min-w-0 flex-1 rounded-md border border-line bg-bg px-2 py-1 text-ui text-fg outline-none placeholder:text-faint focus:border-accent"
           />
           <Button tone="danger" onClick={deny}>
             Refuser
@@ -179,11 +179,11 @@ function QuestionCard({ chatId, permission, active }: Props) {
   useShortcuts(chatId, active, { Escape: dismiss })
 
   return (
-    <Card icon={<MessageCircleQuestionMark size={14} className="text-amber-400" />} title="Claude te pose une question">
+    <Card icon={<MessageCircleQuestionMark size={14} className="text-waiting" />} title="Claude te pose une question">
       {questions.map((question, index) => (
         <div key={index} className="flex flex-col gap-1.5">
-          {question.header && <div className="text-[11px] font-medium tracking-wide text-faint uppercase">{question.header}</div>}
-          <div className="text-[13px] text-fg">{question.question}</div>
+          {question.header && <div className="text-caption font-medium tracking-wide text-faint uppercase">{question.header}</div>}
+          <div className="text-ui text-fg">{question.question}</div>
           <div className="flex flex-col gap-1">
             {question.options.map((option) => {
               const checked = (selected[index] ?? []).includes(option.label)
@@ -197,8 +197,8 @@ function QuestionCard({ chatId, permission, active }: Props) {
                     className={`mt-[3px] h-3 w-3 shrink-0 border ${question.multiSelect ? 'rounded-sm' : 'rounded-full'} ${checked ? 'border-accent bg-accent' : 'border-faint'}`}
                   />
                   <span className="flex flex-col">
-                    <span className="text-[12.5px] text-fg">{option.label}</span>
-                    {option.description && <span className="text-[11.5px] text-muted">{option.description}</span>}
+                    <span className="text-ui text-fg">{option.label}</span>
+                    {option.description && <span className="text-small text-muted">{option.description}</span>}
                   </span>
                 </button>
               )
@@ -214,7 +214,7 @@ function QuestionCard({ chatId, permission, active }: Props) {
                 if (e.key === 'Enter' && complete) submit()
               }}
               placeholder="Autre réponse…"
-              className="rounded-md border border-line bg-bg px-2.5 py-1.5 text-[12.5px] text-fg outline-none placeholder:text-faint focus:border-accent"
+              className="rounded-md border border-line bg-bg px-2.5 py-1.5 text-ui text-fg outline-none placeholder:text-faint focus:border-accent"
             />
           </div>
         </div>
@@ -254,7 +254,7 @@ function PlanCard({ chatId, permission, active }: Props) {
   useShortcuts(chatId, active, { Enter: () => approve('default') })
 
   return (
-    <Card icon={<ClipboardList size={14} className="text-amber-400" />} title="Claude propose un plan">
+    <Card icon={<ClipboardList size={14} className="text-waiting" />} title="Claude propose un plan">
       <div
         ref={ref}
         className="markdown-body chat-markdown chat-selectable scrollbar-sleek max-h-[50vh] overflow-y-auto rounded-md border border-line bg-bg px-4 py-3"
@@ -270,7 +270,7 @@ function PlanCard({ chatId, permission, active }: Props) {
           }
         }}
         placeholder="Ce qu’il faut changer dans le plan (facultatif)"
-        className="rounded-md border border-line bg-bg px-2.5 py-1.5 text-[12.5px] text-fg outline-none placeholder:text-faint focus:border-accent"
+        className="rounded-md border border-line bg-bg px-2.5 py-1.5 text-ui text-fg outline-none placeholder:text-faint focus:border-accent"
       />
       <div className="flex flex-wrap items-center gap-2">
         <Button tone="primary" onClick={() => approve('default')} hint={active ? 'Entrée' : undefined} title="Claude demandera avant chaque modification">
@@ -287,11 +287,11 @@ function PlanCard({ chatId, permission, active }: Props) {
 
 function Card({ icon, title, subtitle, children }: { icon: React.ReactNode; title: string; subtitle?: string | null; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-amber-400/30 bg-panel px-3.5 py-3 shadow-lg shadow-black/20">
+    <div className="flex flex-col gap-2.5 rounded-lg border border-waiting/40 bg-panel px-3.5 py-3 shadow-lg shadow-black/20">
       <div className="flex items-center gap-2">
         {icon}
-        <span className="text-[13px] font-medium text-fg">{title}</span>
-        {subtitle && <span className="text-[11.5px] text-faint">· {subtitle}</span>}
+        <span className="text-ui font-medium text-fg">{title}</span>
+        {subtitle && <span className="text-small text-faint">· {subtitle}</span>}
       </div>
       {children}
     </div>
@@ -310,10 +310,10 @@ function Button(props: { tone?: 'primary' | 'danger'; onClick(): void; disabled?
       onClick={props.onClick}
       disabled={props.disabled}
       title={props.title}
-      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12.5px] font-medium disabled:opacity-40 ${tone}`}
+      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui font-medium disabled:opacity-40 ${tone}`}
     >
       {props.children}
-      {props.hint && <kbd className={`rounded px-1 font-sans text-[10.5px] ${props.tone === 'primary' ? 'bg-bg/15' : 'bg-panel-2 text-faint'}`}>{props.hint}</kbd>}
+      {props.hint && <kbd className={`rounded px-1 font-sans text-caption ${props.tone === 'primary' ? 'bg-bg/15' : 'bg-panel-2 text-faint'}`}>{props.hint}</kbd>}
     </button>
   )
 }

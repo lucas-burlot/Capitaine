@@ -23,7 +23,7 @@ export function ChatImages({ images, label }: { images: ChatImage[]; label: stri
         </button>
       ))}
       {others > 0 && (
-        <span className="flex items-center gap-1 text-[11px] text-faint">
+        <span className="flex items-center gap-1 text-caption text-faint">
           <ImageIcon size={11} />
           {others} image{others > 1 ? 's' : ''} non affichable{others > 1 ? 's' : ''}
         </span>

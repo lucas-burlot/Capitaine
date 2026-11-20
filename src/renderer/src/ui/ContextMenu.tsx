@@ -55,11 +55,11 @@ export function MenuItem(props: { icon: React.ReactNode; label: string; hint?: s
       role="menuitem"
       disabled={props.disabled}
       onClick={props.onClick}
-      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-fg enabled:hover:bg-line disabled:text-faint"
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-small text-fg enabled:hover:bg-line disabled:text-faint"
     >
       {props.icon}
       <span className="flex-1">{props.label}</span>
-      {props.hint && <span className="pl-4 text-[10px] text-faint">{props.hint}</span>}
+      {props.hint && <span className="pl-4 text-caption text-faint">{props.hint}</span>}
     </button>
   )
 }

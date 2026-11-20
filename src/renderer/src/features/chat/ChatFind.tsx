@@ -96,9 +96,9 @@ export function ChatFind({ scrollRef, content, focusRequest, onClose }: Props) {
         placeholder="Rechercher dans le chat"
         aria-label="Rechercher dans le chat"
         spellCheck={false}
-        className="w-48 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-faint"
+        className="w-48 bg-transparent text-ui text-fg outline-none placeholder:text-faint"
       />
-      <span className="min-w-12 text-right text-[11px] text-faint tabular-nums" aria-live="polite">
+      <span className="min-w-12 text-right text-caption text-faint tabular-nums" aria-live="polite">
         {query.trim() ? (ranges.length ? `${current + 1}/${ranges.length}${ranges.length === MAX_MATCHES ? '+' : ''}` : 'Aucun') : ''}
       </span>
       <FindButton title="Précédent (Maj+Entrée)" onClick={() => step(-1)} disabled={ranges.length === 0}>

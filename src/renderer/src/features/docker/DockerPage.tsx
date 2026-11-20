@@ -57,32 +57,32 @@ export function DockerPage({ project }: { project: Project }) {
       toolbar={actionError ? <ErrorBand message={actionError} /> : undefined}
     >
       {result === undefined ? (
-        <p className="px-4 py-3 text-[12px] text-muted">Lecture de Docker…</p>
+        <p className="px-4 py-3 text-small text-muted">Lecture de Docker…</p>
       ) : !result.ok ? (
         result.reason === 'missing' ? (
           <PageMessage title="Docker n’est pas installé">
-            <p className="mt-2 text-[13px] leading-relaxed text-muted">
-              La commande <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg/90">docker</code> est introuvable sur cette machine.
+            <p className="mt-2 text-ui leading-relaxed text-muted">
+              La commande <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-small text-fg/90">docker</code> est introuvable sur cette machine.
             </p>
           </PageMessage>
         ) : (
           <PageMessage title="Docker ne répond pas">
-            <p className="mt-2 text-[13px] leading-relaxed text-muted">Le moteur est-il démarré ?</p>
-            <p className="mt-3 text-[12px] leading-relaxed break-words whitespace-pre-wrap text-muted/80 select-text">{result.message}</p>
+            <p className="mt-2 text-ui leading-relaxed text-muted">Le moteur est-il démarré ?</p>
+            <p className="mt-3 text-small leading-relaxed break-words whitespace-pre-wrap text-muted/80 select-text">{result.message}</p>
           </PageMessage>
         )
       ) : result.containers.length === 0 ? (
         <PageMessage title="Aucun conteneur sur cette machine">
-          <p className="mt-2 text-[13px] leading-relaxed text-muted">
-            Ceux que tu lances (par exemple avec <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg/90">docker compose up</code>) apparaissent ici.
+          <p className="mt-2 text-ui leading-relaxed text-muted">
+            Ceux que tu lances (par exemple avec <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-small text-fg/90">docker compose up</code>) apparaissent ici.
           </p>
         </PageMessage>
       ) : groups.length === 0 ? (
         <PageMessage title="Aucun résultat">
-          <p className="mt-2 text-[13px] text-muted">
+          <p className="mt-2 text-ui text-muted">
             Aucun conteneur ne correspond à « <span className="text-fg">{query}</span> ».
           </p>
-          <button onClick={() => setQuery('')} className="mt-3 rounded-md px-2.5 py-1.5 text-[12.5px] text-accent hover:bg-panel-2">
+          <button onClick={() => setQuery('')} className="mt-3 rounded-md px-2.5 py-1.5 text-ui text-accent hover:bg-panel-2">
             Effacer le filtre
           </button>
         </PageMessage>
@@ -102,7 +102,7 @@ export function DockerPage({ project }: { project: Project }) {
 
 function ErrorBand({ message }: { message: string }) {
   return (
-    <div className="flex shrink-0 gap-2 border-b border-red-500/25 bg-red-500/[0.08] px-4 py-2 text-[12px] text-red-200">
+    <div className="flex shrink-0 gap-2 border-b border-red-500/25 bg-red-500/[0.08] px-4 py-2 text-small text-red-200">
       <TriangleAlert size={13} className="mt-0.5 shrink-0" />
       <span className="min-w-0 flex-1 break-words whitespace-pre-wrap select-text">{message}</span>
       <button title="Fermer" onClick={() => useDocker.getState().dismissError()} className="shrink-0 self-start rounded text-red-300 hover:text-red-100">
@@ -133,10 +133,10 @@ function GroupSection({ group, selectedId, onSelect }: { group: Group; selectedI
             <PageListRow key={container.id} id={container.id} active={active} title={container.name} onSelect={() => onSelect(container.id)}>
               <div className="flex items-center gap-2">
                 <span className={`size-2 shrink-0 rounded-full ${look.dot}`} aria-hidden />
-                <span className={`min-w-0 flex-1 truncate text-[12.5px] leading-[18px] ${active ? 'font-medium text-fg' : 'text-fg/85'}`}>{displayName(container)}</span>
-                <span className={`shrink-0 text-[11px] tabular-nums ${look.text}`}>{look.label}</span>
+                <span className={`min-w-0 flex-1 truncate text-ui leading-[18px] ${active ? 'font-medium text-fg' : 'text-fg/85'}`}>{displayName(container)}</span>
+                <span className={`shrink-0 text-caption tabular-nums ${look.text}`}>{look.label}</span>
               </div>
-              <div className="truncate pl-4 text-[11.5px] leading-4 text-muted">{container.image}</div>
+              <div className="truncate pl-4 text-small leading-4 text-muted">{container.image}</div>
             </PageListRow>
           )
         })}
@@ -151,12 +151,12 @@ function ContainerDetail({ container, project }: { container: DockerContainer; p
   const look = statusLook(container)
   const up = container.state === 'running' || container.state === 'restarting'
   const published = container.ports.filter((p) => p.host !== null && p.protocol === 'tcp')
-  const code = 'rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg/90'
+  const code = 'rounded bg-panel-2 px-1.5 py-0.5 font-mono text-small text-fg/90'
 
   return (
     <article className="flex min-h-full max-w-[1100px] flex-col px-8 pt-7 pb-8">
-      <h2 className="text-[20px] leading-tight font-semibold tracking-[-0.01em] break-words text-fg select-text">{displayName(container)}</h2>
-      <p className="mt-2 flex items-center gap-2 text-[13px] text-muted">
+      <h2 className="text-display leading-tight font-semibold tracking-[-0.01em] break-words text-fg select-text">{displayName(container)}</h2>
+      <p className="mt-2 flex items-center gap-2 text-ui text-muted">
         <span className={`size-2 shrink-0 rounded-full ${look.dot}`} aria-hidden />
         <span className={look.text === 'text-faint' ? 'text-muted' : look.text}>{stateSentence(container)}</span>
       </p>
@@ -201,9 +201,9 @@ function ContainerDetail({ container, project }: { container: DockerContainer; p
         ))}
       </div>
 
-      <dl className="mt-7 border-t border-line text-[12px]">
+      <dl className="mt-7 border-t border-line text-small">
         <Property label="Image">
-          <span className="font-mono text-[11.5px] break-all">{container.image}</span>
+          <span className="font-mono text-small break-all">{container.image}</span>
         </Property>
         {container.composeService && <Property label="Conteneur">{container.name}</Property>}
         {container.composeProject && (
@@ -214,7 +214,7 @@ function ContainerDetail({ container, project }: { container: DockerContainer; p
         )}
         {container.composeDir && (
           <Property label="Dossier">
-            <span className="font-mono text-[11.5px] break-all">{relativeTo(container.composeDir, projectPath)}</span>
+            <span className="font-mono text-small break-all">{relativeTo(container.composeDir, projectPath)}</span>
           </Property>
         )}
         <Property label="Ports">
@@ -233,7 +233,7 @@ function ContainerDetail({ container, project }: { container: DockerContainer; p
         <Property label="Statut Docker">{container.status}</Property>
         <Property label="Créé">{container.createdAt}</Property>
         <Property label="ID">
-          <span className="font-mono text-[11.5px]">{container.id.slice(0, 12)}</span>
+          <span className="font-mono text-small">{container.id.slice(0, 12)}</span>
         </Property>
       </dl>
 
@@ -277,7 +277,7 @@ function ContainerLogs({ id, live }: { id: string; live: boolean }) {
 
   return (
     <section className="mt-9 flex min-h-[280px] flex-1 flex-col">
-      <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold tracking-wider text-muted uppercase">
+      <h3 className="mb-2.5 flex items-center gap-2 text-caption font-semibold tracking-wider text-muted uppercase">
         Logs
         {live && (
           <span className="flex items-center gap-1.5 font-normal tracking-normal normal-case">
@@ -289,9 +289,9 @@ function ContainerLogs({ id, live }: { id: string; live: boolean }) {
       </h3>
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-md border border-line bg-panel">
         {error ? (
-          <p className="px-4 py-3 text-[12px] break-words text-red-300 select-text">{error}</p>
+          <p className="px-4 py-3 text-small break-words text-red-300 select-text">{error}</p>
         ) : text === null ? (
-          <p className="px-4 py-3 text-[12px] text-muted">Lecture des logs…</p>
+          <p className="px-4 py-3 text-small text-muted">Lecture des logs…</p>
         ) : (
           <pre
             ref={pre}
@@ -299,7 +299,7 @@ function ContainerLogs({ id, live }: { id: string; live: boolean }) {
               const el = e.currentTarget
               stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8
             }}
-            className="scrollbar-sleek max-h-[70vh] min-h-0 flex-1 overflow-auto px-4 py-3 font-mono text-[11.5px] leading-[1.55] break-all whitespace-pre-wrap text-muted select-text"
+            className="scrollbar-sleek max-h-[70vh] min-h-0 flex-1 overflow-auto px-4 py-3 font-mono text-small leading-[1.55] break-all whitespace-pre-wrap text-muted select-text"
           >
             {text.trim() || 'Aucun log.'}
           </pre>
