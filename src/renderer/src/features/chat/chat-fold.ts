@@ -11,10 +11,15 @@
  */
 import type { ChatWireMessage } from '@shared/types'
 
+/** An image in the conversation: a data URL to draw, or null when it isn't sent inline (a URL, a file). */
+export interface ChatImage {
+  src: string | null
+}
+
 export interface ToolResult {
   text: string
   isError: boolean
-  images: number
+  images: ChatImage[]
 }
 
 interface RowBase {
@@ -24,7 +29,7 @@ interface RowBase {
 }
 
 export type ChatItem =
-  | (RowBase & { kind: 'user'; text: string; images: number; uuid: string | null; state: 'queued' | 'sent' | 'cancelled' })
+  | (RowBase & { kind: 'user'; text: string; images: ChatImage[]; uuid: string | null; state: 'queued' | 'sent' | 'cancelled' })
   | (RowBase & { kind: 'command'; name: string; args: string; output: string | null })
   | (RowBase & { kind: 'text'; text: string; streaming: boolean })
   | (RowBase & { kind: 'thinking'; text: string; streaming: boolean })
@@ -107,7 +112,7 @@ export class ChatFold {
   }
 
   /** A message the user just sent, shown before Claude takes it. */
-  addUser(text: string, images: number, uuid: string): void {
+  addUser(text: string, images: ChatImage[], uuid: string): void {
     this.push({ kind: 'user', id: `user:${uuid}`, parentId: null, text, images, uuid, state: 'queued' })
   }
 
@@ -339,7 +344,7 @@ export class ChatFold {
     if (typeof content === 'string') return this.userText(content, uuid, parentId)
     if (!Array.isArray(content)) return
     const texts: string[] = []
-    let images = 0
+    const images: ChatImage[] = []
     for (const block of content as ContentBlock[]) {
       if (block?.type === 'tool_result' && block.tool_use_id) {
         const at = this.index.get(block.tool_use_id)
@@ -348,17 +353,17 @@ export class ChatFold {
       } else if (block?.type === 'text' && typeof block.text === 'string') {
         texts.push(block.text)
       } else if (block?.type === 'image') {
-        images++
+        images.push(imageOf(block))
       }
     }
-    if (texts.length || images) this.userText(texts.join('\n'), uuid, parentId, images)
+    if (texts.length || images.length) this.userText(texts.join('\n'), uuid, parentId, images)
   }
 
-  private userText(text: string, uuid: string | null, parentId: string | null, images = 0): void {
+  private userText(text: string, uuid: string | null, parentId: string | null, images: ChatImage[] = []): void {
     // Subagent prompts are the Task call's input, already shown on its card.
     if (parentId) return
     const trimmed = text.trim()
-    if (!trimmed && !images) return
+    if (!trimmed && images.length === 0) return
     if (INTERRUPTED_RE.test(trimmed)) {
       this.addNotice('warning', 'Interrompu')
       return
@@ -485,7 +490,7 @@ export class ChatFold {
       this.replaceAt(at, { ...last, output })
       return true
     }
-    const typed = last?.kind === 'user' && last.state !== 'cancelled' && !last.images ? /^\/(\S+)\s*([\s\S]*)$/.exec(last.text) : null
+    const typed = last?.kind === 'user' && last.state !== 'cancelled' && last.images.length === 0 ? /^\/(\S+)\s*([\s\S]*)$/.exec(last.text) : null
     if (!typed) return false
     this.replaceAt(at, { kind: 'command', id: last!.id, parentId: null, name: typed[1], args: typed[2].trim(), output })
     return true
@@ -554,6 +559,7 @@ interface ContentBlock {
   tool_use_id?: string
   content?: unknown
   is_error?: boolean
+  source?: { type?: string; media_type?: string; data?: string }
 }
 
 interface AssistantBody {
@@ -563,15 +569,26 @@ interface AssistantBody {
   usage?: { input_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; output_tokens?: number }
 }
 
+const DRAWABLE_IMAGE = /^image\/(png|jpeg|gif|webp)$/
+
+/** A base64 image block as a data URL; other sources (URLs, files) have nothing to draw here. */
+function imageOf(block: ContentBlock): ChatImage {
+  const source = block.source
+  if (source?.type === 'base64' && typeof source.data === 'string' && typeof source.media_type === 'string' && DRAWABLE_IMAGE.test(source.media_type)) {
+    return { src: `data:${source.media_type};base64,${source.data}` }
+  }
+  return { src: null }
+}
+
 function toolResult(block: ContentBlock): ToolResult {
   let text = ''
-  let images = 0
+  const images: ChatImage[] = []
   if (typeof block.content === 'string') text = block.content
   else if (Array.isArray(block.content)) {
     const parts: string[] = []
     for (const part of block.content as ContentBlock[]) {
       if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text)
-      else if (part?.type === 'image') images++
+      else if (part?.type === 'image') images.push(imageOf(part))
     }
     text = parts.join('\n')
   }

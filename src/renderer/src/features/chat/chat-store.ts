@@ -209,7 +209,11 @@ export async function sendMessage(chatId: string, text: string, images: ChatUser
   const uuid = crypto.randomUUID()
   // Images first, then one text block: Claude reads slash commands from the last text block.
   const content: ChatUserContent = [...images, ...(trimmed.trim() ? [{ type: 'text' as const, text: trimmed }] : [])]
-  fold.addUser(trimmed, images.length, uuid)
+  fold.addUser(
+    trimmed,
+    images.map((image) => ({ src: image.type === 'image' ? `data:${image.source.media_type};base64,${image.source.data}` : null })),
+    uuid
+  )
   flushFold(chatId)
   setTitleFrom(chatId, trimmed)
   idleSeen.delete(chatId)
