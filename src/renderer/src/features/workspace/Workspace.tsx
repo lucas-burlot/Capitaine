@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import { Columns2, FolderPlus, GitCompare, MessageSquare, PanelRight, PanelRightClose, Plus, Rows2, SquareTerminal, X } from 'lucide-react'
 import { useEditors } from '@/features/editor/editor-store'
 import { usePanels } from '@/app/panels-store'
@@ -6,6 +6,7 @@ import { startDrag } from '@/lib/drag'
 import { computeLayout, dragSizes, nodeAt, paneIds, type Divider, type Rect } from './layout'
 import { isMac, shortcutLabel } from '@/lib/platform'
 import { mostUrgentAgent, tabLabel, useApp, type Tab } from './workspace-store'
+import { TabMenu } from './TabMenu'
 import { AgentStatusIcon } from '@/features/claude/AgentStatus'
 import { EntryIcon } from '@/features/files/FileIcon'
 import { TerminalView } from '@/features/terminals/TerminalView'
@@ -242,12 +243,17 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
   const exited = useApp((s) => s.terminals[tab.activePaneId]?.exitCode != null)
   const chat = useApp((s) => tab.kind === 'terminal' && s.terminals[tab.activePaneId]?.view === 'chat')
   const selectTab = useApp((s) => s.selectTab)
-  const closeTerminalTab = useApp((s) => s.closeTab)
   // Editor tabs go through the unsaved-changes prompt.
-  const closeTab = (tabId: string) => (isEditor ? useEditors.getState().requestClose(tabId) : closeTerminalTab(tabId))
+  const closeTab = (tabId: string) => useEditors.getState().requestClose(tabId)
   const renameTab = useApp((s) => s.renameTab)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const closeMenu = useCallback(() => setMenu(null), [])
+  const startRename = () => {
+    setDraft(label)
+    setEditing(true)
+  }
 
   const finish = (save: boolean) => {
     if (save) renameTab(tab.id, draft)
@@ -264,10 +270,12 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
         }
       }}
       onClick={() => selectTab(tab.id)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        setMenu({ x: e.clientX, y: e.clientY })
+      }}
       onDoubleClick={() => {
-        if (tab.kind !== 'terminal') return
-        setDraft(label)
-        setEditing(true)
+        if (tab.kind === 'terminal') startRename()
       }}
       title={isEditor ? (tab.filePath ?? label) : isDiff ? `Diff · ${tab.diff?.path ?? label}` : label}
       className={`group flex h-8 max-w-56 min-w-28 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-[12px] ${
@@ -334,6 +342,7 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
           <X size={12} />
         )}
       </button>
+      {menu && <TabMenu tab={tab} x={menu.x} y={menu.y} onClose={closeMenu} onRename={startRename} />}
     </div>
   )
 }
