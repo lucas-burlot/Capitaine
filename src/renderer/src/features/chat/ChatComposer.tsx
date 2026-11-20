@@ -2,6 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUp, ImageIcon, Square, X } from 'lucide-react'
 import type { ChatUserContent } from '@shared/types'
 import { PATHS_MIME } from '@/lib/drag'
+import { isWindows } from '@/lib/platform'
+import { useApp } from '@/features/workspace/workspace-store'
+import { EntryIcon } from '@/features/files/FileIcon'
+import { Highlighted } from '@/features/files/FileSearch'
+import { searchFiles, type FileMatch } from '@/features/files/file-search'
+import { cachedProjectFiles, loadProjectFiles } from '@/features/files/project-files'
 import { interrupt, sendMessage, type ChatCommandInfo, type ChatSession } from './chat-store'
 import { shortPath } from './tool-display'
 
@@ -40,6 +46,7 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
   const [menuIndex, setMenuIndex] = useState(0)
   const [menuClosed, setMenuClosed] = useState(false)
   const [dropping, setDropping] = useState(false)
+  const [caret, setCaret] = useState(0)
   const ref = useRef<HTMLTextAreaElement>(null)
   const sent = useRef<string[]>([])
   const recall = useRef(-1)
@@ -81,11 +88,34 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
   }, [text])
 
   const suggestions = useMemo(() => slashSuggestions(text, chat.commands), [text, chat.commands])
-  const menuOpen = suggestions.length > 0 && !menuClosed
+
+  // `@` before the caret opens the project's files; the chosen one is cited relative to the chat's folder.
+  const projectId = useApp((s) => s.terminals[chat.id]?.projectId ?? null)
+  const projectRoot = useApp((s) => s.projects.find((p) => p.id === projectId)?.path ?? null)
+  const [files, setFiles] = useState<string[] | null>(() => (projectId ? cachedProjectFiles(projectId) : null))
+  const mention = useMemo(() => (suggestions.length === 0 ? mentionAt(text, caret) : null), [suggestions.length, text, caret])
+  const mentioning = mention !== null
+  useEffect(() => {
+    if (!mentioning || !projectId) return
+    let live = true
+    loadProjectFiles(projectId).then(
+      (list) => live && setFiles(list),
+      () => live && setFiles((current) => current ?? [])
+    )
+    return () => {
+      live = false
+    }
+  }, [mentioning, projectId])
+  const fileSuggestions = useMemo(() => (mention && files ? fileMatches(mention.query, files) : []), [mention, files])
+
+  const menuLength = suggestions.length || fileSuggestions.length
+  const menuOpen = menuLength > 0 && !menuClosed
+  useEffect(() => {
+    setMenuClosed(false)
+  }, [text.split(/\s/)[0], mention?.start])
   useEffect(() => {
     setMenuIndex(0)
-    setMenuClosed(false)
-  }, [text.split(/\s/)[0]])
+  }, [text.split(/\s/)[0], mention?.start, mention?.query])
 
   const submit = () => {
     if (!text.trim() && attachments.length === 0) return
@@ -104,18 +134,39 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
     ref.current?.focus()
   }
 
+  const completeFile = (match: FileMatch) => {
+    if (!mention || !projectRoot) return
+    const sep = isWindows ? '\\' : '/'
+    const absolute = projectRoot.replace(/[\\/]+$/, '') + sep + (isWindows ? match.path.replace(/\//g, '\\') : match.path)
+    const cited = `@${quoteMention(shortPath(absolute, chat.cwd))} `
+    const next = text.slice(0, mention.start) + cited + text.slice(caret)
+    const position = mention.start + cited.length
+    setText(next)
+    setCaret(position)
+    requestAnimationFrame(() => {
+      ref.current?.focus()
+      ref.current?.setSelectionRange(position, position)
+    })
+  }
+
+  const pick = (index: number) => {
+    if (suggestions.length) complete(suggestions[index])
+    else if (fileSuggestions[index]) completeFile(fileSuggestions[index])
+  }
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing) return
     if (menuOpen) {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
         const step = event.key === 'ArrowDown' ? 1 : -1
-        setMenuIndex((i) => (i + step + suggestions.length) % suggestions.length)
+        setMenuIndex((i) => (i + step + menuLength) % menuLength)
         return
       }
-      if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey && text.trim() !== `/${suggestions[menuIndex].name}`)) {
+      const typedWhole = suggestions.length > 0 && text.trim() === `/${suggestions[menuIndex]?.name}`
+      if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey && !typedWhole)) {
         event.preventDefault()
-        complete(suggestions[menuIndex])
+        pick(menuIndex)
         return
       }
       if (event.key === 'Escape') {
@@ -188,7 +239,49 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
 
   return (
     <div className="relative">
-      {menuOpen && (
+      {menuOpen && fileSuggestions.length > 0 && (
+        <div
+          role="listbox"
+          aria-label="Fichiers à citer"
+          className="scrollbar-sleek absolute right-0 bottom-full left-0 z-20 mb-1.5 max-h-72 overflow-y-auto rounded-lg border border-line bg-panel py-1 shadow-xl shadow-black/40"
+        >
+          {fileSuggestions.map((match, i) => {
+            const nameStart = match.path.lastIndexOf('/') + 1
+            const name = match.path.slice(nameStart)
+            const folder = match.path.slice(0, Math.max(0, nameStart - 1))
+            return (
+              <button
+                key={match.path}
+                role="option"
+                aria-selected={i === menuIndex}
+                ref={(el) => {
+                  if (i === menuIndex) el?.scrollIntoView({ block: 'nearest' })
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  completeFile(match)
+                }}
+                onMouseEnter={() => setMenuIndex(i)}
+                title={match.path}
+                className={`flex w-full items-center gap-1.5 px-3 py-1 text-left text-[12.5px] ${i === menuIndex ? 'bg-panel-2 text-fg' : 'text-muted'}`}
+              >
+                <EntryIcon entry={{ name, isDirectory: false }} />
+                <span className="shrink-0 truncate">
+                  <Highlighted text={name} offset={nameStart} positions={match.positions} />
+                </span>
+                {folder && (
+                  <span className="min-w-0 flex-1 truncate text-[11px] text-faint" dir="rtl">
+                    <bdi>
+                      <Highlighted text={folder} offset={0} positions={match.positions} />
+                    </bdi>
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {menuOpen && suggestions.length > 0 && (
         <div className="scrollbar-sleek absolute right-0 bottom-full left-0 z-20 mb-1.5 max-h-72 overflow-y-auto rounded-lg border border-line bg-panel py-1 shadow-xl shadow-black/40">
           {suggestions.map((command, i) => (
             <button
@@ -248,8 +341,10 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
           rows={1}
           onChange={(e) => {
             setText(e.target.value)
+            setCaret(e.target.selectionStart ?? e.target.value.length)
             recall.current = -1
           }}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           placeholder={blocked ? 'Réponds à Claude ci-dessus, ou écris un message…' : working ? 'Claude travaille — ton message sera lu ensuite (Échap pour interrompre)' : 'Écris à Claude…  ( / pour les commandes, @ pour un fichier )'}
@@ -299,6 +394,22 @@ function slashSuggestions(text: string, commands: ChatCommandInfo[]): ChatComman
   const inName = commands.filter((c) => !byName.includes(c) && c.name.toLowerCase().includes(query))
   const inDescription = query ? commands.filter((c) => !byName.includes(c) && !inName.includes(c) && c.description.toLowerCase().includes(query)) : []
   return [...byName, ...inName, ...inDescription].slice(0, MAX_SUGGESTIONS)
+}
+
+/** The `@word` the caret is in, when it starts the text or follows a space (not an email address). */
+function mentionAt(text: string, caret: number): { start: number; query: string } | null {
+  const match = /(^|\s)@([^\s@"]*)$/.exec(text.slice(0, caret))
+  if (!match) return null
+  return { start: match.index + match[1].length, query: match[2] }
+}
+
+/** Fuzzy matches for what follows the `@`; with nothing typed yet, the files nearest the root. */
+function fileMatches(query: string, files: string[]): FileMatch[] {
+  if (query) return searchFiles(query, files, MAX_SUGGESTIONS)
+  return [...files]
+    .sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b))
+    .slice(0, MAX_SUGGESTIONS)
+    .map((path) => ({ path, score: 0, positions: [] }))
 }
 
 function quoteMention(path: string): string {

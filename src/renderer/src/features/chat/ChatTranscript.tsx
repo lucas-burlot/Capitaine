@@ -3,7 +3,8 @@ import { Brain, ChevronRight, CircleCheck, CircleX, Info, LoaderCircle, OctagonX
 import { shortcutLabel } from '@/lib/platform'
 import { togglePaneView } from './agent-launch'
 import { looksLikeMarkdown, type ChatItem, type ChatItemOf } from './chat-fold'
-import { decorateCodeBlocks, renderMarkdown } from './chat-markdown'
+import { decorateCodeBlocks, linkFilePaths, renderMarkdown, useChatPlace } from './chat-markdown'
+import { lineDiff } from './line-diff'
 import { shortPath, STANDALONE_TOOLS, summarizeTools, toolDisplay } from './tool-display'
 
 interface Props {
@@ -173,7 +174,7 @@ function RowContent({ chatId, item, cwd, working, childrenOf }: RowProps) {
     case 'user':
       return <UserRow item={item} />
     case 'text':
-      return <TextRow text={item.text} streaming={item.streaming} />
+      return <TextRow chatId={chatId} cwd={cwd} text={item.text} streaming={item.streaming} />
     case 'thinking':
       return <ThinkingRow item={item} />
     case 'tool':
@@ -204,12 +205,17 @@ function UserRow({ item }: { item: ChatItemOf<'user'> }) {
   )
 }
 
-const TextRow = memo(function TextRow({ text, streaming }: { text: string; streaming: boolean }) {
+/** Markdown; given its chat, the file paths in its inline code become links. */
+const TextRow = memo(function TextRow({ chatId, cwd, text, streaming }: { chatId?: string; cwd?: string; text: string; streaming: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const html = useMemo(() => renderMarkdown(text), [text])
+  const place = useChatPlace(chatId ?? '', cwd ?? '')
+  const linked = chatId !== undefined && cwd !== undefined
   useLayoutEffect(() => {
-    if (ref.current && !streaming) decorateCodeBlocks(ref.current)
-  }, [html, streaming])
+    if (!ref.current || streaming) return
+    decorateCodeBlocks(ref.current)
+    if (linked) void linkFilePaths(ref.current, place).catch(() => {})
+  }, [html, streaming, place, linked])
   return (
     <div
       ref={ref}
@@ -358,30 +364,38 @@ function Pre({ children, tone }: { children: React.ReactNode; tone?: 'error' }) 
 const MAX_DIFF_LINES = 400
 
 export function Diff({ path, before, after }: { path: string | null; before: string; after: string }) {
-  // A final newline isn't an extra line.
-  const removed = before ? before.replace(/\n$/, '').split('\n') : []
-  const added = after ? after.replace(/\n$/, '').split('\n') : []
-  const total = removed.length + added.length
-  const clip = (lines: string[], budget: number) => lines.slice(0, Math.max(0, budget))
-  const shownRemoved = clip(removed, MAX_DIFF_LINES)
-  const shownAdded = clip(added, MAX_DIFF_LINES - shownRemoved.length)
+  const lines = useMemo(() => lineDiff(before, after), [before, after])
+  const shown = lines.slice(0, MAX_DIFF_LINES)
   return (
     <div className="overflow-hidden rounded-md border border-line bg-panel">
       {path && <div className="border-b border-line px-3 py-1 font-mono text-[11px] text-faint">{path}</div>}
       <div className="chat-selectable scrollbar-sleek max-h-96 overflow-auto py-1 font-mono text-[11.5px] leading-relaxed">
-        {shownRemoved.map((line, i) => (
-          <div key={`r${i}`} className="bg-red-500/10 px-3 whitespace-pre-wrap text-red-300">
-            <span className="mr-2 select-none text-red-400/60">-</span>
-            {line}
-          </div>
-        ))}
-        {shownAdded.map((line, i) => (
-          <div key={`a${i}`} className="bg-emerald-500/10 px-3 whitespace-pre-wrap text-emerald-300">
-            <span className="mr-2 select-none text-emerald-400/60">+</span>
-            {line}
-          </div>
-        ))}
-        {total > MAX_DIFF_LINES && <div className="px-3 text-faint">… {total - MAX_DIFF_LINES} lignes de plus</div>}
+        {shown.map((line, i) =>
+          line.kind === 'fold' ? (
+            <div key={i} className="px-3 text-faint select-none">
+              ⋯ {line.count} ligne{line.count > 1 ? 's' : ''} inchangée{line.count > 1 ? 's' : ''}
+            </div>
+          ) : (
+            <div
+              key={i}
+              className={`px-3 whitespace-pre-wrap ${line.kind === 'del' ? 'bg-red-500/10 text-red-300' : line.kind === 'add' ? 'bg-emerald-500/10 text-emerald-300' : 'text-muted'}`}
+            >
+              <span className={`mr-2 select-none ${line.kind === 'del' ? 'text-red-400/60' : line.kind === 'add' ? 'text-emerald-400/60' : 'text-faint/50'}`}>
+                {line.kind === 'del' ? '-' : line.kind === 'add' ? '+' : ' '}
+              </span>
+              {line.kind !== 'same' && line.changed ? (
+                <>
+                  {line.text.slice(0, line.changed[0])}
+                  <span className={`rounded-sm ${line.kind === 'del' ? 'bg-red-500/30' : 'bg-emerald-500/30'}`}>{line.text.slice(line.changed[0], line.changed[1])}</span>
+                  {line.text.slice(line.changed[1])}
+                </>
+              ) : (
+                line.text
+              )}
+            </div>
+          )
+        )}
+        {lines.length > MAX_DIFF_LINES && <div className="px-3 text-faint">… {lines.length - MAX_DIFF_LINES} lignes de plus</div>}
       </div>
     </div>
   )
