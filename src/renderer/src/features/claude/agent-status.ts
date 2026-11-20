@@ -127,8 +127,20 @@ export function applyAgentReport(session: AgentSession | undefined, report: Agen
   if (report.state === 'clear') return { ...base, children: others }
   const child: AgentChild = { id, state: report.state, kind: report.kind, title: report.title, msg: report.msg }
   const index = base.children.findIndex((c) => c.id === id)
-  const children = index === -1 ? [...others, child] : base.children.map((c) => (c.id === id ? child : c))
+  const children = index === -1 ? insertChild(others, child) : base.children.map((c) => (c.id === id ? child : c))
   return { ...base, children }
+}
+
+/** A nested subagent goes right after its parent's subtree, so the sidebar draws it under its parent. */
+function insertChild(children: AgentChild[], child: AgentChild): AgentChild[] {
+  const slash = child.id.lastIndexOf('/')
+  if (slash === -1) return [...children, child]
+  const parent = child.id.slice(0, slash)
+  let at = -1
+  children.forEach((c, i) => {
+    if (c.id === parent || c.id.startsWith(`${parent}/`)) at = i
+  })
+  return at === -1 ? [...children, child] : [...children.slice(0, at + 1), child, ...children.slice(at + 1)]
 }
 
 export function agentDisplayName(app: string): string {

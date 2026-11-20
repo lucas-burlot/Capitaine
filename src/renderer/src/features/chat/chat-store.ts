@@ -5,10 +5,10 @@
  */
 import { create } from 'zustand'
 import type { ChatPermissionMode, ChatPermissionResponse, ChatUserContent, ChatWireMessage, SavedAgent } from '@shared/types'
-import type { AgentReport } from '@/features/claude/agent-status'
+import type { AgentChild, AgentReport } from '@/features/claude/agent-status'
 import { useApp } from '@/features/workspace/workspace-store'
 import { useAgentSettings } from './agent-settings'
-import { ChatFold, type ChatItem, type FoldSignals } from './chat-fold'
+import { ChatFold, type ChatItem, type ChatItemOf, type FoldSignals } from './chat-fold'
 
 export interface ChatCommandInfo {
   name: string
@@ -437,8 +437,7 @@ function reportStatus(chatId: string): void {
   let report: AgentReport
   const permission = chat.permissions[0]
   if (permission) {
-    const question = permission.toolName === 'AskUserQuestion' || permission.toolName === 'ExitPlanMode'
-    report = { id: null, state: 'blocked', kind: question ? 'question' : 'permission', app: 'claude-code', msg: permissionSummary(permission) }
+    report = { id: null, state: 'blocked', kind: isQuestion(permission) ? 'question' : 'permission', app: 'claude-code', msg: permissionSummary(permission) }
   } else if (chat.status === 'working' || chat.status === 'starting') {
     report = { id: null, state: 'working', app: 'claude-code' }
   } else if (chat.status === 'exited' && chat.error) {
@@ -451,8 +450,70 @@ function reportStatus(chatId: string): void {
     return
   }
   const current = app.agents[chatId]
-  if (current && current.state === report.state && current.kind === report.kind && current.msg === report.msg) return
-  app.applyAgentReport(chatId, report)
+  if (!current || current.state !== report.state || current.kind !== report.kind || current.msg !== report.msg) {
+    app.applyAgentReport(chatId, report)
+  }
+  syncSubagents(chatId, runningSubagents(chat))
+}
+
+const SUBAGENT_TOOLS = new Set(['Task', 'Agent'])
+
+/**
+ * The subagents still at work, as a terminal Claude reports them: one child per Task / Agent call
+ * without a result, its id the path of calls from the main conversation (`outer/inner`).
+ */
+function runningSubagents(chat: ChatSession): AgentChild[] {
+  if (chat.status !== 'working' && chat.status !== 'starting') return []
+  const calls = new Map<string, ChatItemOf<'tool'>>()
+  for (const item of chat.items) {
+    if (item.kind === 'tool' && SUBAGENT_TOOLS.has(item.name)) calls.set(item.id, item)
+  }
+  if (calls.size === 0) return []
+
+  // A permission asked from inside a subagent blocks that subagent.
+  const waiting = new Map<string, PendingPermission>()
+  for (const permission of chat.permissions) {
+    const asking = permission.toolUseId ? chat.items.find((item) => item.id === permission.toolUseId) : undefined
+    if (asking?.parentId && !waiting.has(asking.parentId)) waiting.set(asking.parentId, permission)
+  }
+
+  const children: AgentChild[] = []
+  for (const call of calls.values()) {
+    if (call.result) continue
+    const path = [call.id]
+    for (let parent = call.parentId; parent && path.length < 8; parent = calls.get(parent)?.parentId ?? null) path.unshift(parent)
+    const permission = waiting.get(call.id)
+    const title = text(call.input.description) || text(call.input.subagent_type) || undefined
+    children.push(
+      permission
+        ? { id: path.join('/'), state: 'blocked', kind: isQuestion(permission) ? 'question' : 'permission', title, msg: permissionSummary(permission) }
+        : { id: path.join('/'), state: 'working', title }
+    )
+  }
+  return children
+}
+
+/** Brings the sidebar's subagent rows in line with `children`, touching only what changed. */
+function syncSubagents(chatId: string, children: AgentChild[]): void {
+  const app = useApp.getState()
+  const current = app.agents[chatId]?.children ?? []
+  const wanted = new Set(children.map((child) => child.id))
+  for (const child of current) {
+    if (!wanted.has(child.id)) app.applyAgentReport(chatId, { id: child.id, state: 'clear' })
+  }
+  for (const child of children) {
+    const shown = current.find((c) => c.id === child.id)
+    if (shown && shown.state === child.state && shown.kind === child.kind && shown.title === child.title && shown.msg === child.msg) continue
+    app.applyAgentReport(chatId, { ...child, app: 'claude-code' })
+  }
+}
+
+function isQuestion(permission: PendingPermission): boolean {
+  return permission.toolName === 'AskUserQuestion' || permission.toolName === 'ExitPlanMode'
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 /** One line for the sidebar and the notification: what Claude is waiting on. */
