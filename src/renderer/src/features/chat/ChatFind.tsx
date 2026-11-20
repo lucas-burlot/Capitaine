@@ -151,11 +151,24 @@ function findRanges(root: HTMLElement, query: string): Range[] {
   return ranges
 }
 
-/** Scrolls the transcript so the match sits in its middle third, when it's out of view. */
+/**
+ * Scrolls the transcript so the match sits in its middle third, when it's out of view. Blocks off
+ * screen aren't laid out (`content-visibility: auto`): the match's block comes into view first, then
+ * the match itself, once the block has its real size.
+ */
 function reveal(scroller: HTMLElement | null, range: Range) {
   if (!scroller) return
-  const box = range.getBoundingClientRect()
   const view = scroller.getBoundingClientRect()
-  if (box.top >= view.top + 40 && box.bottom <= view.bottom - 40) return
-  scroller.scrollTop += box.top - view.top - view.height / 3
+  const inView = () => {
+    const box = range.getBoundingClientRect()
+    return box.height > 0 && box.top >= view.top + 40 && box.bottom <= view.bottom - 40
+  }
+  if (inView()) return
+  const block = range.startContainer.parentElement?.closest('[data-chat-block]')
+  block?.scrollIntoView({ block: 'center' })
+  requestAnimationFrame(() => {
+    if (inView()) return
+    const box = range.getBoundingClientRect()
+    scroller.scrollTop += box.top - view.top - view.height / 3
+  })
 }

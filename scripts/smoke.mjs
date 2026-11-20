@@ -571,6 +571,17 @@ chatChecks.terminalOnly = await chatHas('/help ne fonctionne que dans le termina
 chatChecks.terminalButton = (await chat.locator('button:has-text("Passer en terminal")').count()) === 1
 chatChecks.notLeftWaiting = await waitFor(async () => (await chatText()).includes('Prêt') && !(await chatText()).includes('En attente'))
 await shot('12-chat')
+// A long session: only the last blocks are in the page; scrolling up loads the earlier ones in place.
+await say('Longue conversation')
+const blockCount = () => chat.locator('[data-chat-block]').count()
+const chatHolds = (text) => chat.evaluate((el, t) => el.textContent.includes(t), text)
+chatChecks.longArrived = await chatHas('Message n°260')
+chatChecks.windowed = (await blockCount()) === 200 && !(await chatHolds('Message n°001'))
+const scroller = chat.locator('.scrollbar-sleek.overflow-y-auto').first()
+await scroller.evaluate((el) => (el.scrollTop = 0))
+chatChecks.earlierLoaded = await waitFor(async () => (await blockCount()) > 200 && (await chatHolds('Message n°001')))
+chatChecks.keptPlace = (await scroller.evaluate((el) => el.scrollTop)) > 0
+await scroller.evaluate((el) => (el.scrollTop = el.scrollHeight))
 await say('/clear')
 chatChecks.cleared = await waitFor(async () => !(await chatText()).includes('Bonjour Claude') && (await chat.locator('.chat-markdown table').count()) === 0)
 chatChecks.clearRowKept = (await chatText()).includes('clear')

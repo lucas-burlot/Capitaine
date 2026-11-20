@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Brain, ChevronRight, CircleCheck, CircleX, Info, LoaderCircle, OctagonX, Slash, SquareTerminal, TriangleAlert } from 'lucide-react'
 import { shortcutLabel } from '@/lib/platform'
 import { togglePaneView } from './agent-launch'
@@ -13,14 +13,19 @@ interface Props {
   cwd: string
   /** Turn in progress: the last tool without a result is running. */
   working: boolean
+  /** The element the transcript scrolls in: earlier blocks load as it nears the top. */
+  scrollRef: React.RefObject<HTMLDivElement | null>
 }
+
+/** Blocks drawn at first, and added each time the reader nears the top. */
+export const TRANSCRIPT_PAGE = 200
 
 /**
  * The conversation, top-level rows; subagent rows nest under their Task call. While Claude streams,
  * only the rows that changed redraw: rows are memoized, and each Task call's list of nested rows
  * keeps its identity until something in it (or deeper) changes.
  */
-export function ChatTranscript({ chatId, items, cwd, working }: Props) {
+export function ChatTranscript({ chatId, items, cwd, working, scrollRef }: Props) {
   const previous = useRef(new Map<string, ChatItem[]>())
   const children = useMemo(() => {
     const grouped = new Map<string, ChatItem[]>()
@@ -47,15 +52,53 @@ export function ChatTranscript({ chatId, items, cwd, working }: Props) {
     return map
   }, [items])
   const blocks = useMemo(() => blocksOf(items.filter((item) => !item.parentId)), [items])
+
+  // Long conversations draw their last blocks only; the earlier ones load a page at a time.
+  const [shown, setShown] = useState(TRANSCRIPT_PAGE)
+  const hidden = Math.max(0, blocks.length - shown)
+  const visible = hidden > 0 ? blocks.slice(hidden) : blocks
+  const sentinel = useRef<HTMLDivElement>(null)
+  const anchor = useRef<{ height: number; top: number } | null>(null)
+  const loadEarlier = () => {
+    const scroller = scrollRef.current
+    if (scroller) anchor.current = { height: scroller.scrollHeight, top: scroller.scrollTop }
+    setShown((count) => count + TRANSCRIPT_PAGE)
+  }
+  // What loaded above the reader pushes the page down by its height: the view stays where it was.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    const before = anchor.current
+    anchor.current = null
+    if (scroller && before) scroller.scrollTop = before.top + scroller.scrollHeight - before.height
+  }, [shown, scrollRef])
+  useEffect(() => {
+    const target = sentinel.current
+    const root = scrollRef.current
+    if (!target || !root || hidden === 0) return
+    const observer = new IntersectionObserver((entries) => entries.some((entry) => entry.isIntersecting) && loadEarlier(), { root, rootMargin: '600px 0px 0px 0px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+    // Observed again after each page: if the top is still near, the next page loads too.
+  }, [hidden, shown, scrollRef])
+
   return (
     <div className="flex flex-col gap-3">
-      {blocks.map((block, i) =>
-        block.kind === 'row' ? (
-          <Row key={block.item.id} chatId={chatId} item={block.item} cwd={cwd} working={working} childrenOf={children} />
-        ) : (
-          <ToolGroup key={block.id} chatId={chatId} items={block.items} cwd={cwd} working={working} live={working && i === blocks.length - 1} childrenOf={children} />
-        )
+      {hidden > 0 && (
+        <div ref={sentinel} className="flex justify-center">
+          <button onClick={loadEarlier} className="rounded-full border border-line px-2.5 py-0.5 text-[11.5px] text-faint hover:bg-panel-2 hover:text-fg">
+            Afficher les messages précédents ({hidden})
+          </button>
+        </div>
       )}
+      {visible.map((block, i) => (
+        <div key={block.kind === 'row' ? block.item.id : block.id} className="chat-block" data-chat-block="">
+          {block.kind === 'row' ? (
+            <Row chatId={chatId} item={block.item} cwd={cwd} working={working} childrenOf={children} />
+          ) : (
+            <ToolGroup chatId={chatId} items={block.items} cwd={cwd} working={working} live={working && i === visible.length - 1} childrenOf={children} />
+          )}
+        </div>
+      ))}
     </div>
   )
 }

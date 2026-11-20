@@ -69,6 +69,14 @@ function user(message) {
     result(0, 20)
   } else if (text === 'Cherche le bug') {
     return toolTurn(message)
+  } else if (text === 'Longue conversation') {
+    // As many answers as a long session holds: the chat draws its last ones only.
+    send({ type: 'user', uuid: message.uuid, isReplay: true, parent_tool_use_id: null, message: message.message })
+    for (let n = 1; n <= 260; n++) {
+      const label = `Message n°${String(n).padStart(3, '0')}`
+      send({ type: 'assistant', parent_tool_use_id: null, message: { id: `msg_${randomUUID()}`, model, role: 'assistant', content: [{ type: 'text', text: label }] } })
+    }
+    result(1, 900)
   } else {
     send({ type: 'user', uuid: message.uuid, isReplay: true, parent_tool_use_id: null, message: message.message })
     const id = `msg_${randomUUID()}`

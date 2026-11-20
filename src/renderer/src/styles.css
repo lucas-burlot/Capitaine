@@ -301,6 +301,11 @@ body,
 .chat-copy-code:hover {
   color: var(--color-fg);
 }
+/* A chat's blocks off screen skip layout and paint; each keeps its last drawn height meanwhile. */
+.chat-block {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
 /* Inline code naming a file of the project: a click opens it in the editor. */
 .chat-markdown code.chat-file-link {
   cursor: pointer;

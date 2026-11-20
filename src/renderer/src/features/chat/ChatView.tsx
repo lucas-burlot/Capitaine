@@ -122,7 +122,7 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
               </div>
             )}
             {chat && !chat.historyLoading && chat.items.length === 0 && <EmptyChat cwd={chat.cwd} />}
-            {chat && <ChatTranscript chatId={chatId} items={chat.items} cwd={chat.cwd} working={chat.status === 'working'} />}
+            {chat && <ChatTranscript chatId={chatId} items={chat.items} cwd={chat.cwd} working={chat.status === 'working'} scrollRef={scrollRef} />}
             {chat?.status === 'working' && chat.permissions.length === 0 && <Working activity={chat.activity} />}
           </div>
         </div>
