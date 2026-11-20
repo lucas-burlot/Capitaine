@@ -66,7 +66,8 @@ function isShown(record: TranscriptRecord): boolean {
     return attachment?.type === 'queued_command' && attachment.commandMode === 'prompt'
   }
   if (!KEPT_TYPES.has(String(record.type)) || record.isMeta) return false
-  if (record.type === 'system') return record.subtype === 'compact_boundary'
+  // Compaction marks, and what local commands (/model, /usage…) printed.
+  if (record.type === 'system') return record.subtype === 'compact_boundary' || record.subtype === 'local_command'
   // Injected context (compaction summaries, synthetic notes) isn't part of what was said.
   if (record.type === 'user' && (record.isSynthetic || record.isCompactSummary)) return hasToolResult(record)
   return true

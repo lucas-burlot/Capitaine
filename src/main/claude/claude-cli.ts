@@ -48,7 +48,8 @@ export function resolveClaude(): Promise<{ file: string; env: NodeJS.ProcessEnv 
   resolved ??= (async () => {
     const login = await loginShellPath()
     const pathValue = [login, process.env.PATH ?? process.env.Path ?? ''].filter(Boolean).join(delimiter)
-    const file = findClaude(pathValue)
+    // Test hook: the smoke test's stand-in for Claude Code.
+    const file = process.env.CAPITAINE_CLAUDE_BIN || findClaude(pathValue)
     if (!file) return null
     const env: NodeJS.ProcessEnv = {}
     for (const [key, value] of Object.entries(process.env)) {

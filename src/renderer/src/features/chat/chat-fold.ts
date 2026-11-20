@@ -29,7 +29,7 @@ export type ChatItem =
   | (RowBase & { kind: 'text'; text: string; streaming: boolean })
   | (RowBase & { kind: 'thinking'; text: string; streaming: boolean })
   | (RowBase & { kind: 'tool'; name: string; input: Record<string, unknown>; streaming: boolean; result: ToolResult | null })
-  | (RowBase & { kind: 'notice'; tone: 'info' | 'warning' | 'error'; text: string; markdown?: boolean })
+  | (RowBase & { kind: 'notice'; tone: 'info' | 'warning' | 'error'; text: string; markdown?: boolean; action?: 'terminal' })
   | (RowBase & { kind: 'turn'; durationMs: number | null; costUsd: number | null; outcome: 'success' | 'error' | 'cancelled'; error: string | null })
 
 export type ChatItemOf<K extends ChatItem['kind']> = Extract<ChatItem, { kind: K }>
@@ -59,6 +59,7 @@ export interface FoldSignals {
 
 const INTERRUPTED_RE = /^\[Request interrupted by user[^\]]*\]$/
 const INJECTED_RE = /^<([a-z][\w-]*)>[\s\S]*<\/\1>$/
+const UNAVAILABLE_RE = /^\/(\S+) isn't available in this environment\.?$/
 
 export class ChatFold {
   items: ChatItem[] = []
@@ -249,8 +250,26 @@ export class ChatFold {
     if (message.error === 'authentication_failed') signals.authFailed = true
     if (body.model === '<synthetic>') {
       const text = body.content.map((b) => (b.type === 'text' ? b.text ?? '' : '')).join('\n').trim()
-      // Command answers (/context, /usage…) are Markdown.
-      if (text && text !== 'No response requested.') this.addNotice(message.error ? 'error' : 'info', text, true)
+      if (!text || text === 'No response requested.') return
+      const unavailable = UNAVAILABLE_RE.exec(text)
+      if (unavailable) {
+        // Claude never echoes these back: the typed message would wait forever (and the chat stay busy).
+        let at = this.items.length - 1
+        while (at >= 0) {
+          const item = this.items[at]
+          if (item.kind === 'user' && item.state === 'queued' && item.text.split(/\s/)[0] === `/${unavailable[1]}`) break
+          at--
+        }
+        const typed = this.items[at]
+        if (typed?.kind === 'user') {
+          this.replaceAt(at, { kind: 'command', id: typed.id, parentId: null, name: unavailable[1], args: typed.text.slice(unavailable[1].length + 1).trim(), output: null })
+        }
+        this.push({ kind: 'notice', id: `notice:${++this.localCounter}`, parentId: null, tone: 'info', text: `/${unavailable[1]} ne fonctionne que dans le terminal.`, action: 'terminal' })
+        return
+      }
+      // A command's answer (/context, /usage…) goes under it, as when the transcript is read back.
+      if (!message.error && this.attachCommandOutput(text)) return
+      this.addNotice(message.error ? 'error' : 'info', text, looksLikeMarkdown(text))
       return
     }
     if (!parentId && body.usage) {
@@ -307,9 +326,14 @@ export class ChatFold {
       const at = this.index.get(`user:${uuid}`)
       const item = at !== undefined ? this.items[at] : undefined
       if (item?.kind === 'user') {
-        if (item.state !== 'sent') this.replaceAt(at!, { ...item, state: 'sent' })
+        // A slash command Claude ran: the row becomes the command, as it reads back from the transcript.
+        const command = parseCommand(textOf(content))
+        if (command) this.replaceAt(at!, { kind: 'command', id: item.id, parentId: null, ...command, output: null })
+        else if (item.state !== 'sent') this.replaceAt(at!, { ...item, state: 'sent' })
         return
       }
+      // Already turned into a command by its answer.
+      if (item) return
     }
 
     if (typeof content === 'string') return this.userText(content, uuid, parentId)
@@ -339,22 +363,13 @@ export class ChatFold {
       this.addNotice('warning', 'Interrompu')
       return
     }
-    const command = /<command-name>\s*\/?([^<]*)<\/command-name>/.exec(trimmed)
+    const command = parseCommand(trimmed)
     if (command) {
-      const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(trimmed)?.[1]?.trim() ?? ''
       const id = `command:${uuid ?? ++this.localCounter}`
-      if (!this.index.has(id)) this.push({ kind: 'command', id, parentId: null, name: command[1].trim(), args, output: null })
+      if (!this.index.has(id)) this.push({ kind: 'command', id, parentId: null, ...command, output: null })
       return
     }
-    const stdout = /<local-command-(?:stdout|stderr)>([\s\S]*?)<\/local-command-(?:stdout|stderr)>/.exec(trimmed)
-    if (stdout) {
-      const output = stripAnsi(stdout[1]).trim()
-      // Attach to the command just above when there is one.
-      const last = this.items[this.items.length - 1]
-      if (last?.kind === 'command' && last.output === null) this.replaceAt(this.items.length - 1, { ...last, output })
-      else if (output) this.addNotice('info', output)
-      return
-    }
+    if (this.localOutput(trimmed)) return
     // Notes Claude Code injects as user turns (task notifications, reminders, caveats): not the user's words.
     if (INJECTED_RE.test(trimmed)) return
     const id = uuid ? `user:${uuid}` : `user:h${++this.localCounter}`
@@ -383,7 +398,9 @@ export class ChatFold {
     const isError = !cancelled && message.is_error === true
     const errors = Array.isArray(message.errors) ? message.errors.filter((e): e is string => typeof e === 'string') : []
     const error = isError ? errors.join('\n') || (typeof message.result === 'string' ? message.result : null) || 'Claude a rencontré une erreur.' : null
-    this.push({
+    // A local command (/context, /model…) isn't a turn of Claude's: no duration line under it.
+    const local = message.num_turns === 0 && !isError && !cancelled
+    if (!local) this.push({
       kind: 'turn',
       id: `turn:${typeof message.uuid === 'string' ? message.uuid : ++this.localCounter}`,
       parentId: null,
@@ -432,11 +449,13 @@ export class ChatFold {
         return
       case 'local_command_output': {
         const text = typeof message.content === 'string' ? stripAnsi(message.content).trim() : ''
-        const last = this.items[this.items.length - 1]
-        if (last?.kind === 'command' && last.output === null) this.replaceAt(this.items.length - 1, { ...last, output: text })
-        else if (text) this.addNotice('info', text)
+        if (text && !this.attachCommandOutput(text)) this.addNotice('info', text, looksLikeMarkdown(text))
         return
       }
+      // Transcript: a command's output, wrapped in `<local-command-stdout>`.
+      case 'local_command':
+        if (typeof message.content === 'string') this.localOutput(message.content.trim())
+        return
       case 'informational':
       case 'notification': {
         const text = typeof message.content === 'string' ? message.content : typeof message.message === 'string' ? message.message : ''
@@ -444,6 +463,32 @@ export class ChatFold {
         return
       }
     }
+  }
+
+  /** `<local-command-stdout>` text: goes under the command just above. False when it isn't that. */
+  private localOutput(text: string): boolean {
+    const stdout = /^<local-command-(?:stdout|stderr)>([\s\S]*?)<\/local-command-(?:stdout|stderr)>$/.exec(text)
+    if (!stdout) return false
+    const output = stripAnsi(stdout[1]).trim()
+    if (output && !this.attachCommandOutput(output)) this.addNotice('info', output, looksLikeMarkdown(output))
+    return true
+  }
+
+  /**
+   * Puts a command's answer under it: the last row is that command, or the `/…` message it was
+   * typed as (its answer may come before Claude echoes it back). False when there's no such row.
+   */
+  private attachCommandOutput(output: string): boolean {
+    const at = this.items.length - 1
+    const last = this.items[at]
+    if (last?.kind === 'command' && last.output === null) {
+      this.replaceAt(at, { ...last, output })
+      return true
+    }
+    const typed = last?.kind === 'user' && last.state !== 'cancelled' && !last.images ? /^\/(\S+)\s*([\s\S]*)$/.exec(last.text) : null
+    if (!typed) return false
+    this.replaceAt(at, { kind: 'command', id: last!.id, parentId: null, name: typed[1], args: typed[2].trim(), output })
+    return true
   }
 
   /** `/clear`: the transcript starts over, keeping only messages still waiting for Claude. */
@@ -567,6 +612,24 @@ export function parsePartialJson(json: string): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+/** Name and arguments of a command Claude ran (`<command-name>/x</command-name>…`), or null. */
+function parseCommand(text: string): { name: string; args: string } | null {
+  const name = /<command-name>\s*\/?([^<]*)<\/command-name>/.exec(text)
+  if (!name) return null
+  return { name: name[1].trim(), args: /<command-args>([\s\S]*?)<\/command-args>/.exec(text)?.[1]?.trim() ?? '' }
+}
+
+function textOf(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return (content as ContentBlock[]).map((block) => (block?.type === 'text' && typeof block.text === 'string' ? block.text : '')).join('\n')
+}
+
+/** Command output worth rendering as Markdown (tables, headings, code); plain text keeps its layout. */
+export function looksLikeMarkdown(text: string): boolean {
+  return /^#{1,6} |^\|.*\|\s*$|`[^`\n]+`|\*\*[^*\n]+\*\*/m.test(text)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

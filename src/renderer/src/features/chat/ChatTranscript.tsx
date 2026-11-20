@@ -1,10 +1,13 @@
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Brain, ChevronRight, CircleCheck, CircleX, Info, LoaderCircle, OctagonX, Slash, TriangleAlert } from 'lucide-react'
-import type { ChatItem, ChatItemOf } from './chat-fold'
+import { Brain, ChevronRight, CircleCheck, CircleX, Info, LoaderCircle, OctagonX, Slash, SquareTerminal, TriangleAlert } from 'lucide-react'
+import { shortcutLabel } from '@/lib/platform'
+import { togglePaneView } from './agent-launch'
+import { looksLikeMarkdown, type ChatItem, type ChatItemOf } from './chat-fold'
 import { decorateCodeBlocks, renderMarkdown } from './chat-markdown'
 import { shortPath, toolDisplay } from './tool-display'
 
 interface Props {
+  chatId: string
   items: ChatItem[]
   cwd: string
   /** Turn in progress: the last tool without a result is running. */
@@ -16,7 +19,7 @@ interface Props {
  * only the rows that changed redraw: rows are memoized, and each Task call's list of nested rows
  * keeps its identity until something in it (or deeper) changes.
  */
-export function ChatTranscript({ items, cwd, working }: Props) {
+export function ChatTranscript({ chatId, items, cwd, working }: Props) {
   const previous = useRef(new Map<string, ChatItem[]>())
   const children = useMemo(() => {
     const grouped = new Map<string, ChatItem[]>()
@@ -46,22 +49,23 @@ export function ChatTranscript({ items, cwd, working }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {roots.map((item) => (
-        <Row key={item.id} item={item} cwd={cwd} working={working} childrenOf={children} />
+        <Row key={item.id} chatId={chatId} item={item} cwd={cwd} working={working} childrenOf={children} />
       ))}
     </div>
   )
 }
 
 interface RowProps {
+  chatId: string
   item: ChatItem
   cwd: string
   working: boolean
   childrenOf: Map<string, ChatItem[]>
 }
 
-const Row = memo(RowContent, (a, b) => a.item === b.item && a.cwd === b.cwd && a.working === b.working && a.childrenOf.get(a.item.id) === b.childrenOf.get(b.item.id))
+const Row = memo(RowContent, (a, b) => a.item === b.item && a.chatId === b.chatId && a.cwd === b.cwd && a.working === b.working && a.childrenOf.get(a.item.id) === b.childrenOf.get(b.item.id))
 
-function RowContent({ item, cwd, working, childrenOf }: RowProps) {
+function RowContent({ chatId, item, cwd, working, childrenOf }: RowProps) {
   switch (item.kind) {
     case 'user':
       return <UserRow item={item} />
@@ -70,11 +74,11 @@ function RowContent({ item, cwd, working, childrenOf }: RowProps) {
     case 'thinking':
       return <ThinkingRow item={item} />
     case 'tool':
-      return <ToolRow item={item} cwd={cwd} working={working} childrenOf={childrenOf} />
+      return <ToolRow chatId={chatId} item={item} cwd={cwd} working={working} childrenOf={childrenOf} />
     case 'command':
       return <CommandRow item={item} />
     case 'notice':
-      return <NoticeRow item={item} />
+      return <NoticeRow chatId={chatId} item={item} />
     case 'turn':
       return <TurnRow item={item} />
   }
@@ -128,7 +132,7 @@ function ThinkingRow({ item }: { item: ChatItemOf<'thinking'> }) {
   )
 }
 
-function ToolRow({ item, cwd, working, childrenOf }: { item: ChatItemOf<'tool'>; cwd: string; working: boolean; childrenOf: Map<string, ChatItem[]> }) {
+function ToolRow({ chatId, item, cwd, working, childrenOf }: { chatId: string; item: ChatItemOf<'tool'>; cwd: string; working: boolean; childrenOf: Map<string, ChatItem[]> }) {
   const [open, setOpen] = useState(false)
   const display = toolDisplay(item.name, item.input, cwd)
   const Icon = display.icon
@@ -164,7 +168,7 @@ function ToolRow({ item, cwd, working, childrenOf }: { item: ChatItemOf<'tool'>;
       {nested.length > 0 && (open || running) && (
         <div className="mt-1.5 ml-[9px] flex flex-col gap-2 border-l border-line pl-4">
           {nested.map((child) => (
-            <Row key={child.id} item={child} cwd={cwd} working={working} childrenOf={childrenOf} />
+            <Row key={child.id} chatId={chatId} item={child} cwd={cwd} working={working} childrenOf={childrenOf} />
           ))}
         </div>
       )}
@@ -309,19 +313,46 @@ function TodoRow({ input }: { input: Record<string, unknown> }) {
 function CommandRow({ item }: { item: ChatItemOf<'command'> }) {
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="flex items-center gap-1 rounded-md border border-line bg-panel-2 px-2 py-1 font-mono text-[12px] text-fg">
-        <Slash size={11} className="text-accent" />
+      <div className="chat-selectable max-w-[85%] rounded-md border border-line bg-panel-2 px-2 py-1 font-mono text-[12px] break-words whitespace-pre-wrap text-fg">
+        <Slash size={11} className="mr-1 inline-block align-[-1px] text-accent" />
         {item.name}
-        {item.args && <span className="text-muted">{item.args}</span>}
+        {item.args && <span className="text-muted"> {item.args}</span>}
       </div>
-      {item.output && <div className="w-full"><Pre>{item.output}</Pre></div>}
+      {item.output && <CommandOutput text={item.output} />}
     </div>
   )
 }
 
-function NoticeRow({ item }: { item: ChatItemOf<'notice'> }) {
+/** What a command printed: Markdown when it is (tables of /context…), else as laid out. */
+function CommandOutput({ text }: { text: string }) {
+  if (!looksLikeMarkdown(text)) return <div className="w-full"><Pre>{text}</Pre></div>
+  return (
+    <div className="scrollbar-sleek max-h-[480px] w-full overflow-auto rounded-md border border-line bg-panel px-3 py-2">
+      <TextRow text={text} streaming={false} />
+    </div>
+  )
+}
+
+function NoticeRow({ chatId, item }: { chatId: string; item: ChatItemOf<'notice'> }) {
+  const [blocker, setBlocker] = useState<string | null>(null)
   const Icon = item.tone === 'error' ? OctagonX : item.tone === 'warning' ? TriangleAlert : Info
   const color = item.tone === 'error' ? 'text-red-300' : item.tone === 'warning' ? 'text-amber-300' : 'text-muted'
+  if (item.action === 'terminal') {
+    return (
+      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] ${color}`}>
+        <Icon size={13} className="shrink-0" />
+        <span className="chat-selectable">{item.text}</span>
+        <button
+          onClick={() => void togglePaneView(chatId).then(setBlocker)}
+          className="flex items-center gap-1.5 rounded-md border border-line px-2 py-0.5 text-fg hover:bg-panel-2"
+          title={`Reprend cette conversation dans un terminal (${shortcutLabel('toggleAgentView')})`}
+        >
+          <SquareTerminal size={12} /> Passer en terminal
+        </button>
+        {blocker && <span className="w-full pl-[21px] text-amber-300">{blocker}</span>}
+      </div>
+    )
+  }
   return (
     <div className={`chat-selectable flex items-start gap-2 text-[12.5px] ${color}`}>
       <Icon size={13} className="mt-0.5 shrink-0" />

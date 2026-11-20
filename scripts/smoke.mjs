@@ -55,7 +55,7 @@ writeFileSync(updateFixture, JSON.stringify({ version: '9.9.9', notes: ['fix(lin
 const app = await electron.launch({
   executablePath: join(appDir, 'node_modules/electron/dist', process.platform === 'win32' ? 'electron.exe' : 'electron'),
   args: [...(process.platform === 'linux' ? ['--ozone-platform=headless'] : []), appDir, `--user-data-dir=${userData}`],
-  env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfig, CAPITAINE_UPDATE_FIXTURE: updateFixture },
+  env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfig, CAPITAINE_UPDATE_FIXTURE: updateFixture, CAPITAINE_CLAUDE_BIN: join(appDir, 'scripts/fake-claude-chat.mjs') },
   timeout: 30000
 })
 const page = await app.firstWindow()
@@ -462,6 +462,43 @@ chromeChecks.sidebarBack = await waitFor(async () => (await page.locator('aside'
 await shot('10-title-bar')
 console.log('chrome checks:', chromeChecks)
 
+// Claude as a chat, against scripts/fake-claude-chat.mjs: streaming, slash commands, /model, /clear.
+const chat = page.locator('[data-chat-root]:not([aria-hidden="true"])')
+const chatText = () => chat.innerText()
+const chatHas = (text) => waitFor(async () => (await chatText()).includes(text))
+const say = async (text) => {
+  const box = chat.locator('textarea')
+  await box.fill(text)
+  await box.press('Escape') // closes the command menu, so Enter sends what was typed
+  await box.press('Enter')
+}
+const chatChecks = {}
+await page.click('button[title="Chat ou terminal"]')
+await page.click('text=Nouvel agent en chat')
+chatChecks.ready = await waitFor(async () => (await chat.count()) === 1 && (await chatText()).includes('Prêt'))
+await say('Bonjour Claude')
+chatChecks.streamedAnswer = await chatHas('Réponse à : Bonjour Claude')
+await say('/context')
+chatChecks.contextTable = await waitFor(async () => (await chat.locator('.chat-markdown table').count()) === 1)
+chatChecks.contextAsCommand = (await chat.locator('.chat-markdown table').count()) === 1 && !(await chatText()).includes('| Category')
+chatChecks.noDurationForCommand = !(await chatText()).includes('1 s')
+await say('/model haiku')
+chatChecks.modelConfirmed = await chatHas('Modèle : Haiku 5.5')
+chatChecks.modelPicker = await waitFor(async () => (await chat.locator('select').first().inputValue()) === 'haiku')
+chatChecks.statusBarModel = (await chatText()).includes('claude-haiku-5-5')
+await say('/model nimporte')
+chatChecks.unknownModel = await chatHas("Model 'nimporte' not found")
+await say('/help')
+chatChecks.terminalOnly = await chatHas('/help ne fonctionne que dans le terminal.')
+chatChecks.terminalButton = (await chat.locator('button:has-text("Passer en terminal")').count()) === 1
+chatChecks.notLeftWaiting = await waitFor(async () => (await chatText()).includes('Prêt') && !(await chatText()).includes('En attente'))
+await shot('12-chat')
+await say('/clear')
+chatChecks.cleared = await waitFor(async () => !(await chatText()).includes('Bonjour Claude') && (await chat.locator('.chat-markdown table').count()) === 0)
+chatChecks.clearRowKept = (await chatText()).includes('clear')
+await shot('13-chat-cleared')
+console.log('chat checks:', chatChecks)
+
 // destroy() skips beforeunload: a leftover unsaved buffer must never hang the test run.
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.destroy()))
 await app.close()
@@ -472,6 +509,10 @@ if (Object.values(updateChecks).includes(false)) {
 }
 if (Object.values(chromeChecks).includes(false)) {
   console.error('FAIL: title bar')
+  process.exit(1)
+}
+if (Object.values(chatChecks).includes(false)) {
+  console.error('FAIL: chat')
   process.exit(1)
 }
 if (Object.values(gitChecks).includes(false)) {
