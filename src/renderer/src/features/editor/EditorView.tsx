@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Code, Columns2, Eye, ExternalLink, RotateCcw, TriangleAlert } from 'lucide-react'
 import { useEditors } from './editor-store'
 import { closeSession, openSession } from './editor-sessions'
+import { useReveal } from './reveal'
 import { monaco } from './monaco-setup'
 import { isMarkdownPath, MarkdownPreview, type MarkdownPreviewHandle } from './MarkdownPreview'
 
@@ -92,6 +93,7 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
       editorRef.current = editor
       setModel(session.model)
       if (visibleRef.current && modeRef.current !== 'preview') editor.focus()
+      revealAsked(editor, path)
     })
     return () => {
       disposed = true
@@ -101,6 +103,15 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
       closeSession(tabId)
     }
   }, [tabId, projectId, path])
+
+  // A link to a place in this file (`a.ts:42`) while it's already open.
+  useEffect(
+    () =>
+      useReveal.subscribe((state) => {
+        if (state.request?.path === path && editorRef.current) revealAsked(editorRef.current, path)
+      }),
+    [path]
+  )
 
   // Back from the "save changes?" dialog (cancelled): hand the keyboard back to the editor.
   useEffect(
@@ -147,6 +158,19 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
       {meta && !ready && <EditorPlaceholder projectId={projectId} path={path} status={meta.status} error={meta.error} />}
     </div>
   )
+}
+
+/** Shows the place asked for this file, if any: its line in the middle, the cursor on it. */
+function revealAsked(editor: monaco.editor.IStandaloneCodeEditor, path: string) {
+  const request = useReveal.getState().request
+  const model = editor.getModel()
+  if (!request || request.path !== path || !model) return
+  useReveal.getState().done(request.id)
+  const line = Math.min(Math.max(1, request.position.line), model.getLineCount())
+  const column = Math.min(Math.max(1, request.position.column ?? model.getLineFirstNonWhitespaceColumn(line) ?? 1), model.getLineMaxColumn(line))
+  editor.setPosition({ lineNumber: line, column })
+  editor.revealLineInCenter(line)
+  editor.focus()
 }
 
 const MODES: { mode: MarkdownMode; label: string; icon: typeof Code }[] = [

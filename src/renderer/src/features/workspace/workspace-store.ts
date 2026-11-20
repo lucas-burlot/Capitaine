@@ -4,6 +4,7 @@ import { applyAgentReport, stripStatusGlyph, type AgentReport, type AgentSession
 import { setTerminalStartup } from '@/features/terminals/terminal-startup'
 import { defaultAgentView } from '@/features/chat/agent-settings'
 import { pane, paneIds, removePane, resizeSplit, splitPane, type LayoutNode, type SplitDirection } from './layout'
+import { useReveal, type FilePosition } from '@/features/editor/reveal'
 
 /** How a pane shows its agent: a terminal (shell, Claude's own TUI) or Capitaine's chat. */
 export type PaneView = 'shell' | 'chat'
@@ -80,7 +81,8 @@ interface AppState {
   /** New tab whose shell opens a shell inside a running container (`docker exec`). */
   openContainerShell(projectId: string, container: string, title: string): void
   /** Opens a file in an editor tab, or brings its existing tab forward. */
-  openFile(projectId: string, path: string): void
+  /** Opens the file in an editor tab (or selects its tab), scrolled to `position` when given. */
+  openFile(projectId: string, path: string, position?: FilePosition): void
   /** Opens a diff tab, or brings the one showing the same change forward. */
   openDiff(projectId: string, diff: DiffTarget): void
   /** Closes unconditionally; unsaved-changes prompts happen before (editor-store). */
@@ -297,7 +299,8 @@ export const useApp = create<AppState>((set, get) => ({
     get().selectProject(projectId)
   },
 
-  openFile(projectId, path) {
+  openFile(projectId, path, position) {
+    if (position) useReveal.getState().ask(path, position)
     openDocumentTab(projectId, (tab) => tab.kind === 'editor' && tab.filePath === path, { kind: 'editor', filePath: path })
   },
 

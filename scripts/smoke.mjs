@@ -587,6 +587,11 @@ await scroller.evaluate((el) => (el.scrollTop = 0))
 chatChecks.earlierLoaded = await waitFor(async () => (await blockCount()) > 200 && (await chatHolds('Message n°001')))
 chatChecks.keptPlace = (await scroller.evaluate((el) => el.scrollTop)) > 0
 await scroller.evaluate((el) => (el.scrollTop = el.scrollHeight))
+// A path with a line opens the file at that line.
+await chat.locator('code.chat-file-link').first().click()
+chatChecks.fileAtLine = await waitFor(async () => (await page.locator('.monaco-editor .line-numbers.active-line-number').first().textContent().catch(() => ''))?.trim() === '2')
+await page.locator('aside >> text=Bonjour Claude').first().click()
+chatChecks.backToChat = await waitFor(async () => (await chat.count()) === 1)
 await say('/clear')
 chatChecks.cleared = await waitFor(async () => !(await chatText()).includes('Bonjour Claude') && (await chat.locator('.chat-markdown table').count()) === 0)
 chatChecks.clearRowKept = (await chatText()).includes('clear')
