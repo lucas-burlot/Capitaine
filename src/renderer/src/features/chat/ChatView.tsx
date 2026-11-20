@@ -12,7 +12,8 @@ import { takeChatStartup } from './agent-launch'
 import { ChatComposer, insertIntoChat } from './ChatComposer'
 import { ChatTranscript } from './ChatTranscript'
 import { chatAgent, closeChat, ensureStarted, markSeen, openChat, setEffort, setModel, setPermissionMode, useChats, type ChatSession } from './chat-store'
-import { onMarkdownClick } from './chat-markdown'
+import { onMarkdownClick, useChatPlace } from './chat-markdown'
+import { ChatFind } from './ChatFind'
 import { PermissionCard } from './PermissionCard'
 
 interface Props {
@@ -38,7 +39,9 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
   const notBefore = useRef(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
+  const [finding, setFinding] = useState(false)
   const stick = useRef(true)
+  const place = useChatPlace(chatId, chat?.cwd ?? cwd)
 
   useEffect(() => {
     // Reopened after a restart, or carried over from a terminal: resume that conversation.
@@ -99,11 +102,18 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
       data-terminal-id={chatId}
       data-chat-root={chatId}
       onMouseDown={() => useApp.getState().focusPane(chatId)}
+      onKeyDown={(event) => {
+        if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f') {
+          event.preventDefault()
+          setFinding(true)
+        }
+      }}
     >
       {showHeader && <PaneHeader terminalId={chatId} focused={focused} />}
       {chat && <StatusBar chat={chat} />}
       <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} onScroll={onScroll} onClick={onMarkdownClick} className="scrollbar-sleek h-full overflow-y-auto">
+        {finding && <ChatFind scrollRef={scrollRef} content={chat?.items} onClose={() => setFinding(false)} />}
+        <div ref={scrollRef} onScroll={onScroll} onClick={(event) => onMarkdownClick(event, place)} className="scrollbar-sleek h-full overflow-y-auto">
           <div className="mx-auto flex max-w-[820px] flex-col gap-3 px-5 pt-4 pb-6">
             {chat?.historyTruncated && <div className="text-center text-[11.5px] text-faint">Les messages les plus anciens ne sont pas affichés.</div>}
             {chat?.historyLoading && (

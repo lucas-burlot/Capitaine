@@ -3,6 +3,7 @@
 // `set_model`, and plays back the frames Claude Code 2.1 sends for `/context`, `/help`, `/clear`
 // and a plain message (recorded from the real CLI, trimmed to the fields the chat reads).
 import { randomUUID } from 'node:crypto'
+import { readdirSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 
 const MODELS = { default: 'claude-opus-5-5', opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5' }
@@ -113,7 +114,9 @@ async function toolTurn(message) {
   const slow = call('Bash', { command: 'npm run smoke', description: 'Lance le test de bout en bout' })
   await sleep(Number(process.env.FAKE_CLAUDE_SLOW_MS ?? 2500))
   done(slow, 'OK — screenshots in smoke-shots')
-  say('Corrigé : `/clear` vide maintenant le chat, et le test de bout en bout passe.')
+  // A real file of the folder, so the chat can make its path a link.
+  const file = readdirSync(cwd, { withFileTypes: true }).find((entry) => entry.isFile() && !entry.name.startsWith('.'))?.name ?? 'package.json'
+  say(`Corrigé : \`/clear\` vide maintenant le chat, et le test de bout en bout passe. Voir \`${file}\`.\n\n\`\`\`ts\nconst fixed: boolean = true\n\`\`\``)
   result(1, 48_000)
   state('idle')
 }

@@ -3,7 +3,7 @@ import { Brain, ChevronRight, CircleCheck, CircleX, Info, LoaderCircle, OctagonX
 import { shortcutLabel } from '@/lib/platform'
 import { togglePaneView } from './agent-launch'
 import { looksLikeMarkdown, type ChatItem, type ChatItemOf } from './chat-fold'
-import { decorateCodeBlocks, renderMarkdown } from './chat-markdown'
+import { decorateCodeBlocks, linkFilePaths, renderMarkdown, useChatPlace } from './chat-markdown'
 import { lineDiff } from './line-diff'
 import { shortPath, STANDALONE_TOOLS, summarizeTools, toolDisplay } from './tool-display'
 
@@ -174,7 +174,7 @@ function RowContent({ chatId, item, cwd, working, childrenOf }: RowProps) {
     case 'user':
       return <UserRow item={item} />
     case 'text':
-      return <TextRow text={item.text} streaming={item.streaming} />
+      return <TextRow chatId={chatId} cwd={cwd} text={item.text} streaming={item.streaming} />
     case 'thinking':
       return <ThinkingRow item={item} />
     case 'tool':
@@ -205,12 +205,17 @@ function UserRow({ item }: { item: ChatItemOf<'user'> }) {
   )
 }
 
-const TextRow = memo(function TextRow({ text, streaming }: { text: string; streaming: boolean }) {
+/** Markdown; given its chat, the file paths in its inline code become links. */
+const TextRow = memo(function TextRow({ chatId, cwd, text, streaming }: { chatId?: string; cwd?: string; text: string; streaming: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const html = useMemo(() => renderMarkdown(text), [text])
+  const place = useChatPlace(chatId ?? '', cwd ?? '')
+  const linked = chatId !== undefined && cwd !== undefined
   useLayoutEffect(() => {
-    if (ref.current && !streaming) decorateCodeBlocks(ref.current)
-  }, [html, streaming])
+    if (!ref.current || streaming) return
+    decorateCodeBlocks(ref.current)
+    if (linked) void linkFilePaths(ref.current, place).catch(() => {})
+  }, [html, streaming, place, linked])
   return (
     <div
       ref={ref}

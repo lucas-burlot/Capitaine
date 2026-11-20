@@ -301,6 +301,15 @@ body,
 .chat-copy-code:hover {
   color: var(--color-fg);
 }
+/* Inline code naming a file of the project: a click opens it in the editor. */
+.chat-markdown code.chat-file-link {
+  cursor: pointer;
+  text-decoration: underline dotted color-mix(in srgb, var(--color-accent) 60%, transparent);
+  text-underline-offset: 3px;
+}
+.chat-markdown code.chat-file-link:hover {
+  color: var(--color-accent);
+}
 /* Text still arriving: a soft caret after the last character. */
 .chat-streaming > :last-child::after {
   content: '';
