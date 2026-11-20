@@ -7,14 +7,9 @@ import { isWindows, shortcutLabel } from '@/lib/platform'
 import { useApp } from '@/features/workspace/workspace-store'
 import { PATHS_MIME } from '@/lib/drag'
 import { EntryIcon } from './FileIcon'
+import { cachedProjectFiles, loadProjectFiles } from './project-files'
 
 const MAX_RESULTS = 200
-// Agents add and remove files all the time: the list is fetched again when older than this.
-const FILE_LIST_MAX_AGE_MS = 5000
-
-// Project files by project id, kept between searches.
-const fileLists = new Map<string, { files: string[]; at: number }>()
-const loading = new Set<string>()
 // Focus requests already honoured, so a remount doesn't steal the focus again.
 let handledFocusRequest = 0
 
@@ -29,7 +24,7 @@ interface Props {
 export function FileSearch({ project, query, onQueryChange, onContextMenu }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const [files, setFiles] = useState<string[] | null>(() => fileLists.get(project.id)?.files ?? null)
+  const [files, setFiles] = useState<string[] | null>(() => cachedProjectFiles(project.id))
   const [active, setActive] = useState(0)
   const focusRequest = useExplorer((s) => s.searchFocusRequest)
 
@@ -37,24 +32,15 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu }: Pro
 
   const refreshFiles = () => {
     const projectId = project.id
-    const cached = fileLists.get(projectId)
-    if (loading.has(projectId) || (cached && Date.now() - cached.at < FILE_LIST_MAX_AGE_MS)) return
-    loading.add(projectId)
-    void window.capitaine.files
-      .all(projectId)
-      .then(
-        (list) => {
-          fileLists.set(projectId, { files: list, at: Date.now() })
-          if (projectIdRef.current === projectId) setFiles(list)
-        },
-        () => projectIdRef.current === projectId && setFiles((current) => current ?? [])
-      )
-      .finally(() => loading.delete(projectId))
+    loadProjectFiles(projectId).then(
+      (list) => projectIdRef.current === projectId && setFiles(list),
+      () => projectIdRef.current === projectId && setFiles((current) => current ?? [])
+    )
   }
 
   useEffect(() => {
     projectIdRef.current = project.id
-    setFiles(fileLists.get(project.id)?.files ?? null)
+    setFiles(cachedProjectFiles(project.id))
   }, [project.id])
 
   useEffect(() => {
@@ -205,7 +191,7 @@ function ResultRow({ match, index, active, absolutePath, onHover, onOpen, onCont
 }
 
 /** `text` sits at `offset` in the matched path; the matched characters are emphasised. */
-function Highlighted({ text, offset, positions }: { text: string; offset: number; positions: number[] }) {
+export function Highlighted({ text, offset, positions }: { text: string; offset: number; positions: number[] }) {
   const marked = new Set(positions.map((p) => p - offset).filter((p) => p >= 0 && p < text.length))
   if (marked.size === 0) return <>{text}</>
   const parts: React.ReactNode[] = []
