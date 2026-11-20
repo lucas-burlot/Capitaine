@@ -40,6 +40,7 @@ interface AgentSettings {
   view: AgentView
   /** Model for new chats; null: Claude's own default. */
   model: string | null
+  /** Mode for new chats: the last one picked, except "Tout autoriser", which is never carried over. */
   permissionMode: ChatPermissionMode
   effort: string | null
   setView(view: AgentView): void
@@ -50,6 +51,8 @@ interface AgentSettings {
 
 function initialPermissionMode(): ChatPermissionMode {
   const saved = read(PERMISSION_KEY)
+  // Saved by an earlier version: "Tout autoriser" is never a default, new agents start by asking.
+  if (saved === 'bypassPermissions') return 'default'
   return PERMISSION_MODES.some((m) => m.value === saved) ? (saved as ChatPermissionMode) : 'default'
 }
 
@@ -67,6 +70,8 @@ export const useAgentSettings = create<AgentSettings>((set) => ({
     set({ model })
   },
   setPermissionMode(permissionMode) {
+    // "Tout autoriser" applies to the chat it was confirmed in, never to the agents that come next.
+    if (permissionMode === 'bypassPermissions') return
     write(PERMISSION_KEY, permissionMode)
     set({ permissionMode })
   },
