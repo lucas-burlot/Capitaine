@@ -39,7 +39,9 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
   const notBefore = useRef(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
-  const [finding, setFinding] = useState(false)
+  // Ctrl/⌘+F presses while the chat is the active pane; null while the find bar is closed.
+  const [findRequest, setFindRequest] = useState<number | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
   const place = useChatPlace(chatId, chat?.cwd ?? cwd)
 
@@ -87,6 +89,21 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
     if (bottom !== atBottom) setAtBottom(bottom)
   }
 
+  // Ctrl/⌘+F finds in the chat whenever it's the active pane, wherever the keyboard focus is
+  // (clicking the transcript focuses nothing), except in a field or editor of another part of the app.
+  useEffect(() => {
+    if (!focused || !visible) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'f') return
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (target && !rootRef.current?.contains(target) && target.closest('input, textarea, select, [contenteditable="true"], .monaco-editor, .xterm')) return
+      event.preventDefault()
+      setFindRequest((count) => (count ?? 0) + 1)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [focused, visible])
+
   const scrollToBottom = () => {
     const el = scrollRef.current
     if (!el) return
@@ -96,23 +113,18 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
 
   return (
     <div
+      ref={rootRef}
       className={`absolute flex flex-col bg-bg ${visible ? '' : 'invisible pointer-events-none'}`}
       style={{ left: `${rect.left * 100}%`, top: `${rect.top * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }}
       aria-hidden={!visible}
       data-terminal-id={chatId}
       data-chat-root={chatId}
       onMouseDown={() => useApp.getState().focusPane(chatId)}
-      onKeyDown={(event) => {
-        if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f') {
-          event.preventDefault()
-          setFinding(true)
-        }
-      }}
     >
       {showHeader && <PaneHeader terminalId={chatId} focused={focused} />}
       {chat && <StatusBar chat={chat} />}
       <div className="relative min-h-0 flex-1">
-        {finding && <ChatFind scrollRef={scrollRef} content={chat?.items} onClose={() => setFinding(false)} />}
+        {findRequest !== null && <ChatFind scrollRef={scrollRef} content={chat?.items} focusRequest={findRequest} onClose={() => setFindRequest(null)} />}
         <div ref={scrollRef} onScroll={onScroll} onClick={(event) => onMarkdownClick(event, place)} className="scrollbar-sleek h-full overflow-y-auto">
           <div className="mx-auto flex max-w-[820px] flex-col gap-3 px-5 pt-4 pb-6">
             {chat?.historyTruncated && <div className="text-center text-[11.5px] text-faint">Les messages les plus anciens ne sont pas affichés.</div>}
