@@ -2,7 +2,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { Marked, type Tokens } from 'marked'
 import DOMPurify from 'dompurify'
 import { useApp } from '@/features/workspace/workspace-store'
-import { monaco } from './monaco-setup'
+import type { monaco } from './monaco-setup'
+import { colorizeCodeBlocks } from './colorize'
 
 export function isMarkdownPath(path: string): boolean {
   return /\.(md|markdown|mdx|mdown|mkd)$/i.test(path)
@@ -43,31 +44,6 @@ function stripFrontMatter(source: string): string {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(source)
   if (!match) return source
   return '```yaml\n' + match[1] + '\n```\n\n' + source.slice(match[0].length)
-}
-
-/** Monaco language id for a fenced block's info string (`ts`, `bash`, `py`…). */
-function languageFor(info: string): string | null {
-  const name = info.toLowerCase()
-  for (const lang of monaco.languages.getLanguages()) {
-    if (lang.id === name || lang.aliases?.some((a) => a.toLowerCase() === name) || lang.extensions?.includes(`.${name}`)) return lang.id
-  }
-  return null
-}
-
-function colorizeBlocks(root: HTMLElement) {
-  for (const code of root.querySelectorAll<HTMLElement>('pre > code[class*="language-"]')) {
-    const info = /language-(\S+)/.exec(code.className)?.[1]
-    const lang = info ? languageFor(info) : null
-    if (!lang) continue
-    const text = code.textContent ?? ''
-    monaco.editor
-      .colorize(text.replace(/\n$/, ''), lang, { tabSize: 2 })
-      .then((html) => {
-        // Monaco emits non-breaking spaces; plain ones keep copied code clean (the block is `white-space: pre`).
-        if (code.isConnected && code.textContent === text) code.innerHTML = html.replace(/&#160;|&nbsp;|\u00a0/g, ' ')
-      })
-      .catch(() => {})
-  }
 }
 
 /** Resolves a relative link against the file's folder, keeping the platform's separator. */
@@ -112,7 +88,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, Props>(function
       const body = bodyRef.current
       if (!body) return
       body.innerHTML = render(model.getValue())
-      colorizeBlocks(body)
+      colorizeCodeBlocks(body)
     }
     paint()
     let timer: ReturnType<typeof setTimeout> | undefined

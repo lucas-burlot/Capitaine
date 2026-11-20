@@ -35,8 +35,12 @@ export function onMarkdownClick(event: React.MouseEvent): void {
   if (/^https?:\/\//i.test(href)) window.open(href)
 }
 
-/** Adds the copy buttons to a rendered block's `<pre>`s. */
+// Monaco is heavy: it loads with the first code block, not with the chat.
+const colorize = () => import('@/features/editor/colorize')
+
+/** Adds the copy buttons to a rendered block's `<pre>`s and colours their code. */
 export function decorateCodeBlocks(root: HTMLElement): void {
+  if (root.querySelector('pre > code[class*="language-"]')) void colorize().then((m) => m.colorizeCodeBlocks(root), () => {})
   for (const pre of root.querySelectorAll('pre')) {
     if (pre.querySelector('[data-copy-code]')) continue
     const button = document.createElement('button')
