@@ -28,6 +28,8 @@ interface EditorState {
   removeMeta(tabId: string): void
   /** Closes the tab, asking first when it has unsaved changes. */
   requestClose(tabId: string): void
+  /** Closes the tabs (any kind); files with unsaved changes are asked about together, once the rest are closed. */
+  requestCloseTabs(tabIds: string[]): void
   resolveClose(choice: 'save' | 'discard' | 'cancel'): Promise<void>
 }
 
@@ -54,12 +56,16 @@ export const useEditors = create<EditorState>((set, get) => ({
   },
 
   requestClose(tabId) {
-    if (!get().meta[tabId]?.dirty) {
-      useApp.getState().closeTab(tabId)
-      return
-    }
-    useApp.getState().selectTab(tabId)
-    set({ closeRequest: { tabIds: [tabId], reason: 'tab', error: null, saving: false } })
+    get().requestCloseTabs([tabId])
+  },
+
+  requestCloseTabs(tabIds) {
+    const dirty = tabIds.filter((id) => get().meta[id]?.dirty)
+    for (const id of tabIds) if (!dirty.includes(id)) useApp.getState().closeTab(id)
+    if (dirty.length === 0) return
+    // One tab: show it while asking. Several: the dialog lists them, the current tab stays.
+    if (tabIds.length === 1) useApp.getState().selectTab(dirty[0])
+    set({ closeRequest: { tabIds: dirty, reason: 'tab', error: null, saving: false } })
   },
 
   async resolveClose(choice) {

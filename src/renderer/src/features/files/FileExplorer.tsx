@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ChevronRight,
   ChevronsDownUp,
@@ -17,6 +17,7 @@ import { useApp } from '@/features/workspace/workspace-store'
 import { focusedTerminalId, pasteIntoTerminal } from '@/features/terminals/terminal-registry'
 import { PATHS_MIME } from '@/lib/drag'
 import { IconButton } from '@/ui/IconButton'
+import { ContextMenu, MenuItem, MenuSeparator } from '@/ui/ContextMenu'
 import { EntryIcon } from './FileIcon'
 import { FileSearch } from './FileSearch'
 
@@ -193,29 +194,8 @@ function statusDot(status: GitFileStatus): string {
 }
 
 function EntryMenu({ project, x, y, entry, onClose }: { project: Project; x: number; y: number; entry: DirEntry; onClose(): void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ x, y })
   const terminalId = focusedTerminalId()
   const hasTerminal = useApp((s) => (s.terminalOrder[project.id] ?? []).length > 0)
-
-  useLayoutEffect(() => {
-    // Keep the menu inside the window.
-    const rect = ref.current?.getBoundingClientRect()
-    if (rect) setPos({ x: Math.min(x, window.innerWidth - rect.width - 4), y: Math.min(y, window.innerHeight - rect.height - 4) })
-  }, [x, y])
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose()
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', esc)
-    window.addEventListener('blur', onClose)
-    return () => {
-      window.removeEventListener('mousedown', close)
-      window.removeEventListener('keydown', esc)
-      window.removeEventListener('blur', onClose)
-    }
-  }, [onClose])
 
   const act = (fn: () => void) => () => {
     fn()
@@ -223,51 +203,33 @@ function EntryMenu({ project, x, y, entry, onClose }: { project: Project; x: num
   }
 
   return (
-    <div
-      ref={ref}
-      className="fixed z-50 w-max min-w-60 rounded-md border border-line bg-panel-2 py-1 whitespace-nowrap shadow-xl shadow-black/40"
-      style={{ left: pos.x, top: pos.y }}
-    >
+    <ContextMenu x={x} y={y} onClose={onClose}>
       {!entry.isDirectory && (
         <>
-          <Item icon={<FilePen size={13} />} label="Ouvrir dans l’éditeur" onClick={act(() => useApp.getState().openFile(project.id, entry.path))} />
-          <Item
+          <MenuItem icon={<FilePen size={13} />} label="Ouvrir dans l’éditeur" onClick={act(() => useApp.getState().openFile(project.id, entry.path))} />
+          <MenuItem
             icon={<ExternalLink size={13} />}
             label="Ouvrir avec l’application par défaut"
             onClick={act(() => void window.capitaine.files.open(project.id, entry.path).catch(() => {}))}
           />
         </>
       )}
-      <Item
+      <MenuItem
         icon={<TextCursorInput size={13} />}
         label="Insérer le chemin dans le terminal"
         disabled={!terminalId}
         hint={!terminalId ? (hasTerminal ? 'aucun terminal actif' : 'aucun terminal') : undefined}
         onClick={act(() => terminalId && pasteIntoTerminal(terminalId, pathsForTerminal([entry.path])))}
       />
-      <div className="my-1 border-t border-line" />
-      <Item icon={<Copy size={13} />} label="Copier le chemin" onClick={act(() => window.capitaine.files.copyText(entry.path))} />
-      <Item icon={<Copy size={13} />} label="Copier le chemin relatif" onClick={act(() => window.capitaine.files.copyText(entry.relPath))} />
-      <div className="my-1 border-t border-line" />
-      <Item
+      <MenuSeparator />
+      <MenuItem icon={<Copy size={13} />} label="Copier le chemin" onClick={act(() => window.capitaine.files.copyText(entry.path))} />
+      <MenuItem icon={<Copy size={13} />} label="Copier le chemin relatif" onClick={act(() => window.capitaine.files.copyText(entry.relPath))} />
+      <MenuSeparator />
+      <MenuItem
         icon={<FolderSearch size={13} />}
         label={isMac ? 'Afficher dans le Finder' : 'Afficher dans le gestionnaire de fichiers'}
         onClick={act(() => window.capitaine.files.reveal(project.id, entry.path))}
       />
-    </div>
-  )
-}
-
-function Item(props: { icon: React.ReactNode; label: string; hint?: string; disabled?: boolean; onClick(): void }) {
-  return (
-    <button
-      disabled={props.disabled}
-      onClick={props.onClick}
-      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-fg enabled:hover:bg-line disabled:text-faint"
-    >
-      {props.icon}
-      <span className="flex-1">{props.label}</span>
-      {props.hint && <span className="text-[10px] text-faint">{props.hint}</span>}
-    </button>
+    </ContextMenu>
   )
 }

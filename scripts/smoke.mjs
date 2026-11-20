@@ -332,6 +332,48 @@ for (const name of ['other.md', 'notes.md']) {
   if (await waitFor(() => page.$('text=Ne pas enregistrer').then(Boolean), 1500)) await page.click('text=Ne pas enregistrer')
   await waitFor(async () => !(await page.$(`main header [title$="${name}"]`)))
 }
+// Tab right-click menu: close those to the right (unsaved file asked about), then every file.
+const tabMenuChecks = {}
+const tabTitlesInOrder = () => page.$$eval('main header div.group[title]', (els) => els.map((el) => el.getAttribute('title')))
+const fileTab = (name) => `main header div.group[title$="/${name}"]`
+const menuItem = (label) => page.locator(`[role=menu] [role=menuitem]:has-text("${label}")`)
+for (const name of ['App.vue', 'other.md', 'new.txt', '.env.local']) {
+  await page.dblclick(`[role=treeitem]:has(span.truncate:text-is("${name}"))`)
+  await page.waitForSelector(fileTab(name))
+}
+await page.click('[data-editor-tab].flex .view-lines')
+await page.keyboard.type('# modifié\n')
+tabMenuChecks.dirty = await waitFor(dirtyTab)
+const beforeMenu = await tabTitlesInOrder()
+const pivot = beforeMenu.findIndex((title) => title.endsWith('/other.md'))
+await page.click(fileTab('other.md'), { button: 'right' })
+tabMenuChecks.menuOpens = await menuItem('Fermer les onglets à droite').isVisible()
+// Playwright's own capture: the window one blurs the page, which closes menus.
+await page.screenshot({ path: join(shots, '14-tab-menu.png') })
+tabMenuChecks.menuStaysOpen = await menuItem('Fermer les onglets à droite').isVisible()
+await page.keyboard.press('Escape')
+tabMenuChecks.escapeCloses = await waitFor(async () => (await page.locator('[role=menu]').count()) === 0)
+await page.click(fileTab('other.md'), { button: 'right' })
+await menuItem('Fermer les onglets à droite').click()
+tabMenuChecks.unsavedAsked = await waitFor(() => page.$('text=Ne pas enregistrer').then(Boolean))
+await page.click('text=Ne pas enregistrer')
+tabMenuChecks.closedToTheRight = await waitFor(async () => JSON.stringify(await tabTitlesInOrder()) === JSON.stringify(beforeMenu.slice(0, pivot + 1)))
+tabMenuChecks.pivotStillActive = (await page.locator(`${fileTab('other.md')}.bg-bg`).count()) === 1
+// Editor tabs are titled with their file's path; terminal tabs here with their folder.
+const isFileTab = (title) => /\/(tracked\.txt|App\.vue|other\.md|new\.txt|\.env\.local)$/.test(title)
+const otherTabs = beforeMenu.filter((title) => !isFileTab(title))
+await page.click(fileTab('App.vue'), { button: 'right' })
+await menuItem('Fermer tous les fichiers').click()
+tabMenuChecks.filesClosed = await waitFor(async () => {
+  const titles = await tabTitlesInOrder()
+  return otherTabs.length > 0 && JSON.stringify(titles) === JSON.stringify(otherTabs)
+})
+console.log('tab menu checks:', tabMenuChecks, { beforeMenu, after: await tabTitlesInOrder() })
+if (Object.values(tabMenuChecks).includes(false)) {
+  console.error('FAIL: tab menu')
+  process.exit(1)
+}
+
 // Git panel: changes / staged / stash, diffs, staging.
 const gitChecks = {}
 const gitPanel = page.locator('[aria-label="Changements git"]')
