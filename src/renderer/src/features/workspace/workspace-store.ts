@@ -119,6 +119,16 @@ export function terminalLabel(terminal: TerminalPane): string {
   return terminal.customTitle || (terminal.shellTitle && cleanShellTitle(terminal.shellTitle)) || `Terminal ${terminal.number}`
 }
 
+/**
+ * An agent's name outside its tab (the sidebar, notifications): the name you gave its tab, which in a
+ * split tab is followed by the pane's own; otherwise the pane's.
+ */
+export function agentLabel(state: Pick<AppState, 'tabs'>, terminal: TerminalPane): string {
+  const tab = state.tabs[terminal.tabId]
+  if (!tab?.customTitle) return terminalLabel(terminal)
+  return paneIds(tab.layout).length > 1 ? `${tab.customTitle} · ${terminalLabel(terminal)}` : tab.customTitle
+}
+
 export function fileName(path: string): string {
   return path.split(/[\\/]/).pop() || path
 }

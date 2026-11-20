@@ -9,11 +9,6 @@ import { createInterface } from 'node:readline'
 const MODELS = { default: 'claude-opus-5-5', opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5' }
 const NAMES = { default: 'Default (recommended)', opus: 'Opus 5.5', sonnet: 'Sonnet 5.5', haiku: 'Haiku 5.5' }
 let model = MODELS.default
-// Two MCP servers: one up, one failing until it is reconnected.
-const mcpServers = [
-  { name: 'docs', status: 'connected', serverInfo: { name: 'docs', version: '1.2.0' } },
-  { name: 'github', status: 'failed', error: 'Connection refused' }
-]
 let sessionId = randomUUID()
 
 const send = (frame) => process.stdout.write(`${JSON.stringify({ ...frame, session_id: sessionId })}\n`)
@@ -44,14 +39,6 @@ function control(message) {
       account: { tokenSource: 'claude.ai' },
       capabilities: []
     })
-  }
-  if (request.subtype === 'mcp_status') return reply({ mcpServers })
-  if (request.subtype === 'mcp_reconnect' || request.subtype === 'mcp_toggle') {
-    const server = mcpServers.find((s) => s.name === request.serverName)
-    if (!server) return send({ type: 'control_response', response: { subtype: 'error', request_id: requestId, error: `Server not found: ${request.serverName}` } })
-    const up = request.subtype === 'mcp_reconnect' || request.enabled
-    Object.assign(server, up ? { status: 'connected', serverInfo: { name: server.name, version: '0.9.0' }, error: undefined } : { status: 'disabled', error: undefined })
-    return reply({})
   }
   if (request.subtype === 'set_model') {
     if (!MODELS[request.model]) {
