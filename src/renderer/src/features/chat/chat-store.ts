@@ -204,6 +204,8 @@ export async function sendMessage(chatId: string, text: string, images: ChatUser
   if (!trimmed.trim() && images.length === 0) return
   const fold = folds.get(chatId)
   if (!fold) return
+  const modelCommand = images.length === 0 ? /^\/model\s+(\S+)\s*$/.exec(trimmed) : null
+  if (modelCommand && chatOf(chatId)?.status !== 'working') return runModelCommand(chatId, modelCommand[1])
   const uuid = crypto.randomUUID()
   // Images first, then one text block: Claude reads slash commands from the last text block.
   const content: ChatUserContent = [...images, ...(trimmed.trim() ? [{ type: 'text' as const, text: trimmed }] : [])]
@@ -218,6 +220,34 @@ export async function sendMessage(chatId: string, text: string, images: ChatUser
   }
   patch(chatId, { status: 'working' })
   window.capitaine.chat.send(chatId, uuid, content)
+}
+
+/**
+ * `/model <name>` goes through `set_model`, like the picker: Claude then says which model it took
+ * straight away (the command itself only shows on the next turn), and the picker follows. For this
+ * conversation only, as in Claude Code: the default for new chats stays as it was.
+ */
+async function runModelCommand(chatId: string, name: string): Promise<void> {
+  const fold = folds.get(chatId)
+  if (!fold) return
+  const row = fold.addCommand('model', name)
+  flushFold(chatId)
+  if (!(await ensureStarted(chatId))) {
+    fold.setCommandOutput(row, 'Claude n’a pas pu démarrer.')
+    flushFold(chatId)
+    return
+  }
+  try {
+    const answer = (await window.capitaine.chat.control(chatId, { subtype: 'set_model', model: name })) as { model?: unknown } | null
+    const active = typeof answer?.model === 'string' ? answer.model : null
+    const chat = chatOf(chatId)
+    const label = chat?.models.find((m) => m.value === name)?.displayName ?? active ?? name
+    patch(chatId, { model: name === 'default' ? null : name, ...(active ? { activeModel: active } : {}) })
+    fold.setCommandOutput(row, `Modèle : ${label} (pour cette conversation)`)
+  } catch (error) {
+    fold.setCommandOutput(row, messageOf(error))
+  }
+  flushFold(chatId)
 }
 
 export async function interrupt(chatId: string): Promise<void> {
@@ -370,6 +400,7 @@ function applySignals(chatId: string, signals: FoldSignals): void {
   if (signals.contextWindow !== undefined) update.contextWindow = signals.contextWindow
   if (signals.costUsd !== undefined) update.costUsd = signals.costUsd
   if (signals.activity !== undefined) update.activity = signals.activity
+  if (signals.commands) update.commands = parseCommands(signals.commands)
   if (signals.reset) {
     update.contextTokens = signals.contextTokens ?? null
     update.historyTruncated = false

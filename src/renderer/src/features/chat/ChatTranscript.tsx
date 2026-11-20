@@ -11,16 +11,35 @@ interface Props {
   working: boolean
 }
 
-/** The conversation, top-level rows; subagent rows nest under their Task call. */
+/**
+ * The conversation, top-level rows; subagent rows nest under their Task call. While Claude streams,
+ * only the rows that changed redraw: rows are memoized, and each Task call's list of nested rows
+ * keeps its identity until something in it (or deeper) changes.
+ */
 export function ChatTranscript({ items, cwd, working }: Props) {
+  const previous = useRef(new Map<string, ChatItem[]>())
   const children = useMemo(() => {
-    const map = new Map<string, ChatItem[]>()
+    const grouped = new Map<string, ChatItem[]>()
+    const parentOf = new Map<string, string>()
     for (const item of items) {
       if (!item.parentId) continue
-      const list = map.get(item.parentId) ?? []
-      list.push(item)
-      map.set(item.parentId, list)
+      parentOf.set(item.id, item.parentId)
+      const list = grouped.get(item.parentId)
+      if (list) list.push(item)
+      else grouped.set(item.parentId, [item])
     }
+    const changed = new Set<string>()
+    for (const [id, list] of grouped) {
+      const old = previous.current.get(id)
+      if (!old || old.length !== list.length || old.some((item, i) => item !== list[i])) changed.add(id)
+    }
+    // A change in a nested subagent redraws every Task call above it.
+    for (const id of [...changed]) {
+      for (let up = parentOf.get(id); up && !changed.has(up); up = parentOf.get(up)) changed.add(up)
+    }
+    const map = new Map<string, ChatItem[]>()
+    for (const [id, list] of grouped) map.set(id, changed.has(id) ? list : previous.current.get(id)!)
+    previous.current = map
     return map
   }, [items])
   const roots = useMemo(() => items.filter((item) => !item.parentId), [items])
@@ -40,7 +59,9 @@ interface RowProps {
   childrenOf: Map<string, ChatItem[]>
 }
 
-function Row({ item, cwd, working, childrenOf }: RowProps) {
+const Row = memo(RowContent, (a, b) => a.item === b.item && a.cwd === b.cwd && a.working === b.working && a.childrenOf.get(a.item.id) === b.childrenOf.get(b.item.id))
+
+function RowContent({ item, cwd, working, childrenOf }: RowProps) {
   switch (item.kind) {
     case 'user':
       return <UserRow item={item} />
@@ -304,7 +325,13 @@ function NoticeRow({ item }: { item: ChatItemOf<'notice'> }) {
   return (
     <div className={`chat-selectable flex items-start gap-2 text-[12.5px] ${color}`}>
       <Icon size={13} className="mt-0.5 shrink-0" />
-      <span className="whitespace-pre-wrap">{item.text}</span>
+      {item.markdown ? (
+        <div className="min-w-0 flex-1">
+          <TextRow text={item.text} streaming={false} />
+        </div>
+      ) : (
+        <span className="whitespace-pre-wrap">{item.text}</span>
+      )}
     </div>
   )
 }

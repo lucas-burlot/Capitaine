@@ -29,7 +29,7 @@ export type ChatItem =
   | (RowBase & { kind: 'text'; text: string; streaming: boolean })
   | (RowBase & { kind: 'thinking'; text: string; streaming: boolean })
   | (RowBase & { kind: 'tool'; name: string; input: Record<string, unknown>; streaming: boolean; result: ToolResult | null })
-  | (RowBase & { kind: 'notice'; tone: 'info' | 'warning' | 'error'; text: string })
+  | (RowBase & { kind: 'notice'; tone: 'info' | 'warning' | 'error'; text: string; markdown?: boolean })
   | (RowBase & { kind: 'turn'; durationMs: number | null; costUsd: number | null; outcome: 'success' | 'error' | 'cancelled'; error: string | null })
 
 export type ChatItemOf<K extends ChatItem['kind']> = Extract<ChatItem, { kind: K }>
@@ -47,7 +47,8 @@ export interface FoldSignals {
   contextWindow?: number
   costUsd?: number
   activity?: string | null
-  slashCommands?: string[]
+  /** Claude's commands changed (skill or plugin added…): the raw list, as `initialize` gives it. */
+  commands?: unknown[]
   authFailed?: boolean
   /** `/clear`: the conversation started over. */
   reset?: boolean
@@ -71,6 +72,8 @@ export class ChatFold {
   /** Tool input JSON received so far, per tool call. */
   private partialJson = new Map<string, string>()
   private changed = false
+  /** `items` is a copy no one else holds yet: rows can be written in place until it's handed out. */
+  private owned = false
   private localCounter = 0
   private replaySeen = false
 
@@ -91,12 +94,14 @@ export class ChatFold {
   reindex(): void {
     this.index = new Map(this.items.map((item, i) => [item.id, i]))
     this.changed = true
+    this.owned = false
   }
 
-  /** True once since the last call when rows changed. */
+  /** True once since the last call when rows changed; `items` is then the caller's to keep. */
   takeChanged(): boolean {
     const changed = this.changed
     this.changed = false
+    this.owned = false
     return changed
   }
 
@@ -105,8 +110,21 @@ export class ChatFold {
     this.push({ kind: 'user', id: `user:${uuid}`, parentId: null, text, images, uuid, state: 'queued' })
   }
 
-  addNotice(tone: 'info' | 'warning' | 'error', text: string): void {
-    this.push({ kind: 'notice', id: `notice:${++this.localCounter}`, parentId: null, tone, text })
+  addNotice(tone: 'info' | 'warning' | 'error', text: string, markdown = false): void {
+    this.push({ kind: 'notice', id: `notice:${++this.localCounter}`, parentId: null, tone, text, ...(markdown ? { markdown } : {}) })
+  }
+
+  /** A command run from here rather than by Claude; returns its row id for the output. */
+  addCommand(name: string, args: string): string {
+    const id = `command:local:${++this.localCounter}`
+    this.push({ kind: 'command', id, parentId: null, name, args, output: null })
+    return id
+  }
+
+  setCommandOutput(id: string, output: string): void {
+    const at = this.index.get(id)
+    const item = at !== undefined ? this.items[at] : undefined
+    if (item?.kind === 'command') this.replaceAt(at!, { ...item, output })
   }
 
   /** Queued messages Claude dropped (interrupt). */
@@ -231,7 +249,8 @@ export class ChatFold {
     if (message.error === 'authentication_failed') signals.authFailed = true
     if (body.model === '<synthetic>') {
       const text = body.content.map((b) => (b.type === 'text' ? b.text ?? '' : '')).join('\n').trim()
-      if (text && text !== 'No response requested.') this.addNotice(message.error ? 'error' : 'info', text)
+      // Command answers (/context, /usage…) are Markdown.
+      if (text && text !== 'No response requested.') this.addNotice(message.error ? 'error' : 'info', text, true)
       return
     }
     if (!parentId && body.usage) {
@@ -388,7 +407,9 @@ export class ChatFold {
         if (typeof message.session_id === 'string') signals.sessionId = message.session_id
         if (typeof message.model === 'string') signals.model = message.model
         if (typeof message.permissionMode === 'string') signals.permissionMode = message.permissionMode
-        if (Array.isArray(message.slash_commands)) signals.slashCommands = message.slash_commands.filter((c): c is string => typeof c === 'string')
+        return
+      case 'commands_changed':
+        if (Array.isArray(message.commands)) signals.commands = message.commands
         return
       case 'status':
         if (typeof message.permissionMode === 'string') signals.permissionMode = message.permissionMode
@@ -432,6 +453,7 @@ export class ChatFold {
     // The command's own row comes first; its replay, right after, finds it there.
     const command: ChatItem[] = trigger ? [{ kind: 'command', id: `command:${trigger}`, parentId: null, name: 'clear', args: '', output: null }] : []
     this.items = [...command, ...queued]
+    this.owned = true
     this.index = new Map(this.items.map((item, i) => [item.id, i]))
     this.pendingBlocks.clear()
     this.streamingMessage.clear()
@@ -443,7 +465,8 @@ export class ChatFold {
   }
 
   private push(item: ChatItem): void {
-    this.items = [...this.items, item]
+    this.own()
+    this.items.push(item)
     this.index.set(item.id, this.items.length - 1)
     this.changed = true
   }
@@ -455,10 +478,16 @@ export class ChatFold {
   }
 
   private replaceAt(at: number, item: ChatItem): void {
-    const next = this.items.slice()
-    next[at] = item
-    this.items = next
+    this.own()
+    this.items[at] = item
     this.changed = true
+  }
+
+  /** Copies `items` once per batch (not once per delta) before writing to it. */
+  private own(): void {
+    if (this.owned) return
+    this.items = this.items.slice()
+    this.owned = true
   }
 }
 
