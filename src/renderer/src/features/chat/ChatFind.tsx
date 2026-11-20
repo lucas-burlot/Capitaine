@@ -20,6 +20,8 @@ interface Props {
   scrollRef: React.RefObject<HTMLDivElement | null>
   /** Changes when the transcript does, so the matches follow new messages. */
   content: unknown
+  /** Bumped by each Ctrl/⌘+F: the field takes the focus again, its text selected. */
+  focusRequest: number
   onClose(): void
 }
 
@@ -28,17 +30,17 @@ interface Props {
  * so the transcript's DOM is left alone, and matches may span the spans of coloured code.
  * Only what is drawn is searched: folded tool groups keep their steps to themselves.
  */
-export function ChatFind({ scrollRef, content, onClose }: Props) {
+export function ChatFind({ scrollRef, content, focusRequest, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [ranges, setRanges] = useState<Range[]>([])
   const [current, setCurrent] = useState(0)
 
+  useEffect(() => ensureHighlightStyles(), [])
   useEffect(() => {
-    ensureHighlightStyles()
     inputRef.current?.focus()
     inputRef.current?.select()
-  }, [])
+  }, [focusRequest])
 
   // Matches again as the query or the transcript changes, a moment after the last change.
   useEffect(() => {

@@ -546,6 +546,11 @@ await chat.locator('button:has(span:text-is("Modification"))').first().click()
 await groups.first().click()
 await find.press('Escape')
 chatChecks.findCloses = await waitFor(async () => (await find.count()) === 0)
+// Ctrl+F works from the transcript too, where a click focuses nothing.
+await chat.locator('text=Je regarde comment le chat gère les messages de Claude.').click()
+await page.keyboard.press('Control+f')
+chatChecks.findFromTranscript = await waitFor(async () => (await find.count()) === 1)
+await find.press('Escape')
 // @ in the composer lists the project's files; picking one cites it.
 const composerBox = chat.locator('textarea')
 await composerBox.fill('Regarde @')
