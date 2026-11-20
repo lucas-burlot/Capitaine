@@ -18,7 +18,7 @@ import {
   type AgentSession,
   type AgentState
 } from './agent-status'
-import { isTerminalFocused, terminalLabel, useApp } from '@/features/workspace/workspace-store'
+import { agentLabel, isTerminalFocused, useApp } from '@/features/workspace/workspace-store'
 
 export function AgentStatusIcon({ state, kind, size = 13 }: { state: AgentState; kind?: AgentBlockKind; size?: number }) {
   switch (state) {
@@ -83,12 +83,12 @@ export function ProjectAgentList({ projectId }: { projectId: string }) {
 
 function AgentSessionRow({ terminalId, session }: { terminalId: string; session: AgentSession }) {
   const tab = useApp((s) => s.terminals[terminalId])
+  const name = useApp((s) => (s.terminals[terminalId] ? agentLabel(s, s.terminals[terminalId]) : ''))
   const active = useApp((s) => isTerminalFocused(s, terminalId))
   const focusTerminal = useApp((s) => s.focusTerminal)
   const now = useNow(15000)
   if (!tab) return null
 
-  const name = terminalLabel(tab)
   const live = session.state === 'working' || session.state === 'blocked'
   const status = agentStateLabel(session.state, session.kind)
 

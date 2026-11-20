@@ -605,6 +605,12 @@ chatChecks.backToChat = await waitFor(async () => (await chat.count()) === 1)
 await say('/clear')
 chatChecks.cleared = await waitFor(async () => !(await chatText()).includes('Bonjour Claude') && (await chat.locator('.chat-markdown table').count()) === 0)
 chatChecks.clearRowKept = (await chatText()).includes('clear')
+// Renaming the chat's tab renames its agent in the sidebar.
+await page.locator('div.rounded-t-md.bg-bg').first().dblclick()
+const tabName = page.locator('div.rounded-t-md.bg-bg input')
+await tabName.fill('Mon agent')
+await tabName.press('Enter')
+chatChecks.sidebarRenamed = await waitFor(async () => (await page.locator('aside').first().innerText()).includes('Mon agent'))
 await shot('13-chat-cleared')
 console.log('chat checks:', chatChecks)
 

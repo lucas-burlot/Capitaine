@@ -1,5 +1,5 @@
 import { agentDisplayName, agentMessageText, type AgentSession } from './agent-status'
-import { isTerminalVisible, terminalLabel, useApp } from '@/features/workspace/workspace-store'
+import { agentLabel, isTerminalVisible, useApp } from '@/features/workspace/workspace-store'
 
 function needsNotice(prev: AgentSession | undefined, next: AgentSession): 'blocked' | 'done' | null {
   if (next.state === 'blocked' && (prev?.state !== 'blocked' || prev.kind !== next.kind || prev.msg !== next.msg)) {
@@ -23,7 +23,7 @@ export function startAgentNotifications(): () => void {
       if (!tab || !project) continue
       const agent = agentDisplayName(session.app)
       const title = notice === 'blocked' ? `${agent} t’attend — ${project.name}` : `${agent} a terminé — ${project.name}`
-      const body = [terminalLabel(tab), session.msg && agentMessageText(session.msg)].filter(Boolean).join('\n')
+      const body = [agentLabel(state, tab), session.msg && agentMessageText(session.msg)].filter(Boolean).join('\n')
 
       const notification = new Notification(title, { body, silent: notice === 'done' })
       notification.onclick = () => {
