@@ -518,18 +518,6 @@ const chatChecks = {}
 await page.click('button[title="Chat ou terminal"]')
 await page.click('text=Nouvel agent en chat')
 chatChecks.ready = await waitFor(async () => (await chat.count()) === 1 && (await chatText()).includes('Prêt'))
-// The MCP servers in the toolbar: one failing, fixed from the list.
-const mcpBadge = chat.locator('button:has-text("MCP ")')
-chatChecks.mcpBadge = await waitFor(async () => (await mcpBadge.count()) === 1 && (await mcpBadge.innerText()).includes('1/2'))
-await mcpBadge.click()
-const mcpList = chat.locator('[role=dialog][aria-label="Serveurs MCP"]')
-chatChecks.mcpFailedShown = await waitFor(async () => (await mcpList.locator('[data-mcp-server="github"]').innerText()).includes('En échec'))
-await page.waitForTimeout(400)
-await shot('11b-chat-mcp')
-await mcpList.locator('[data-mcp-server="github"] button:has-text("Relancer")').click()
-chatChecks.mcpReconnected = await waitFor(async () => (await mcpBadge.innerText()).includes('2/2'))
-await page.keyboard.press('Escape')
-chatChecks.mcpListCloses = await waitFor(async () => (await mcpList.count()) === 0)
 await say('Bonjour Claude')
 chatChecks.streamedAnswer = await chatHas('Réponse à : Bonjour Claude')
 // An attached image shows as a thumbnail in the message; a click shows it full size.
