@@ -66,6 +66,8 @@ function user(message) {
     init()
     commandEcho(message.uuid, 'clear')
     result(0, 20)
+  } else if (text === 'Cherche le bug') {
+    return toolTurn(message)
   } else {
     send({ type: 'user', uuid: message.uuid, isReplay: true, parent_tool_use_id: null, message: message.message })
     const id = `msg_${randomUUID()}`
@@ -80,6 +82,39 @@ function user(message) {
     send({ type: 'stream_event', parent_tool_use_id: null, event: { type: 'message_stop' } })
     result(1, 2300)
   }
+  state('idle')
+}
+
+/** A turn that reads, searches, runs and edits between two answers; its last command takes a while. */
+async function toolTurn(message) {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+  const say = (text) => send({ type: 'assistant', parent_tool_use_id: null, message: { id: `msg_${randomUUID()}`, model, role: 'assistant', content: [{ type: 'text', text }] } })
+  const call = (name, input) => {
+    const id = `toolu_${randomUUID()}`
+    send({ type: 'assistant', parent_tool_use_id: null, message: { id: `msg_${randomUUID()}`, model, role: 'assistant', content: [{ type: 'tool_use', id, name, input }] } })
+    return id
+  }
+  const done = (id, content) => send({ type: 'user', parent_tool_use_id: null, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content }] } })
+  const cwd = process.cwd()
+  send({ type: 'user', uuid: message.uuid, isReplay: true, parent_tool_use_id: null, message: message.message })
+  say('Je regarde comment le chat gère les messages de Claude.')
+  for (const [name, input, output] of [
+    ['Read', { file_path: `${cwd}/src/chat-fold.ts` }, '1\texport class ChatFold {}'],
+    ['Read', { file_path: `${cwd}/src/chat-store.ts` }, '1\texport const useChats = {}'],
+    ['Grep', { pattern: 'conversation_reset', path: `${cwd}/src` }, 'src/chat-fold.ts'],
+    ['Bash', { command: 'npm run typecheck', description: 'Vérifie les types' }, 'ok'],
+    ['Read', { file_path: `${cwd}/src/ChatView.tsx` }, '1\texport function ChatView() {}'],
+    ['Edit', { file_path: `${cwd}/src/chat-fold.ts`, old_string: 'case "system":', new_string: 'case "system":\n  case "conversation_reset":' }, 'The file has been updated.']
+  ]) {
+    done(call(name, input), output)
+  }
+  say('Le bug vient du message `conversation_reset`, que le chat ignorait : il vidait la conversation côté Claude mais pas à l’écran.')
+  done(call('Bash', { command: 'npm run build', description: 'Compile l’application' }), 'built in 4.2s')
+  const slow = call('Bash', { command: 'npm run smoke', description: 'Lance le test de bout en bout' })
+  await sleep(Number(process.env.FAKE_CLAUDE_SLOW_MS ?? 2500))
+  done(slow, 'OK — screenshots in smoke-shots')
+  say('Corrigé : `/clear` vide maintenant le chat, et le test de bout en bout passe.')
+  result(1, 48_000)
   state('idle')
 }
 

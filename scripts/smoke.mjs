@@ -55,7 +55,7 @@ writeFileSync(updateFixture, JSON.stringify({ version: '9.9.9', notes: ['fix(lin
 const app = await electron.launch({
   executablePath: join(appDir, 'node_modules/electron/dist', process.platform === 'win32' ? 'electron.exe' : 'electron'),
   args: [...(process.platform === 'linux' ? ['--ozone-platform=headless'] : []), appDir, `--user-data-dir=${userData}`],
-  env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfig, CAPITAINE_UPDATE_FIXTURE: updateFixture, CAPITAINE_CLAUDE_BIN: join(appDir, 'scripts/fake-claude-chat.mjs') },
+  env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfig, CAPITAINE_UPDATE_FIXTURE: updateFixture, CAPITAINE_CLAUDE_BIN: join(appDir, 'scripts/fake-claude-chat.mjs'), FAKE_CLAUDE_SLOW_MS: '2000' },
   timeout: 30000
 })
 const page = await app.firstWindow()
@@ -520,6 +520,16 @@ await page.click('text=Nouvel agent en chat')
 chatChecks.ready = await waitFor(async () => (await chat.count()) === 1 && (await chatText()).includes('Prêt'))
 await say('Bonjour Claude')
 chatChecks.streamedAnswer = await chatHas('Réponse à : Bonjour Claude')
+// Tool calls in a row fold into one line: the step in progress while Claude works, a summary after.
+await say('Cherche le bug')
+const groups = chat.locator('button[aria-expanded]')
+chatChecks.liveStep = await waitFor(async () => (await groups.last().innerText()).includes('Lance le test de bout en bout'))
+chatChecks.groupSummary = await waitFor(async () => (await groups.first().innerText()).includes('6 actions · 3 fichiers lus, 1 recherche, 1 commande, 1 modification'))
+chatChecks.secondGroupDone = await waitFor(async () => (await groups.last().innerText()).includes('2 actions · 2 commandes'))
+chatChecks.stepsHidden = !(await chatText()).includes('src/chat-store.ts')
+await groups.first().click()
+chatChecks.expandShowsSteps = await chatHas('src/chat-store.ts')
+await groups.first().click()
 await say('/context')
 chatChecks.contextTable = await waitFor(async () => (await chat.locator('.chat-markdown table').count()) === 1)
 chatChecks.contextAsCommand = (await chat.locator('.chat-markdown table').count()) === 1 && !(await chatText()).includes('| Category')

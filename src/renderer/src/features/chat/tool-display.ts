@@ -112,3 +112,29 @@ export function permissionTitle(name: string): string {
       return `Claude veut utiliser ${name.startsWith('mcp__') ? name.split('__').slice(1).join(' · ') : name}`
   }
 }
+
+/** Tool calls that stay on their own row instead of folding into a group: they're moments, not steps. */
+export const STANDALONE_TOOLS = new Set(['TodoWrite', 'AskUserQuestion', 'ExitPlanMode'])
+
+const TOOL_KINDS: { names: (name: string) => boolean; one: string; many: string }[] = [
+  { names: (n) => n === 'Read', one: 'fichier lu', many: 'fichiers lus' },
+  { names: (n) => ['Edit', 'MultiEdit', 'NotebookEdit', 'Write'].includes(n), one: 'modification', many: 'modifications' },
+  { names: (n) => ['Bash', 'BashOutput', 'Monitor', 'KillShell'].includes(n), one: 'commande', many: 'commandes' },
+  { names: (n) => n === 'Grep' || n === 'Glob', one: 'recherche', many: 'recherches' },
+  { names: (n) => n === 'WebSearch', one: 'recherche web', many: 'recherches web' },
+  { names: (n) => n === 'WebFetch', one: 'page web', many: 'pages web' },
+  { names: (n) => n === 'Task' || n === 'Agent', one: 'sous-agent', many: 'sous-agents' },
+  { names: (n) => n === 'Skill', one: 'skill', many: 'skills' }
+]
+
+/** "3 fichiers lus, 2 commandes, 1 modification": what a run of tool calls did, in order of first use. */
+export function summarizeTools(names: string[]): string {
+  const counts = new Map<string, { one: string; many: string; count: number }>()
+  for (const name of names) {
+    const kind = TOOL_KINDS.find((k) => k.names(name)) ?? { one: 'autre outil', many: 'autres outils' }
+    const entry = counts.get(kind.one) ?? { ...kind, count: 0 }
+    entry.count++
+    counts.set(kind.one, entry)
+  }
+  return [...counts.values()].map((k) => `${k.count} ${k.count > 1 ? k.many : k.one}`).join(', ')
+}
