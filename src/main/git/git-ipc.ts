@@ -1,13 +1,16 @@
 import { ipcMain } from 'electron'
-import type { CommitOptions, DiffSide, StashOptions } from '../../shared/types'
+import type { CommitOptions, DiffSide, MergeOptions, StashOptions } from '../../shared/types'
 import type { ProjectStore } from '../projects/project-store'
 import { stringList, text } from '../system/ipc-args'
 import {
   commit,
   createBranch,
+  deleteBranch,
   fetchAll,
   finishOperation,
   listBranches,
+  mergeBranch,
+  mergePreview,
   pull,
   push,
   stashApply,
@@ -46,6 +49,15 @@ export function registerGitIpc(projects: ProjectStore): void {
   ipcMain.handle('git:switch', async (_e, projectId: string, name: unknown) => switchBranch(await repoOf(projectId), text(name)))
   ipcMain.handle('git:create-branch', async (_e, projectId: string, name: unknown, from: unknown) =>
     createBranch(await repoOf(projectId), text(name), text(from) || undefined)
+  )
+  ipcMain.handle('git:merge-preview', async (_e, projectId: string, source: unknown, target: unknown) =>
+    mergePreview(await repoOf(projectId), text(source), text(target))
+  )
+  ipcMain.handle('git:merge', async (_e, projectId: string, options: Partial<MergeOptions> | undefined) =>
+    mergeBranch(await repoOf(projectId), { source: text(options?.source), target: text(options?.target), fastForward: options?.fastForward === true })
+  )
+  ipcMain.handle('git:delete-branch', async (_e, projectId: string, name: unknown, alsoRemote: unknown) =>
+    deleteBranch(await repoOf(projectId), text(name), alsoRemote === true)
   )
   ipcMain.handle('git:commit', async (_e, projectId: string, options: Partial<CommitOptions> | undefined) =>
     commit(await repoOf(projectId), { message: text(options?.message), all: options?.all === true, amend: options?.amend === true })

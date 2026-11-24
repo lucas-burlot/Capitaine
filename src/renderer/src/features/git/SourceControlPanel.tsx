@@ -22,6 +22,7 @@ import { resolutionKey, useGit } from './git-store'
 import { relativeTime } from '@/lib/relative-time'
 import { CommitBox } from './CommitBox'
 import { GitBranchBar } from './GitBranchBar'
+import { MergeFollowUp } from './MergeFollowUp'
 import { aiResolvable, GitOperationBanner } from './GitOperationBanner'
 import { fileName, useApp } from '@/features/workspace/workspace-store'
 import { PATHS_MIME } from '@/lib/drag'
@@ -45,6 +46,7 @@ export function SourceControlPanel({ project }: { project: Project }) {
   return (
     <div className="min-h-0 flex-1 overflow-auto pb-2" aria-label="Changements git">
       <GitBranchBar project={project} status={status} />
+      <MergeFollowUp project={project} status={status} />
       <CommitBox project={project} status={status} />
       <GitOperationBanner project={project} status={status} />
       {error && (

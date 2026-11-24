@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import type { CommitOptions, GitActionResult, GitBranch, StashOptions } from '../../shared/types'
+import type { CommitOptions, GitActionResult, GitBranch, MergeOptions, MergePreview, StashOptions } from '../../shared/types'
 import { branchInfo, git, gitError, gitOrThrow, insideRepo, operationInProgress, type GitOptions } from './git-repo'
 
 /** Network operations get far longer than the local ones (slow remotes, big fetches, hooks). */
@@ -287,4 +287,85 @@ export async function stashDrop(repoRoot: string, ref: string, hash: string): Pr
   await checkStash(repoRoot, ref, hash)
   await gitOrThrow(repoRoot, ['stash', 'drop', ref])
   return { message: `Stash supprimé (${hash.slice(0, 7)})` }
+}
+
+/** A commit-ish the user picked (a branch name), refused when it could pass as an option or doesn't exist. */
+async function checkRevision(repoRoot: string, rev: string): Promise<string> {
+  if (!rev || rev.startsWith('-') || !(await git(repoRoot, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`])).ok) {
+    throw new Error(`Branche introuvable : ${rev}`)
+  }
+  return rev
+}
+
+const isAncestor = async (repoRoot: string, ancestor: string, of: string) => (await git(repoRoot, ['merge-base', '--is-ancestor', ancestor, of])).ok
+
+/** What merging `source` into `target` would bring, for the confirmation. */
+export async function mergePreview(repoRoot: string, source: string, target: string): Promise<MergePreview> {
+  await checkRevision(repoRoot, source)
+  await checkRevision(repoRoot, target)
+  const count = await gitOrThrow(repoRoot, ['rev-list', '--count', `${target}..${source}`])
+  return { commits: Number(count.trim()) || 0, canFastForward: await isAncestor(repoRoot, target, source) }
+}
+
+/**
+ * Merges `source` into the local branch `target`, switching to it first if needed (only from a
+ * clean working tree). Stops on conflicts: the panel's merge banner takes over from there.
+ */
+export async function mergeBranch(repoRoot: string, options: MergeOptions): Promise<GitActionResult> {
+  const source = await checkRevision(repoRoot, options.source)
+  const target = options.target
+  if (!target || target.startsWith('-') || !(await refExists(repoRoot, `refs/heads/${target}`))) throw new Error(`La branche locale ${target} n’existe pas`)
+  if (source === target) throw new Error('Une branche ne peut pas être mergée dans elle-même')
+  const operation = await operationInProgress(repoRoot)
+  if (operation) throw new Error(`Termine d’abord l’opération en cours : ${operation.label}`)
+
+  const info = await branchInfo(repoRoot)
+  if (info?.branch !== target) {
+    const changed = (await gitOrThrow(repoRoot, ['status', '--porcelain', '--untracked-files=no'])).trim()
+    if (changed) throw new Error(`Commite ou stashe tes modifications avant de passer sur ${target} pour le merge`)
+    await gitOrThrow(repoRoot, ['switch', target])
+  }
+
+  const commits = Number((await gitOrThrow(repoRoot, ['rev-list', '--count', `${target}..${source}`])).trim()) || 0
+  if (commits === 0) return { message: `Déjà à jour : ${target} contient déjà ${source}` }
+  const fastForward = options.fastForward && (await isAncestor(repoRoot, target, source))
+  const args = ['merge', fastForward ? '--ff-only' : '--no-ff', '--no-edit', source]
+  const result = await git(repoRoot, args, { timeout: HOOK_TIMEOUT })
+  if (!result.ok) {
+    const conflicts = await unmergedPaths(repoRoot)
+    if (conflicts.length) return { message: `Merge de ${source} : ${plural(conflicts.length, 'conflit', 'conflits')} à résoudre`, conflicts: true }
+    throw new Error(gitError(result, args))
+  }
+  const sourceIsLocal = await refExists(repoRoot, `refs/heads/${source}`)
+  const upstream = sourceIsLocal ? (await git(repoRoot, ['rev-parse', '--abbrev-ref', `${source}@{upstream}`])).stdout.trim() : ''
+  return {
+    message: `${source} mergée dans ${target} (${plural(commits, 'commit', 'commits')}${fastForward ? ', avance rapide' : ''})`,
+    merged: { source, target, sourceIsLocal, sourceUpstream: upstream || null }
+  }
+}
+
+/**
+ * Deletes a local branch already merged (git refuses otherwise), and its remote branch when
+ * `alsoRemote`.
+ */
+export async function deleteBranch(repoRoot: string, name: string, alsoRemote: boolean): Promise<GitActionResult> {
+  if (!name || name.startsWith('-') || !(await refExists(repoRoot, `refs/heads/${name}`))) throw new Error(`La branche ${name} n’existe pas`)
+  const info = await branchInfo(repoRoot)
+  if (info?.branch === name) throw new Error('Impossible de supprimer la branche sur laquelle tu es')
+  const config = async (key: string) => (await git(repoRoot, ['config', '--get', key])).stdout.trim()
+  const remote = await config(`branch.${name}.remote`)
+  const remoteBranch = (await config(`branch.${name}.merge`)).replace(/^refs\/heads\//, '')
+  const local = await git(repoRoot, ['branch', '-d', name])
+  if (!local.ok) {
+    if (/not fully merged/.test(local.stderr)) throw new Error(`${name} a des commits qui ne sont pas encore mergés : elle n’a pas été supprimée`)
+    throw new Error(gitError(local, ['branch']))
+  }
+  if (!alsoRemote || !remote || remote === '.' || !remoteBranch) return { message: `Branche ${name} supprimée` }
+  const args = ['push', remote, '--delete', remoteBranch]
+  const pushed = await git(repoRoot, args, await networkOptions(repoRoot))
+  if (!pushed.ok) {
+    if (/remote ref does not exist/.test(pushed.stderr)) return { message: `Branche ${name} supprimée (elle n’existait plus sur ${remote})` }
+    throw new Error(`Branche ${name} supprimée en local, mais pas sur ${remote} : ${gitError(pushed, args)}`)
+  }
+  return { message: `Branche ${name} supprimée, en local et sur ${remote}` }
 }

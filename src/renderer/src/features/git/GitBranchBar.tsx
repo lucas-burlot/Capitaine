@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Check, ChevronDown, Cloud, CloudUpload, GitBranch, GitBranchPlus, LoaderCircle, RefreshCw, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ChevronDown, Cloud, CloudUpload, GitBranch, GitBranchPlus, GitMerge, LoaderCircle, RefreshCw, Search, TriangleAlert } from 'lucide-react'
 import type { GitBranch as Branch, Project, RepoStatus } from '@shared/types'
-import { useGit } from './git-store'
+import { errorText, useGit } from './git-store'
 import { relativeTime } from '@/lib/relative-time'
 import { IconButton } from '@/ui/IconButton'
 
@@ -147,6 +147,11 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
   const [query, setQuery] = useState('')
   /** Set when creating a branch from another one than HEAD. */
   const [base, setBase] = useState<string | null>(null)
+  /** Picking the branch the current one is merged into. */
+  const [mergeInto, setMergeInto] = useState(false)
+  /** The merge being confirmed. */
+  const [merge, setMerge] = useState<{ source: string; target: string } | null>(null)
+  const current = status.branch
   const [cursor, setCursor] = useState(0)
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -170,6 +175,10 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
     if (base) return name ? [{ kind: 'create', name, from: base }] : []
     const needle = name.toLowerCase()
     const matches = (branches ?? []).filter((b) => !needle || b.name.toLowerCase().includes(needle))
+    if (mergeInto) {
+      const targets = matches.filter((b) => !b.remote && !b.current)
+      return targets.length ? [{ kind: 'header', label: `Merger ${current} dans…` }, ...targets.map((branch) => ({ kind: 'branch' as const, branch }))] : []
+    }
     const local = matches.filter((b) => !b.remote).sort((a, b) => Number(b.current) - Number(a.current))
     const remote = matches.filter((b) => b.remote)
     const out: PickerRow[] = []
@@ -178,7 +187,7 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
     if (local.length) out.push({ kind: 'header', label: 'Branches locales' }, ...local.map((branch) => ({ kind: 'branch' as const, branch })))
     if (remote.length) out.push({ kind: 'header', label: 'Branches distantes' }, ...remote.map((branch) => ({ kind: 'branch' as const, branch })))
     return out
-  }, [branches, query, base])
+  }, [branches, query, base, mergeInto, current])
 
   const selectable = rows.map((row, i) => (row.kind === 'header' ? -1 : i)).filter((i) => i >= 0)
   const active = selectable.includes(cursor) ? cursor : (selectable[0] ?? -1)
@@ -194,6 +203,7 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
       if (await git.createBranch(project.id, row.name, row.from ?? undefined)) onClose()
       return
     }
+    if (mergeInto && current) return setMerge({ source: current, target: row.branch.name })
     if (row.branch.current) return onClose()
     onClose()
     await git.switchBranch(project.id, row.branch.name)
@@ -210,21 +220,44 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
       void choose(rows[active])
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      if (base) {
+      if (base || mergeInto) {
         setBase(null)
+        setMergeInto(false)
         setQuery('')
       } else onClose()
     }
   }
 
   const from = base ?? status.branch ?? 'HEAD'
+  const shell =
+    'absolute top-full right-2 left-2 z-50 -mt-0.5 flex max-h-[min(440px,70vh)] flex-col overflow-hidden rounded-lg border border-line bg-panel-2 shadow-2xl shadow-black/60'
+  if (merge) {
+    return (
+      <div ref={rootRef} className={shell}>
+        <MergeConfirm
+          project={project}
+          status={status}
+          source={merge.source}
+          target={merge.target}
+          onBack={() => {
+            setMerge(null)
+            requestAnimationFrame(() => inputRef.current?.focus())
+          }}
+          onDone={onClose}
+        />
+      </div>
+    )
+  }
   return (
-    <div
-      ref={rootRef}
-      className="absolute top-full right-2 left-2 z-50 -mt-0.5 flex max-h-[min(440px,70vh)] flex-col overflow-hidden rounded-lg border border-line bg-panel-2 shadow-2xl shadow-black/60"
-    >
+    <div ref={rootRef} className={shell}>
       <div className="flex items-center gap-2 border-b border-line px-2.5">
-        {base ? <GitBranchPlus size={13} className="shrink-0 text-accent" /> : <Search size={13} className="shrink-0 text-faint" />}
+        {base ? (
+          <GitBranchPlus size={13} className="shrink-0 text-accent" />
+        ) : mergeInto ? (
+          <GitMerge size={13} className="shrink-0 text-accent" />
+        ) : (
+          <Search size={13} className="shrink-0 text-faint" />
+        )}
         <input
           ref={inputRef}
           value={query}
@@ -235,14 +268,18 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
             setCursor(0)
           }}
           onKeyDown={onKey}
-          placeholder={base ? `Nom de la nouvelle branche (depuis ${base})` : 'Changer de branche, ou nommer une nouvelle…'}
+          placeholder={
+            base ? `Nom de la nouvelle branche (depuis ${base})` : mergeInto ? `Merger ${current} dans quelle branche ?` : 'Changer de branche, ou nommer une nouvelle…'
+          }
           className="h-9 min-w-0 flex-1 bg-transparent text-ui text-fg outline-none placeholder:text-faint"
         />
       </div>
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
         {!branches && <p className="px-3 py-2 text-small text-faint">Chargement des branches…</p>}
         {branches && rows.length === 0 && (
-          <p className="px-3 py-2 text-small text-faint">{base ? 'Tape le nom de la branche à créer.' : 'Aucune branche ne correspond.'}</p>
+          <p className="px-3 py-2 text-small text-faint">
+            {base ? 'Tape le nom de la branche à créer.' : mergeInto ? 'Aucune autre branche locale ne correspond.' : 'Aucune branche ne correspond.'}
+          </p>
         )}
         {rows.map((row, i) => {
           if (row.kind === 'header') {
@@ -318,7 +355,21 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
                   )}
                 </span>
               )}
-              <span className="shrink-0 text-caption text-faint group-hover:hidden">{relativeTime(branch.updatedAt, true)}</span>
+              <span className={`shrink-0 text-caption text-faint ${mergeInto ? '' : 'group-hover:hidden'}`}>{relativeTime(branch.updatedAt, true)}</span>
+              {!mergeInto && current && !branch.current && (
+                <button
+                  title={`Merger ${branch.name} dans ${current}`}
+                  aria-label={`Merger ${branch.name} dans ${current}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMerge({ source: branch.name, target: current })
+                  }}
+                  className="hidden shrink-0 rounded p-0.5 text-muted group-hover:block hover:bg-line hover:text-accent"
+                >
+                  <GitMerge size={13} />
+                </button>
+              )}
+              {!mergeInto && (
               <button
                 title={`Nouvelle branche depuis ${branch.name}`}
                 onClick={(e) => {
@@ -331,13 +382,28 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
               >
                 <GitBranchPlus size={13} />
               </button>
+              )}
             </div>
           )
         })}
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-caption text-faint">
-        <span className="truncate">↑↓ · ↵ basculer / créer · Échap</span>
-        {!base && (
+        <span className="truncate">{mergeInto ? '↑↓ · ↵ choisir · Échap retour' : '↑↓ · ↵ basculer / créer · Échap'}</span>
+        {!base && !mergeInto && current && (
+          <button
+            title={`Merger ${current} dans une autre branche`}
+            onClick={() => {
+              setMergeInto(true)
+              setQuery('')
+              setCursor(0)
+              inputRef.current?.focus()
+            }}
+            className="ml-auto flex shrink-0 items-center gap-1 text-muted hover:text-accent"
+          >
+            <GitMerge size={11} /> Merger dans…
+          </button>
+        )}
+        {!base && !mergeInto && (
           <button
             onClick={() => {
               setBase(status.branch ?? 'HEAD')
@@ -350,6 +416,118 @@ function BranchPicker({ project, status, onClose }: { project: Project; status: 
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+const FAST_FORWARD_KEY = 'capitaine.mergeFastForward'
+
+/**
+ * "Merge source into target?": what it brings, whether the panel must switch branch first (and
+ * can: nothing uncommitted), and the fast-forward choice, kept for next time.
+ */
+function MergeConfirm(props: { project: Project; status: RepoStatus; source: string; target: string; onBack(): void; onDone(): void }) {
+  const { project, status, source, target } = props
+  const [preview, setPreview] = useState<{ commits: number; canFastForward: boolean } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [fastForward, setFastForward] = useState(() => localStorage.getItem(FAST_FORWARD_KEY) === 'on')
+  const confirmRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    let live = true
+    window.capitaine.git.mergePreview(project.id, source, target).then(
+      (result) => live && setPreview(result),
+      (err: unknown) => live && setError(errorText(err))
+    )
+    return () => {
+      live = false
+    }
+  }, [project.id, source, target])
+
+  useEffect(() => confirmRef.current?.focus(), [preview])
+
+  const switching = status.branch !== target
+  const uncommitted = status.staged.length + status.conflicts.length + status.unstaged.filter((c) => c.kind !== 'untracked').length
+  const blocked = (switching && uncommitted > 0) || !!status.operation
+  const upToDate = preview?.commits === 0
+  const canMerge = !!preview && !upToDate && !blocked
+
+  const confirm = () => {
+    if (!canMerge) return
+    localStorage.setItem(FAST_FORWARD_KEY, fastForward ? 'on' : 'off')
+    props.onDone()
+    void useGit.getState().merge(project.id, { source, target, fastForward: fastForward && preview.canFastForward })
+  }
+
+  return (
+    <div
+      className="flex flex-col gap-2.5 p-3 text-ui"
+      role="dialog"
+      aria-label="Merger une branche"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          props.onBack()
+        }
+      }}
+    >
+      <div className="flex items-start gap-2">
+        <GitMerge size={15} className="mt-0.5 shrink-0 text-accent" />
+        <div className="min-w-0 text-fg">
+          Merger <span className="font-medium break-all">{source}</span> dans <span className="font-medium break-all">{target}</span>
+        </div>
+      </div>
+      <div className="text-small text-muted">
+        {error ? (
+          <span className="text-red-300">{error}</span>
+        ) : !preview ? (
+          'Lecture des commits…'
+        ) : upToDate ? (
+          `Rien à merger : ${target} contient déjà tout ${source}.`
+        ) : (
+          `${preview.commits} commit${preview.commits > 1 ? 's' : ''} de ${source} à intégrer.`
+        )}
+      </div>
+      {switching && !blocked && <div className="text-small text-muted">Capitaine passera d’abord sur {target}.</div>}
+      {status.operation && (
+        <Warning>Termine ou annule d’abord l’opération en cours.</Warning>
+      )}
+      {!status.operation && switching && uncommitted > 0 && (
+        <Warning>
+          Il faut passer sur {target} : commite ou stashe d’abord tes {uncommitted} modification{uncommitted > 1 ? 's' : ''} en cours.
+        </Warning>
+      )}
+      {preview?.canFastForward && !upToDate && (
+        <label className="flex cursor-pointer items-start gap-2 text-small text-muted">
+          <input type="checkbox" checked={fastForward} onChange={(e) => setFastForward(e.target.checked)} className="mt-0.5 accent-[var(--color-accent)]" />
+          <span>
+            Avance rapide, sans commit de merge
+            <span className="block text-caption text-faint">{target} n’a pas bougé depuis : ses commits suivront simplement ceux de {source}.</span>
+          </span>
+        </label>
+      )}
+      <div className="flex justify-end gap-2 pt-1">
+        <button onClick={props.onBack} className="rounded-md px-3 py-1.5 text-small text-muted hover:bg-line hover:text-fg">
+          Retour
+        </button>
+        <button
+          ref={confirmRef}
+          disabled={!canMerge}
+          onClick={confirm}
+          className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-small font-medium text-bg hover:brightness-110 disabled:opacity-50"
+        >
+          <GitMerge size={12} /> Merger
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Warning({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-small text-amber-200">
+      <TriangleAlert size={12} className="mt-0.5 shrink-0" />
+      <span className="min-w-0">{children}</span>
     </div>
   )
 }

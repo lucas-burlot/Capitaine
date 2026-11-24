@@ -66,6 +66,33 @@ export interface GitActionResult {
   message: string
   /** The action stopped on conflicts (pull, continue…): the status now lists them. */
   conflicts?: boolean
+  /** A merge went through: what to offer next (push the target, delete the source). */
+  merged?: MergeDone
+}
+
+export interface MergeOptions {
+  /** Branch merged in: local (`feat/x`) or remote (`origin/feat/x`). */
+  source: string
+  /** Local branch receiving it; switched to first when it isn't the current one. */
+  target: string
+  /** Moves the target forward when it can, instead of always making a merge commit. */
+  fastForward: boolean
+}
+
+export interface MergePreview {
+  /** Commits of `source` that `target` doesn't have yet (0: already merged). */
+  commits: number
+  /** `target` is an ancestor of `source`: fast-forward would apply. */
+  canFastForward: boolean
+}
+
+export interface MergeDone {
+  source: string
+  target: string
+  /** The source is a local branch: it can be deleted now. */
+  sourceIsLocal: boolean
+  /** Its remote branch (`origin/feat/x`), deleted along with it when asked. */
+  sourceUpstream: string | null
 }
 
 export type CommitFollowUp = 'none' | 'push' | 'sync'
