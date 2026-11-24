@@ -17,11 +17,13 @@ interface Props {
   project: Project
   query: string
   onQueryChange(query: string): void
+  /** Buttons on the right of the field (the tree's refresh and collapse). */
+  actions?: React.ReactNode
   onContextMenu(menu: { x: number; y: number; entry: DirEntry }): void
 }
 
 /** Search field at the top of the files view; while it holds a query, its results replace the tree. */
-export function FileSearch({ project, query, onQueryChange, onContextMenu }: Props) {
+export function FileSearch({ project, query, onQueryChange, onContextMenu, actions }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [files, setFiles] = useState<string[] | null>(() => cachedProjectFiles(project.id))
@@ -81,8 +83,8 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu }: Pro
   const searching = query.trim() !== ''
   return (
     <>
-      <div className="shrink-0 px-2 pt-2 pb-1">
-        <div className="flex h-7 items-center gap-1.5 rounded border border-line bg-bg px-2 focus-within:border-accent/60">
+      <div className="flex shrink-0 items-center gap-0.5 px-2 pt-2 pb-1">
+        <div className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded border border-line bg-bg px-2 focus-within:border-accent/60">
           <Search size={13} className="shrink-0 text-faint" />
           <input
             ref={inputRef}
@@ -112,6 +114,7 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu }: Pro
             </button>
           )}
         </div>
+        {actions}
       </div>
 
       {searching && (

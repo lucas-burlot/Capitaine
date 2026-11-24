@@ -30,22 +30,15 @@ import { FileSearch } from './FileSearch'
 
 const GIT_POLL_MS = 4000
 
-/** Header buttons of the files view (rendered by the right panel). */
-export function FileExplorerActions({ project }: { project: Project }) {
+/** Refresh and collapse, on the right of the search field. */
+function TreeActions({ project }: { project: Project }) {
   const { refreshAll, collapseAll } = useExplorer.getState()
-  const create = (kind: 'file' | 'directory') => () => useExplorer.getState().startCreate(project.id, project.path, targetFolder(project), kind)
   return (
     <>
-      <IconButton title="Nouveau fichier" onClick={create('file')}>
-        <FilePlus size={13} />
-      </IconButton>
-      <IconButton title="Nouveau dossier" onClick={create('directory')}>
-        <FolderPlus size={13} />
-      </IconButton>
-      <IconButton title="Rafraîchir" onClick={() => refreshAll(project.id, project.path)}>
+      <IconButton title="Rafraîchir" className="p-1.5" onClick={() => refreshAll(project.id, project.path)}>
         <RefreshCw size={13} />
       </IconButton>
-      <IconButton title="Tout replier" onClick={() => collapseAll(project.id, project.path)}>
+      <IconButton title="Tout replier" className="p-1.5" onClick={() => collapseAll(project.id, project.path)}>
         <ChevronsDownUp size={13} />
       </IconButton>
     </>
@@ -75,7 +68,13 @@ export function FileExplorer({ project }: { project: Project }) {
 
   return (
     <>
-      <FileSearch project={project} query={query} onQueryChange={setQuery} onContextMenu={(m) => setMenu({ ...m, fromSearch: true })} />
+      <FileSearch
+        project={project}
+        query={query}
+        onQueryChange={setQuery}
+        onContextMenu={(m) => setMenu({ ...m, fromSearch: true })}
+        actions={<TreeActions project={project} />}
+      />
       {notice && (
         <div className="flex shrink-0 items-start gap-1.5 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 text-small text-red-300" role="alert">
           <TriangleAlert size={12} className="mt-0.5 shrink-0" />
@@ -137,14 +136,6 @@ interface NodeProps {
   projectId: string
   depth: number
   onContextMenu(menu: EntryMenuState): void
-}
-
-/** The folder new files go to: the selected folder, the selected file's folder, or the root. */
-function targetFolder(project: Project): string {
-  const selected = useExplorer.getState().selected[project.id]
-  const entry = selected ? findEntry(selected) : null
-  if (!entry) return project.path
-  return entry.isDirectory ? entry.path : parentPath(entry.path)
 }
 
 /** A listed entry, by absolute path. */

@@ -1,11 +1,9 @@
 import { useEffect } from 'react'
-import { FolderTree, GitBranch, PanelRightClose, RefreshCw } from 'lucide-react'
+import { FolderTree, GitBranch } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { usePanels, type RightPanelView } from './panels-store'
 import { useGit } from '@/features/git/git-store'
-import { shortcutLabel } from '@/lib/platform'
-import { FileExplorer, FileExplorerActions } from '@/features/files/FileExplorer'
-import { IconButton } from '@/ui/IconButton'
+import { FileExplorer } from '@/features/files/FileExplorer'
 import { ResizeHandle, usePanelWidth } from '@/ui/ResizeHandle'
 import { SourceControlPanel } from '@/features/git/SourceControlPanel'
 import { customTitleBar, titleBarHeightClass, WindowControlsSpacer } from './TitleBar'
@@ -26,7 +24,6 @@ export function RightPanel({ project }: { project: Project }) {
     max: 720
   })
   const view = usePanels((s) => s.rightView)
-  const toggleOpen = usePanels((s) => s.toggleRight)
   useGitPolling(project.id)
 
   return (
@@ -38,14 +35,6 @@ export function RightPanel({ project }: { project: Project }) {
           <ViewTab view="git" current={view} icon={<GitBranch size={14} />} label="Git" badge={<GitBadge projectId={project.id} />} />
         </div>
         <div className="min-w-[32px] flex-1 self-stretch" data-window-drag />
-        {view === 'files' ? (
-          <FileExplorerActions project={project} />
-        ) : (
-          <GitRefreshButton projectId={project.id} />
-        )}
-        <IconButton title={`Masquer le panneau (${shortcutLabel('toggleExplorer')})`} onClick={toggleOpen}>
-          <PanelRightClose size={13} />
-        </IconButton>
         <WindowControlsSpacer />
       </header>
       {view === 'files' ? (
@@ -74,24 +63,6 @@ function ViewTab(props: { view: RightPanelView; current: RightPanelView; icon: R
       {props.icon}
       {props.badge}
     </button>
-  )
-}
-
-/** Re-reads the repo, and fetches the remotes too (the panel also does it every few minutes). */
-function GitRefreshButton({ projectId }: { projectId: string }) {
-  const fetching = useGit((s) => !!s.fetching[projectId])
-  const hasRemote = useGit((s) => !!s.status[projectId]?.hasRemote)
-  return (
-    <IconButton
-      title={hasRemote ? 'Rafraîchir et récupérer les branches distantes (fetch)' : 'Rafraîchir'}
-      onClick={() => {
-        const git = useGit.getState()
-        if (hasRemote) void git.fetch(projectId, false)
-        else void git.refresh(projectId)
-      }}
-    >
-      <RefreshCw size={13} className={fetching ? 'animate-spin' : ''} />
-    </IconButton>
   )
 }
 
