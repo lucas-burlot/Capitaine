@@ -272,6 +272,35 @@ await page.keyboard.press('Control+z')
 editorChecks.undoClearsDirty = await waitFor(async () => !(await dirtyTab()))
 console.log('  editor:', 'undoClearsDirty', editorChecks.undoClearsDirty)
 
+// Git blame at the end of the cursor's line: uncommitted, committed, follows the cursor, hidden while unsaved.
+const blameText = () =>
+  page.evaluate(() => {
+    const el = document.querySelector('[data-editor-tab].flex .editor-blame')
+    return el && !el.hidden ? el.textContent : null
+  })
+// On a line of the file: the empty one after the last newline has no author.
+await page.keyboard.press('Control+Home')
+editorChecks.blameUncommitted = await waitFor(async () => (await blameText()) === 'Pas encore commité')
+console.log('  editor:', 'blameUncommitted', editorChecks.blameUncommitted, await blameText())
+await page.dblclick('[role=treeitem]:has-text("App.vue")')
+editorChecks.blameCommitted = await waitFor(async () => /^smoke, .* · init$/.test((await blameText()) ?? ''), 20000)
+console.log('  editor:', 'blameCommitted', editorChecks.blameCommitted, await blameText())
+await page.click('[data-editor-tab].flex .view-lines')
+await page.keyboard.press('Control+Home')
+const blameTop = () => page.$eval('[data-editor-tab].flex .editor-blame', (el) => el.getBoundingClientRect().top)
+const firstTop = await blameTop()
+await page.keyboard.press('ArrowDown')
+editorChecks.blameFollowsCursor = await waitFor(async () => (await blameTop()) > firstTop)
+await shot('07b-editor-blame')
+await page.keyboard.type('Z', { delay: 10 })
+editorChecks.blameHiddenWhileDirty = await waitFor(async () => (await blameText()) === null)
+await page.keyboard.press('Control+z')
+editorChecks.blameBackAfterUndo = await waitFor(async () => (await blameText()) !== null)
+console.log(
+  '  editor:',
+  ...['blameFollowsCursor', 'blameHiddenWhileDirty', 'blameBackAfterUndo'].flatMap((key) => [key, editorChecks[key]])
+)
+
 // Markdown: edit / side by side / preview, live while typing, Ctrl+Shift+V, links.
 const markdownChecks = {}
 const previewText = (selector) =>

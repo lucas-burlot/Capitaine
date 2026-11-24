@@ -3,6 +3,7 @@ import { Code, Columns2, Eye, ExternalLink, RotateCcw, TriangleAlert } from 'luc
 import { useEditors } from './editor-store'
 import { closeSession, openSession } from './editor-sessions'
 import { useReveal } from './reveal'
+import { attachBlame } from './blame'
 import { monaco } from './monaco-setup'
 import { isMarkdownPath, MarkdownPreview, type MarkdownPreviewHandle } from './MarkdownPreview'
 
@@ -57,6 +58,7 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
   useEffect(() => {
     const session = openSession(tabId, projectId, path)
     let disposed = false
+    let detachBlame = () => {}
     void session.load().then(() => {
       const container = containerRef.current
       if (disposed || !container || !session.model) return
@@ -90,6 +92,7 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
           previewRef.current?.scrollToRatio(max > 0 ? event.scrollTop / max : 0)
         })
       }
+      detachBlame = attachBlame(editor, tabId, projectId, path)
       editorRef.current = editor
       setModel(session.model)
       if (visibleRef.current && modeRef.current !== 'preview') editor.focus()
@@ -97,6 +100,7 @@ export default function EditorView({ tabId, projectId, path, visible }: Props) {
     })
     return () => {
       disposed = true
+      detachBlame()
       editorRef.current?.dispose()
       editorRef.current = null
       setModel(null)

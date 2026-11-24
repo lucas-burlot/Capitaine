@@ -133,3 +133,22 @@ export interface BranchInfo {
   /** Changed + untracked files (ignored excluded). */
   changes: number
 }
+
+/** The commit that last touched some lines of a file. */
+export interface BlameCommit {
+  /** All zeros for lines not committed yet. */
+  hash: string
+  author: string
+  /** The author is the repo's configured `user.email`. */
+  mine: boolean
+  /** Milliseconds. */
+  time: number
+  summary: string
+}
+
+/** `git blame` of a file as saved on disk: one entry per commit, and each line's commit. */
+export interface FileBlame {
+  commits: BlameCommit[]
+  /** `lines[n]`: index in `commits` of line n + 1. */
+  lines: number[]
+}

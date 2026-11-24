@@ -18,7 +18,7 @@ import {
   writeResolution
 } from './git-actions'
 import { generateCommitMessage, resolveConflict } from './git-ai'
-import { branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './git-repo'
+import { blameFile, branchInfo, repoRootOf, repoStatus, showBlob, stagePaths, stashFiles, stashList, unstagePaths } from './git-repo'
 
 export function registerGitIpc(projects: ProjectStore): void {
   // The repo is always derived from the project here, never taken from the renderer.
@@ -79,5 +79,9 @@ export function registerGitIpc(projects: ProjectStore): void {
   ipcMain.handle('git:ai-commit-message', async (_e, projectId: string, all: unknown) =>
     generateCommitMessage(await repoOf(projectId), all === true)
   )
+  ipcMain.handle('git:blame', (_e, projectId: string, path: unknown) => {
+    const file = text(path)
+    return projects.rootFor(projectId, file) ? blameFile(file) : null
+  })
   ipcMain.handle('git:ai-resolve', async (_e, projectId: string, path: unknown) => resolveConflict(await repoOf(projectId), text(path)))
 }
