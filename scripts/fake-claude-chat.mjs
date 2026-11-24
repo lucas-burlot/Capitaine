@@ -25,9 +25,16 @@ const commandEcho = (uuid, name, args = '') =>
     message: { role: 'user', content: `<command-name>/${name}</command-name>\n            <command-message>${name}</command-message>\n            <command-args>${args}</command-args>` }
   })
 
+/** Ends the turn waiting on it (`Tâche longue`) when the chat asks to interrupt. */
+let stopWaiting = null
+
 function control(message) {
   const { request_id: requestId, request } = message
   const reply = (response) => send({ type: 'control_response', response: { subtype: 'success', request_id: requestId, response } })
+  if (request.subtype === 'interrupt') {
+    stopWaiting?.()
+    return reply({})
+  }
   if (request.subtype === 'initialize') {
     return reply({
       commands: [
@@ -69,6 +76,8 @@ function user(message) {
     result(0, 20)
   } else if (text === 'Cherche le bug') {
     return toolTurn(message)
+  } else if (text === 'Tâche longue') {
+    return longTurn(message)
   } else if (text === 'Longue conversation') {
     // As many answers as a long session holds: the chat draws its last ones only.
     send({ type: 'user', uuid: message.uuid, isReplay: true, parent_tool_use_id: null, message: message.message })
@@ -91,6 +100,20 @@ function user(message) {
     send({ type: 'stream_event', parent_tool_use_id: null, event: { type: 'message_stop' } })
     result(1, 2300)
   }
+  state('idle')
+}
+
+/** A turn that works until interrupted (or 30 s), then ends the way Claude Code does. */
+async function longTurn(message) {
+  send({ type: 'user', uuid: message.uuid, isReplay: true, parent_tool_use_id: null, message: message.message })
+  send({ type: 'assistant', parent_tool_use_id: null, message: { id: `msg_${randomUUID()}`, model, role: 'assistant', content: [{ type: 'text', text: 'Je commence une longue tâche.' }] } })
+  const interrupted = await new Promise((resolve) => {
+    stopWaiting = () => resolve(true)
+    setTimeout(() => resolve(false), 30_000)
+  })
+  stopWaiting = null
+  if (interrupted) send({ type: 'user', parent_tool_use_id: null, message: { role: 'user', content: [{ type: 'text', text: '[Request interrupted by user]' }] } })
+  result(1, 4200)
   state('idle')
 }
 

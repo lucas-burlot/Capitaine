@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUp, ImageIcon, Square, X } from 'lucide-react'
 import type { ChatUserContent } from '@shared/types'
 import { PATHS_MIME } from '@/lib/drag'
-import { isWindows } from '@/lib/platform'
+import { isMac, isWindows } from '@/lib/platform'
 import { useApp } from '@/features/workspace/workspace-store'
 import { EntryIcon } from '@/features/files/FileIcon'
 import { Highlighted } from '@/features/files/FileSearch'
@@ -22,6 +22,8 @@ interface Attachment {
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
 const MAX_SUGGESTIONS = 50
+/** Stops Claude like in the terminal (ChatView); Cmd+C stays copy on macOS. */
+const INTERRUPT_KEY = isMac ? '⌃C' : 'Ctrl+C'
 
 /** Text typed into a chat from outside (drops on the pane, "paste into terminal" actions). */
 const inserters = new Map<string, (text: string) => void>()
@@ -347,7 +349,7 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
           onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
-          placeholder={blocked ? 'Réponds à Claude ci-dessus, ou écris un message…' : working ? 'Claude travaille — ton message sera lu ensuite (Échap pour interrompre)' : 'Écris à Claude…  ( / pour les commandes, @ pour un fichier )'}
+          placeholder={blocked ? 'Réponds à Claude ci-dessus, ou écris un message…' : working ? `Claude travaille — ton message sera lu ensuite (Échap ou ${INTERRUPT_KEY} pour interrompre)` : 'Écris à Claude…  ( / pour les commandes, @ pour un fichier )'}
           className="scrollbar-sleek block w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-reading leading-relaxed text-fg outline-none placeholder:text-faint"
         />
         <div className="flex items-center gap-1 px-2 pb-2">
@@ -367,7 +369,7 @@ export function ChatComposer({ chat, focused, blocked, toolbar }: Props) {
             />
           </label>
           {working && (
-            <button onClick={() => void interrupt(chat.id)} className="rounded-md border border-line p-1.5 text-fg hover:bg-panel-2" title="Interrompre (Échap)">
+            <button onClick={() => void interrupt(chat.id)} className="rounded-md border border-line p-1.5 text-fg hover:bg-panel-2" title={`Interrompre (Échap ou ${INTERRUPT_KEY})`}>
               <Square size={12} fill="currentColor" />
             </button>
           )}
