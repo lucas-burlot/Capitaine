@@ -644,6 +644,17 @@ if (!chatChecks.mentionMenu) console.log('mention debug:', JSON.stringify({ valu
 await composerBox.press('Enter')
 chatChecks.mentionInserted = await waitFor(async () => firstFile !== null && (await composerBox.inputValue()).startsWith(`Regarde @${firstFile.includes(' ') ? '"' : ''}`) && !(await composerBox.inputValue()).endsWith('@'))
 await composerBox.fill('')
+// Ctrl+C stops Claude, as in the terminal, wherever the keyboard is in the chat; with text
+// selected, it copies instead.
+await say('Tâche longue')
+await chatHas('Je commence une longue tâche.')
+await chat.locator('text=Je commence une longue tâche.').first().selectText()
+await page.keyboard.press('Control+c')
+await page.waitForTimeout(500)
+chatChecks.ctrlCCopiesSelection = !(await chatText()).includes('Interrompu')
+await chat.locator('textarea').click()
+await page.keyboard.press('Control+c')
+chatChecks.ctrlCInterrupts = await waitFor(async () => (await chatText()).includes('Interrompu') && (await chat.locator('button[title^="Interrompre"]').count()) === 0)
 await say('/context')
 chatChecks.contextTable = await waitFor(async () => (await chat.locator('.chat-markdown table').count()) === 1)
 chatChecks.contextAsCommand = (await chat.locator('.chat-markdown table').count()) === 1 && !(await chatText()).includes('| Category')

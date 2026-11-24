@@ -11,7 +11,7 @@ import { PERMISSION_MODES } from './agent-settings'
 import { takeChatStartup } from './agent-launch'
 import { ChatComposer, insertIntoChat } from './ChatComposer'
 import { ChatTranscript } from './ChatTranscript'
-import { chatAgent, closeChat, ensureStarted, markSeen, openChat, setEffort, setModel, setPermissionMode, useChats, type ChatSession } from './chat-store'
+import { chatAgent, closeChat, ensureStarted, interrupt, markSeen, openChat, setEffort, setModel, setPermissionMode, useChats, type ChatSession } from './chat-store'
 import { onMarkdownClick, useChatPlace } from './chat-markdown'
 import { ChatFind } from './ChatFind'
 import { PermissionCard } from './PermissionCard'
@@ -114,6 +114,23 @@ export function ChatView({ chatId, cwd, rect, visible, focused, showHeader }: Pr
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [focused, visible])
+
+  // Ctrl+C stops Claude, as in the terminal, while it works and the chat is the active pane. It
+  // still copies when text is selected (on Windows and Linux, Ctrl+C is also copy).
+  const working = chat?.status === 'working'
+  useEffect(() => {
+    if (!focused || !visible || !working) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'c') return
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (target && !rootRef.current?.contains(target) && target.closest('input, textarea, select, [contenteditable="true"], .monaco-editor, .xterm')) return
+      if (hasSelection(target)) return
+      event.preventDefault()
+      void interrupt(chatId)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [focused, visible, working, chatId])
 
   const scrollToBottom = () => {
     const el = scrollRef.current
@@ -296,6 +313,13 @@ function Select(props: {
       ))}
     </select>
   )
+}
+
+/** Text selected in the field being typed in, or in the page: Ctrl+C means copy then. */
+function hasSelection(target: HTMLElement | null): boolean {
+  const field = target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement ? target : null
+  if (field && field.selectionStart !== null && field.selectionStart !== field.selectionEnd) return true
+  return (window.getSelection()?.toString() ?? '') !== ''
 }
 
 function Working({ activity }: { activity: string | null }) {
