@@ -14,6 +14,8 @@ import type {
   GitStash,
   GitStashFile,
   GitStatus,
+  MergeOptions,
+  MergePreview,
   RepoStatus,
   StashOptions
 } from './git'
@@ -107,6 +109,11 @@ export interface CapitaineApi {
     /** `from`: branch to start from; HEAD when omitted. */
     createBranch(projectId: string, name: string, from?: string): Promise<GitActionResult>
     commit(projectId: string, options: CommitOptions): Promise<GitActionResult>
+    mergePreview(projectId: string, source: string, target: string): Promise<MergePreview>
+    /** Stops on conflicts (`conflicts: true`); `merged` once it went through. */
+    merge(projectId: string, options: MergeOptions): Promise<GitActionResult>
+    /** A merged local branch, and its remote branch when `alsoRemote`. */
+    deleteBranch(projectId: string, name: string, alsoRemote: boolean): Promise<GitActionResult>
     push(projectId: string): Promise<GitActionResult>
     pull(projectId: string): Promise<GitActionResult>
     fetch(projectId: string): Promise<GitActionResult>

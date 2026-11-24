@@ -7,6 +7,8 @@ import type {
   GitBranch,
   GitStash,
   GitStashFile,
+  MergeDone,
+  MergeOptions,
   RepoStatus,
   StashOptions
 } from '@shared/types'
@@ -14,7 +16,7 @@ import { resolutionDiff } from './diff-targets'
 import { useApp } from '@/features/workspace/workspace-store'
 
 /** The one repo-changing action running for a project (they would step on each other). */
-export type GitPending = 'commit' | 'push' | 'pull' | 'sync' | 'switch' | 'branch' | 'continue' | 'abort' | 'stash'
+export type GitPending = 'commit' | 'push' | 'pull' | 'sync' | 'switch' | 'branch' | 'continue' | 'abort' | 'stash' | 'merge' | 'delete'
 
 export interface GitNotice {
   tone: 'ok' | 'warn'
@@ -48,6 +50,8 @@ interface GitState {
   generatingMessage: Record<string, boolean>
   /** Keyed by `${projectId}:${path}`. */
   resolutions: Record<string, ResolutionState | undefined>
+  /** Last merge that went through, until its follow-ups (push, delete the branch) are done or dismissed. */
+  merges: Record<string, (MergeDone & { deleted: boolean }) | null>
 
   refresh(projectId: string): Promise<void>
   refreshBranches(projectIds: string[]): Promise<void>
@@ -66,6 +70,10 @@ interface GitState {
   switchBranch(projectId: string, name: string): Promise<boolean>
   createBranch(projectId: string, name: string, from?: string): Promise<boolean>
   finishOperation(projectId: string, how: 'continue' | 'abort'): Promise<void>
+  merge(projectId: string, options: MergeOptions): Promise<boolean>
+  /** The merged source branch, and its remote branch when it has one. */
+  deleteMergedBranch(projectId: string): Promise<void>
+  dismissMerge(projectId: string): void
   takeSide(projectId: string, path: string, side: 'current' | 'incoming'): Promise<void>
   stashPush(projectId: string, options: StashOptions): Promise<boolean>
   /** `drop`: pop (apply, then remove it from the list). */
@@ -77,6 +85,8 @@ interface GitState {
 }
 
 const inFlight = new Map<string, Promise<void>>()
+/** Merges started from the panel that stopped on conflicts, by project. */
+const stoppedMerges = new Map<string, MergeOptions>()
 const noticeTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 /** Electron wraps errors thrown in the main process: keep only what the main process said. */
@@ -102,6 +112,7 @@ export const useGit = create<GitState>((set, get) => ({
   drafts: {},
   generatingMessage: {},
   resolutions: {},
+  merges: {},
 
   async refreshBranches(projectIds) {
     const results = await Promise.all(
@@ -242,7 +253,42 @@ export const useGit = create<GitState>((set, get) => ({
   },
 
   async finishOperation(projectId, how) {
-    await run(projectId, how, () => window.capitaine.git.finishOperation(projectId, how))
+    const started = stoppedMerges.get(projectId)
+    await run(projectId, how, async () => {
+      const done = await window.capitaine.git.finishOperation(projectId, how)
+      // A merge started here that stopped on conflicts, now concluded: same follow-ups as a clean one.
+      if (how === 'continue' && started && !done.conflicts) {
+        stoppedMerges.delete(projectId)
+        const local = get().branchList[projectId]?.find((b) => !b.remote && b.name === started.source)
+        set((s) => ({
+          merges: { ...s.merges, [projectId]: { source: started.source, target: started.target, sourceIsLocal: !!local, sourceUpstream: local?.upstream ?? null, deleted: false } }
+        }))
+      }
+      if (how === 'abort') stoppedMerges.delete(projectId)
+      return done
+    })
+  },
+
+  async merge(projectId, options) {
+    get().dismissMerge(projectId)
+    stoppedMerges.delete(projectId)
+    return run(projectId, 'merge', async () => {
+      const done = await window.capitaine.git.merge(projectId, options)
+      if (done.merged) set((s) => ({ merges: { ...s.merges, [projectId]: { ...done.merged!, deleted: false } } }))
+      if (done.conflicts) stoppedMerges.set(projectId, options)
+      return done
+    })
+  },
+
+  async deleteMergedBranch(projectId) {
+    const merged = get().merges[projectId]
+    if (!merged?.sourceIsLocal || merged.deleted) return
+    const ok = await run(projectId, 'delete', () => window.capitaine.git.deleteBranch(projectId, merged.source, !!merged.sourceUpstream))
+    if (ok) set((s) => ({ merges: { ...s.merges, [projectId]: s.merges[projectId] && { ...s.merges[projectId]!, deleted: true } } }))
+  },
+
+  dismissMerge(projectId) {
+    if (get().merges[projectId]) set((s) => ({ merges: { ...s.merges, [projectId]: null } }))
   },
 
   async takeSide(projectId, path, side) {
