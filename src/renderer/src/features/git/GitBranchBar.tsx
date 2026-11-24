@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Check, ChevronDown, Cloud, CloudUpload, GitBranch, 
 import type { GitBranch as Branch, Project, RepoStatus } from '@shared/types'
 import { useGit } from './git-store'
 import { relativeTime } from '@/lib/relative-time'
+import { IconButton } from '@/ui/IconButton'
 
 /** Current branch (opens the picker) and the pull / push buttons, at the top of the git panel. */
 export function GitBranchBar({ project, status }: { project: Project; status: RepoStatus }) {
@@ -40,9 +41,29 @@ export function GitBranchBar({ project, status }: { project: Project; status: Re
           onPush={() => void push(project.id)}
           onSync={() => void sync(project.id)}
         />
+        <GitRefreshButton projectId={project.id} />
       </div>
       {pickerOpen && <BranchPicker project={project} status={status} onClose={() => setPickerOpen(false)} />}
     </div>
+  )
+}
+
+/** Re-reads the repo, and fetches the remotes too (the panel also does it every few minutes). */
+function GitRefreshButton({ projectId }: { projectId: string }) {
+  const fetching = useGit((s) => !!s.fetching[projectId])
+  const hasRemote = useGit((s) => !!s.status[projectId]?.hasRemote)
+  return (
+    <IconButton
+      className="p-1.5"
+      title={hasRemote ? 'Rafraîchir et récupérer les branches distantes (fetch)' : 'Rafraîchir'}
+      onClick={() => {
+        const git = useGit.getState()
+        if (hasRemote) void git.fetch(projectId, false)
+        else void git.refresh(projectId)
+      }}
+    >
+      <RefreshCw size={13} className={fetching ? 'animate-spin' : ''} />
+    </IconButton>
   )
 }
 

@@ -186,6 +186,10 @@ explorerChecks.untracked = await waitRow('new.txt', (r) => r.badge === 'U')
 explorerChecks.ignored = await waitRow('dist', (r) => r.row.includes('opacity-45'))
 await page.click('[role=treeitem]:has-text("src")')
 explorerChecks.expand = await waitRow('app.ts')
+// The panel header holds the view tabs only; the tree's actions sit beside the search field.
+const panelHeaderButtons = await page.$$eval('section:has([role=tree]) > header button:not([role=tab])', (els) => els.map((el) => el.title))
+explorerChecks.headerTabsOnly = panelHeaderButtons.every((title) => !/Rafraîchir|replier|Masquer/.test(title))
+explorerChecks.actionsBySearch = (await page.locator('div:has(> div > input[aria-label="Rechercher un fichier"]) > button[title="Tout replier"]').count()) === 1
 writeFileSync(join(gitDemo, 'src/live.ts'), 'export const live = 1\n')
 explorerChecks.liveRefresh = await waitRow('live.ts', (r) => r.badge === 'U')
 
@@ -461,6 +465,7 @@ gitChecks.sections = await waitFor(async () => {
   return /Indexés/i.test(text) && text.includes('staged.txt') && /Modifications/i.test(text) && text.includes('tracked.txt') && text.includes('new.txt')
 })
 gitChecks.branch = await waitFor(async () => /master|main/.test(await gitPanel.innerText()))
+gitChecks.refreshInBranchBar = (await gitPanel.locator('button[title^="Rafraîchir"]').count()) === 1
 gitChecks.badge = await waitFor(async () => /\d/.test(await page.locator('[role=tab][aria-label="Git"]').innerText()))
 await gitRow('tracked.txt').click()
 gitChecks.diffOpens = await waitFor(async () => {
