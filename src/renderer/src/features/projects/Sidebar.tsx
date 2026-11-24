@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, Container, FilePen, FolderOpen, FolderPlus, GitBranch, MoreHorizontal, Pencil, Sparkles, SquareTerminal, Trash2 } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { isMac, shortcutLabel } from '@/lib/platform'
@@ -9,6 +9,8 @@ import { useApp } from '@/features/workspace/workspace-store'
 import { AgentStatusIcon, AgentSummary, ProjectAgentList } from '@/features/claude/AgentStatus'
 import { ResizeHandle, usePanelWidth } from '@/ui/ResizeHandle'
 import { TitleBarBrand, titleBarHeightClass } from '@/app/TitleBar'
+import { ContextMenu, MenuItem } from '@/ui/ContextMenu'
+import { RenameInput } from '@/ui/RenameInput'
 
 export function Sidebar() {
   const panel = usePanelWidth({ storageKey: 'capitaine.sidebarWidth', defaultWidth: 240, min: 180, max: 560 })
@@ -190,7 +192,7 @@ function ProjectRow({ project, dragging, onDragStart, onDragEnd, onDrop }: RowPr
   const selectProject = useApp((s) => s.selectProject)
   const renameProject = useApp((s) => s.renameProject)
   const removeProject = useApp((s) => s.removeProject)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [editing, setEditing] = useState(false)
   const count = terminalIds?.length ?? 0
 
@@ -202,6 +204,10 @@ function ProjectRow({ project, dragging, onDragStart, onDragEnd, onDrop }: RowPr
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
       onClick={() => selectProject(project.id)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        setMenu({ x: e.clientX, y: e.clientY })
+      }}
       title={project.path}
       className={`group relative mb-0.5 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 ${
         active ? 'bg-panel-2 text-fg' : 'text-muted hover:bg-panel-2/60 hover:text-fg'
@@ -246,92 +252,46 @@ function ProjectRow({ project, dragging, onDragStart, onDragEnd, onDrop }: RowPr
       )}
 
       <button
-        className={`rounded p-0.5 text-faint hover:text-fg ${menuOpen ? 'block' : 'hidden group-hover:block'}`}
+        className={`rounded p-0.5 text-faint hover:text-fg ${menu ? 'block' : 'hidden group-hover:block'}`}
+        title="Actions du projet"
         onClick={(e) => {
           e.stopPropagation()
-          setMenuOpen((v) => !v)
+          const rect = e.currentTarget.getBoundingClientRect()
+          setMenu((open) => (open ? null : { x: rect.right - 4, y: rect.bottom + 2 }))
         }}
       >
         <MoreHorizontal size={14} />
       </button>
 
-      {menuOpen && (
-        <Menu onClose={() => setMenuOpen(false)}>
-          <MenuItem icon={<Pencil size={13} />} label="Renommer" onClick={() => setEditing(true)} />
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
+          <MenuItem
+            icon={<Pencil size={13} />}
+            label="Renommer"
+            onClick={() => {
+              setMenu(null)
+              setEditing(true)
+            }}
+          />
           <MenuItem
             icon={<FolderOpen size={13} />}
             label={isMac ? 'Afficher dans le Finder' : "Ouvrir l'emplacement"}
-            onClick={() => void window.capitaine.projects.reveal(project.id)}
+            onClick={() => {
+              setMenu(null)
+              void window.capitaine.projects.reveal(project.id)
+            }}
           />
           <MenuItem
             icon={<Trash2 size={13} />}
             label={count > 0 ? `Retirer (ferme ${count} terminal${count > 1 ? 'aux' : ''})` : 'Retirer de la liste'}
             danger
-            onClick={() => void removeProject(project.id)}
+            onClick={() => {
+              setMenu(null)
+              void removeProject(project.id)
+            }}
           />
-        </Menu>
+        </ContextMenu>
       )}
     </div>
-  )
-}
-
-function RenameInput({ initial, onDone }: { initial: string; onDone(value: string | null): void }) {
-  const [value, setValue] = useState(initial)
-  return (
-    <input
-      autoFocus
-      value={value}
-      onFocus={(e) => e.currentTarget.select()}
-      onClick={(e) => e.stopPropagation()}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => onDone(value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onDone(value)
-        if (e.key === 'Escape') onDone(null)
-      }}
-      className="w-full rounded border border-line bg-bg px-1 text-ui text-fg outline-none focus:border-accent"
-    />
-  )
-}
-
-function Menu({ children, onClose }: { children: React.ReactNode; onClose(): void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose()
-    }
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', esc)
-    return () => {
-      window.removeEventListener('mousedown', close)
-      window.removeEventListener('keydown', esc)
-    }
-  }, [onClose])
-  return (
-    <div
-      ref={ref}
-      onClick={(e) => {
-        e.stopPropagation()
-        onClose()
-      }}
-      className="absolute top-8 right-1 z-20 min-w-52 rounded-md border border-line bg-panel-2 py-1 shadow-xl shadow-black/40"
-    >
-      {children}
-    </div>
-  )
-}
-
-function MenuItem(props: { icon: React.ReactNode; label: string; danger?: boolean; onClick(): void }) {
-  return (
-    <button
-      onClick={props.onClick}
-      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-small hover:bg-line ${
-        props.danger ? 'text-red-400' : 'text-fg'
-      }`}
-    >
-      {props.icon}
-      {props.label}
-    </button>
   )
 }

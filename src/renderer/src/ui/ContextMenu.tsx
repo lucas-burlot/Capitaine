@@ -49,13 +49,13 @@ export function ContextMenu({ x, y, onClose, children }: { x: number; y: number;
   )
 }
 
-export function MenuItem(props: { icon: React.ReactNode; label: string; hint?: string; disabled?: boolean; onClick(): void }) {
+export function MenuItem(props: { icon: React.ReactNode; label: string; hint?: string; disabled?: boolean; danger?: boolean; onClick(): void }) {
   return (
     <button
       role="menuitem"
       disabled={props.disabled}
       onClick={props.onClick}
-      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-small text-fg enabled:hover:bg-line disabled:text-faint"
+      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-small enabled:hover:bg-line disabled:text-faint ${props.danger ? 'text-red-400' : 'text-fg'}`}
     >
       {props.icon}
       <span className="flex-1">{props.label}</span>

@@ -90,6 +90,8 @@ interface AppState {
   selectTab(tabId: string): void
   cycleTab(direction: 1 | -1): void
   renameTab(tabId: string, title: string): void
+  /** A file or folder was renamed: its editor tabs (and those of the files inside) follow it. */
+  moveFiles(from: string, to: string): void
   splitActivePane(direction: SplitDirection): void
   resizeSplit(tabId: string, path: number[], sizes: number[]): void
   focusPane(terminalId: string): void
@@ -127,6 +129,17 @@ export function agentLabel(state: Pick<AppState, 'tabs'>, terminal: TerminalPane
   const tab = state.tabs[terminal.tabId]
   if (!tab?.customTitle) return terminalLabel(terminal)
   return paneIds(tab.layout).length > 1 ? `${tab.customTitle} · ${terminalLabel(terminal)}` : tab.customTitle
+}
+
+/** `path` once `from` became `to` (itself, or something inside it); null when it isn't concerned. */
+export function movedPath(path: string, from: string, to: string): string | null {
+  if (path === from) return to
+  return isUnder(path, from) ? to + path.slice(from.length) : null
+}
+
+/** `path` is strictly inside the folder `dir`. */
+export function isUnder(path: string, dir: string): boolean {
+  return path.startsWith(dir) && (path[dir.length] === '/' || path[dir.length] === '\\')
 }
 
 export function fileName(path: string): string {
@@ -353,6 +366,20 @@ export const useApp = create<AppState>((set, get) => ({
       const tab = state.tabs[tabId]
       if (!tab) return state
       return { tabs: { ...state.tabs, [tabId]: { ...tab, customTitle: title.trim() || null } } }
+    })
+  },
+
+  moveFiles(from, to) {
+    set((state) => {
+      let changed = false
+      const tabs = { ...state.tabs }
+      for (const tab of Object.values(state.tabs)) {
+        const moved = tab.kind === 'editor' && tab.filePath ? movedPath(tab.filePath, from, to) : null
+        if (!moved) continue
+        tabs[tab.id] = { ...tab, filePath: moved }
+        changed = true
+      }
+      return changed ? { tabs } : state
     })
   },
 

@@ -7,6 +7,7 @@ import {
   KeyRound,
   LoaderCircle,
   MessageCircleQuestionMark,
+  Pencil,
   ShieldAlert
 } from 'lucide-react'
 import {
@@ -18,7 +19,10 @@ import {
   type AgentSession,
   type AgentState
 } from './agent-status'
-import { agentLabel, isTerminalFocused, useApp } from '@/features/workspace/workspace-store'
+import { agentLabel, isTerminalFocused, terminalLabel, useApp } from '@/features/workspace/workspace-store'
+import { paneIds } from '@/features/workspace/layout'
+import { ContextMenu, MenuItem } from '@/ui/ContextMenu'
+import { RenameInput } from '@/ui/RenameInput'
 
 export function AgentStatusIcon({ state, kind, size = 13 }: { state: AgentState; kind?: AgentBlockKind; size?: number }) {
   switch (state) {
@@ -87,6 +91,8 @@ function AgentSessionRow({ terminalId, session }: { terminalId: string; session:
   const active = useApp((s) => isTerminalFocused(s, terminalId))
   const focusTerminal = useApp((s) => s.focusTerminal)
   const now = useNow(15000)
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [editing, setEditing] = useState(false)
   if (!tab) return null
 
   const live = session.state === 'working' || session.state === 'blocked'
@@ -94,23 +100,55 @@ function AgentSessionRow({ terminalId, session }: { terminalId: string; session:
 
   return (
     <li>
-      <button
-        onClick={() => focusTerminal(terminalId)}
-        title={`${agentDisplayName(session.app)} — ${name}\n${status}${session.msg ? `\n${session.msg}` : ''}`}
-        className={`flex w-full flex-col gap-0.5 rounded-md px-1.5 py-1 text-left ${active ? 'bg-panel-2' : 'hover:bg-panel-2/60'}`}
-      >
-        <span className="flex w-full min-w-0 items-center gap-1.5">
+      {editing ? (
+        <div className="flex w-full min-w-0 items-center gap-1.5 rounded-md bg-panel-2 px-1.5 py-1">
           <AgentStatusIcon state={session.state} kind={session.kind} />
-          <span className="min-w-0 flex-1 truncate text-small text-fg">{name}</span>
-        </span>
-        <span className={`flex w-full min-w-0 gap-1 pl-[19px] text-caption ${stateText[session.state]}`}>
-          <span className="shrink-0">{status}</span>
-          {live && <span className="shrink-0 text-faint">· {formatElapsed(now - session.since)}</span>}
-        </span>
-        {session.state === 'blocked' && session.msg && (
-          <span className="line-clamp-2 pl-[19px] text-caption leading-snug text-muted">{agentMessageText(session.msg)}</span>
-        )}
-      </button>
+          <RenameInput
+            initial={renameTarget(terminalId).initial}
+            className="text-small"
+            onDone={(value) => {
+              setEditing(false)
+              if (value !== null) renameTarget(terminalId).rename(value)
+            }}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => focusTerminal(terminalId)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setMenu({ x: e.clientX, y: e.clientY })
+          }}
+          title={`${agentDisplayName(session.app)} — ${name}\n${status}${session.msg ? `\n${session.msg}` : ''}`}
+          className={`flex w-full flex-col gap-0.5 rounded-md px-1.5 py-1 text-left ${active ? 'bg-panel-2' : 'hover:bg-panel-2/60'}`}
+        >
+          <span className="flex w-full min-w-0 items-center gap-1.5">
+            <AgentStatusIcon state={session.state} kind={session.kind} />
+            <span className="min-w-0 flex-1 truncate text-small text-fg" onDoubleClick={() => setEditing(true)}>
+              {name}
+            </span>
+          </span>
+          <span className={`flex w-full min-w-0 gap-1 pl-[19px] text-caption ${stateText[session.state]}`}>
+            <span className="shrink-0">{status}</span>
+            {live && <span className="shrink-0 text-faint">· {formatElapsed(now - session.since)}</span>}
+          </span>
+          {session.state === 'blocked' && session.msg && (
+            <span className="line-clamp-2 pl-[19px] text-caption leading-snug text-muted">{agentMessageText(session.msg)}</span>
+          )}
+        </button>
+      )}
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
+          <MenuItem
+            icon={<Pencil size={13} />}
+            label="Renommer"
+            onClick={() => {
+              setMenu(null)
+              setEditing(true)
+            }}
+          />
+        </ContextMenu>
+      )}
       {session.children.length > 0 && (
         <ul className="mb-0.5 ml-[19px]">
           {session.children.map((child) => (
@@ -120,6 +158,21 @@ function AgentSessionRow({ terminalId, session }: { terminalId: string; session:
       )}
     </li>
   )
+}
+
+/**
+ * What renaming a session from the sidebar changes: its tab, like renaming the tab itself, so
+ * both show the same name; in a split tab, the pane's own name (the tab's stays in front).
+ */
+function renameTarget(terminalId: string): { initial: string; rename(value: string): void } {
+  const state = useApp.getState()
+  const terminal = state.terminals[terminalId]
+  const tab = terminal ? state.tabs[terminal.tabId] : undefined
+  if (!terminal || !tab) return { initial: '', rename: () => {} }
+  if (paneIds(tab.layout).length > 1) {
+    return { initial: terminalLabel(terminal), rename: (value) => useApp.getState().renameTerminal(terminalId, value) }
+  }
+  return { initial: agentLabel(state, terminal), rename: (value) => useApp.getState().renameTab(tab.id, value) }
 }
 
 function SubagentRow({ child }: { child: AgentChild }) {

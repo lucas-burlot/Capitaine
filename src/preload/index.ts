@@ -44,6 +44,11 @@ const api: CapitaineApi = {
     write: (projectId, path, content) => ipcRenderer.invoke('files:write', projectId, path, content),
     open: (projectId, path) => ipcRenderer.invoke('files:open', projectId, path),
     reveal: (projectId, path) => ipcRenderer.send('files:reveal', projectId, path),
+    create: (projectId, dir, name, kind) => ipcRenderer.invoke('files:create', projectId, dir, name, kind),
+    rename: (projectId, path, name) => ipcRenderer.invoke('files:rename', projectId, path, name),
+    duplicate: (projectId, path) => ipcRenderer.invoke('files:duplicate', projectId, path),
+    trash: (projectId, path) => ipcRenderer.invoke('files:trash', projectId, path),
+    delete: (projectId, path) => ipcRenderer.invoke('files:delete', projectId, path),
     copyText: (text) => ipcRenderer.send('clipboard:write', text),
     pathForFile: (file) => webUtils.getPathForFile(file)
   },
