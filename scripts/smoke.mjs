@@ -2,7 +2,7 @@
 // Usage: npm run build && npm run smoke   — screenshots land in ./smoke-shots
 import { _electron as electron } from 'playwright-core'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir, homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -164,6 +164,10 @@ const waitRow = async (name, predicate = () => true, timeout = 8000) => {
   return false
 }
 await page.click('aside >> text=gitdemo')
+const waitFor = async (fn, timeout = 8000) => {
+  for (const deadline = Date.now() + timeout; Date.now() < deadline; await page.waitForTimeout(150)) if (await fn()) return true
+  return false
+}
 const explorerChecks = {}
 // The explorer sits on the right of the terminals, and its handle (on its left edge) widens it when dragged left.
 const explorerBox = () => page.$eval('section:has([role=tree])', (el) => el.getBoundingClientRect().toJSON())
@@ -211,6 +215,49 @@ await page.click('text=Copier le chemin relatif')
 explorerChecks.copyRelative = (await app.evaluate(({ clipboard }) => clipboard.readText())) === 'src/app.ts'
 await shot('06-explorer')
 
+// File operations from the tree: new folder and file, rename (F2), duplicate, trash. Everything
+// happens in src/ops, trashed at the end, so the repo is as before for the git checks.
+const opsDir = join(gitDemo, 'src/ops')
+const onDisk = (path) => existsSync(join(opsDir, path))
+const explorerMenu = (label) => page.locator(`[role=menu] [role=menuitem]:has-text("${label}")`)
+const treeInput = page.locator('[role=tree] input')
+await page.click('[role=treeitem]:has(span.truncate:text-is("src"))', { button: 'right' })
+await explorerMenu('Nouveau dossier').click()
+await treeInput.fill('ops')
+await treeInput.press('Enter')
+explorerChecks.newFolder = await waitFor(async () => existsSync(opsDir) && (await page.$('[role=treeitem]:has(span.truncate:text-is("ops"))')) !== null)
+await page.click('[role=treeitem]:has(span.truncate:text-is("ops"))', { button: 'right' })
+await explorerMenu('Nouveau fichier').click()
+await treeInput.fill('a.txt')
+await treeInput.press('Enter')
+explorerChecks.newFileOpens = await waitFor(async () => onDisk('a.txt') && (await page.$('main header div.group[title$="/ops/a.txt"]')) !== null)
+await page.click('[role=treeitem]:has(span.truncate:text-is("a.txt"))')
+await page.keyboard.press('F2')
+// The name is preselected without its extension: typing replaces "a" only.
+await treeInput.waitFor()
+await page.keyboard.type('b')
+await page.keyboard.press('Enter')
+explorerChecks.renamedKeepsExtension = await waitFor(() => onDisk('b.txt') && !onDisk('a.txt'))
+explorerChecks.tabFollowsRename = await waitFor(async () => (await page.$('main header div.group[title$="/ops/b.txt"]')) !== null)
+await page.click('[role=treeitem]:has(span.truncate:text-is("b.txt"))', { button: 'right' })
+await explorerMenu('Dupliquer').click()
+explorerChecks.duplicated = await waitFor(() => onDisk('b copie.txt'))
+await shot('06b-explorer-ops')
+await page.click('[role=treeitem]:has(span.truncate:text-is("ops"))', { button: 'right' })
+await explorerMenu('Mettre à la corbeille').click()
+explorerChecks.trashAsks = await waitFor(() => page.$('[role=dialog]:has-text("à la corbeille ?")').then(Boolean))
+await page.click('[role=dialog] button:has-text("Mettre à la corbeille")')
+// The smoke's repo is on /tmp, a tmpfs the system trash refuses: deleting for good is offered then.
+const refused = page.locator('[role=dialog] button:has-text("Supprimer définitivement")')
+await waitFor(async () => !existsSync(opsDir) || (await refused.count()) > 0)
+if (existsSync(opsDir)) {
+  explorerChecks.trashRefusedOffersDelete = (await page.locator('[role=dialog]:has-text("La corbeille l’a refusé")').count()) === 1
+  await refused.click()
+}
+explorerChecks.trashed = await waitFor(() => !existsSync(opsDir))
+explorerChecks.trashClosesTab = await waitFor(async () => (await page.$('main header div.group[title$="/ops/b.txt"]')) === null)
+console.log('  explorer ops:', Object.fromEntries(Object.entries(explorerChecks).slice(-10)))
+
 // In-app editor: open by double-click, edit, save, outside changes, unsaved-changes prompts.
 const editorChecks = {}
 const editorText = () =>
@@ -218,10 +265,6 @@ const editorText = () =>
     const view = document.querySelector('[data-editor-tab].flex .view-lines')
     return view ? view.innerText.replace(/\u00a0/g, ' ') : null
   })
-const waitFor = async (fn, timeout = 8000) => {
-  for (const deadline = Date.now() + timeout; Date.now() < deadline; await page.waitForTimeout(150)) if (await fn()) return true
-  return false
-}
 const dirtyTab = () => page.$('main header [title^="Modifications non enregistrées"]').then(Boolean)
 const tracked = join(gitDemo, 'tracked.txt')
 await page.dblclick('[role=treeitem]:has-text("tracked.txt")')
@@ -656,6 +699,19 @@ const tabName = page.locator('div.rounded-t-md.bg-bg input')
 await tabName.fill('Mon agent')
 await tabName.press('Enter')
 chatChecks.sidebarRenamed = await waitFor(async () => (await page.locator('aside').first().innerText()).includes('Mon agent'))
+// And the other way: right-click the agent in the sidebar to rename it, and its tab follows.
+await page.locator('aside li button:has-text("Mon agent")').first().click({ button: 'right' })
+await page.locator('[role=menu] [role=menuitem]:has-text("Renommer")').click()
+const sidebarName = page.locator('aside li input')
+await sidebarName.fill('Agent renommé')
+await sidebarName.press('Enter')
+chatChecks.renamedFromSidebar = await waitFor(async () =>
+  (await page.locator('aside').first().innerText()).includes('Agent renommé') && (await page.locator('main header').first().innerText()).includes('Agent renommé')
+)
+// A project's menu opens on right-click too.
+await page.locator('aside nav >> text=gitdemo').click({ button: 'right' })
+chatChecks.projectContextMenu = await page.locator('[role=menu] [role=menuitem]:has-text("Retirer")').isVisible()
+await page.keyboard.press('Escape')
 await shot('13-chat-cleared')
 console.log('chat checks:', chatChecks)
 

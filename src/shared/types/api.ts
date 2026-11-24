@@ -79,6 +79,16 @@ export interface CapitaineApi {
     open(projectId: string, path: string): Promise<void>
     reveal(projectId: string, path: string): void
     copyText(text: string): void
+    /** New empty file or folder in `dir`; rejects when the name is taken. Resolves with its path. */
+    create(projectId: string, dir: string, name: string, kind: 'file' | 'directory'): Promise<string>
+    /** Renames in the same folder. Resolves with the new path. */
+    rename(projectId: string, path: string, name: string): Promise<string>
+    /** Copies next to itself ("name copie.ext"). Resolves with the copy's path. */
+    duplicate(projectId: string, path: string): Promise<string>
+    /** Moves to the system trash. */
+    trash(projectId: string, path: string): Promise<void>
+    /** Deletes for good (when the trash refused it). */
+    delete(projectId: string, path: string): Promise<void>
     /** Absolute path of a file dropped from the OS (Electron hides `File.path`). */
     pathForFile(file: File): string
   }
