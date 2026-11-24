@@ -1,9 +1,11 @@
 import { execFile } from 'node:child_process'
 import { readFile, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import type {
+  BlameCommit,
   BranchInfo,
   DiffSide,
+  FileBlame,
   GitChange,
   GitChangeKind,
   GitStash,
@@ -347,4 +349,73 @@ export function insideRepo(repoRoot: string, repoPath: string): string {
   const rel = relative(repoRoot, abs)
   if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw new Error('Chemin hors du dépôt')
   return abs
+}
+
+const BLAME_HEADER = /^([0-9a-f]{40}|[0-9a-f]{64}) \d+ (\d+)/
+
+/** Last blames, by file: reused while neither HEAD nor the file moved. */
+const blameCache = new Map<string, { key: string; blame: FileBlame | null }>()
+const BLAME_CACHE_SIZE = 64
+
+/**
+ * Who last touched each line of a file, as saved on disk: one `git blame` for the whole file.
+ * Null when git can't blame it (outside a repo, untracked, binary…). Cheap to call again: the
+ * result is kept until HEAD or the file changes.
+ */
+export async function blameFile(path: string): Promise<FileBlame | null> {
+  // Run from the file's own folder: it may live in a nested repo or a submodule.
+  const cwd = dirname(path)
+  const [head, info] = await Promise.all([git(cwd, ['rev-parse', 'HEAD']), stat(path).catch(() => null)])
+  if (!info?.isFile()) return null
+  const key = `${head.stdout.trim()}:${info.mtimeMs}:${info.size}`
+  const cached = blameCache.get(path)
+  if (cached?.key === key) return cached.blame
+  const blame = await runBlame(cwd, path)
+  blameCache.delete(path)
+  blameCache.set(path, { key, blame })
+  if (blameCache.size > BLAME_CACHE_SIZE) blameCache.delete(blameCache.keys().next().value as string)
+  return blame
+}
+
+async function runBlame(cwd: string, path: string): Promise<FileBlame | null> {
+  const [blame, email] = await Promise.all([
+    git(cwd, ['blame', '--porcelain', '--', basename(path)], { timeout: 30_000 }),
+    git(cwd, ['config', 'user.email'])
+  ])
+  if (!blame.ok) return null
+  const myEmail = email.stdout.trim().toLowerCase()
+  const commits: BlameCommit[] = []
+  const indexOf = new Map<string, number>()
+  const lines: number[] = []
+  let current: BlameCommit | null = null
+  let line = 0
+  // Porcelain: a header per group of lines; a commit's details only the first time it shows up;
+  // then the line itself, behind a tab.
+  for (const row of blame.stdout.split('\n')) {
+    if (row.startsWith('\t')) {
+      if (current) lines[line - 1] = indexOf.get(current.hash) ?? 0
+      continue
+    }
+    const header = BLAME_HEADER.exec(row)
+    if (header) {
+      const hash = header[1]
+      line = Number(header[2])
+      let index = indexOf.get(hash)
+      if (index === undefined) {
+        index = commits.push({ hash, author: '', mine: false, time: 0, summary: '' }) - 1
+        indexOf.set(hash, index)
+      }
+      current = commits[index]
+      continue
+    }
+    if (!current) continue
+    const space = row.indexOf(' ')
+    const key = space < 0 ? row : row.slice(0, space)
+    const value = space < 0 ? '' : row.slice(space + 1)
+    if (key === 'author') current.author = value
+    else if (key === 'author-mail') current.mine = !!myEmail && value.replace(/^<|>$/g, '').toLowerCase() === myEmail
+    else if (key === 'author-time') current.time = Number(value) * 1000
+    else if (key === 'summary') current.summary = value
+  }
+  return { commits, lines }
 }

@@ -367,3 +367,16 @@ body,
 .chat-selectable ::selection {
   background: rgb(226 192 141 / 0.25);
 }
+
+/* Editor: who last changed the cursor's line (git blame), greyed out after its end. */
+.monaco-editor .editor-blame {
+  padding-left: 3em;
+  color: color-mix(in srgb, var(--color-faint) 80%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  font-style: italic;
+  white-space: pre;
+}
+.monaco-editor .editor-blame[hidden] {
+  display: none;
+}

@@ -68,6 +68,7 @@ const api: CapitaineApi = {
     stashPush: (projectId, options) => ipcRenderer.invoke('git:stash-push', projectId, options),
     stashApply: (projectId, ref, hash, drop) => ipcRenderer.invoke('git:stash-apply', projectId, ref, hash, drop),
     stashDrop: (projectId, ref, hash) => ipcRenderer.invoke('git:stash-drop', projectId, ref, hash),
+    blame: (projectId, path) => ipcRenderer.invoke('git:blame', projectId, path),
     ai: {
       commitMessage: (projectId, all) => ipcRenderer.invoke('git:ai-commit-message', projectId, all),
       resolveConflict: (projectId, path) => ipcRenderer.invoke('git:ai-resolve', projectId, path)

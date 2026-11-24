@@ -8,6 +8,7 @@ import type {
   CommitOptions,
   ConflictResolution,
   DiffSide,
+  FileBlame,
   GitActionResult,
   GitBranch,
   GitStash,
@@ -109,6 +110,8 @@ export interface CapitaineApi {
     /** `hash` guards against `stash@{n}` having shifted since the list was read. `drop`: pop. */
     stashApply(projectId: string, ref: string, hash: string, drop: boolean): Promise<GitActionResult>
     stashDrop(projectId: string, ref: string, hash: string): Promise<GitActionResult>
+    /** Blame of a project file (absolute path); null when it isn't tracked by git. */
+    blame(projectId: string, path: string): Promise<FileBlame | null>
     ai: {
       /** Commit message for the staged changes (all changes when `all`), written by Claude. */
       commitMessage(projectId: string, all: boolean): Promise<string>
