@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import type { DirEntry, Project } from '@shared/types'
-import { useExplorer } from './explorer-store'
+import { fileStatus, useExplorer } from './explorer-store'
 import { searchFiles, type FileMatch } from './file-search'
 import { isWindows, shortcutLabel } from '@/lib/platform'
 import { useApp } from '@/features/workspace/workspace-store'
@@ -125,6 +125,7 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu, actio
             <ResultRow
               key={match.path}
               match={match}
+              projectId={project.id}
               index={index}
               active={index === active}
               absolutePath={absolutePath(match.path)}
@@ -144,6 +145,7 @@ export function FileSearch({ project, query, onQueryChange, onContextMenu, actio
 
 interface RowProps {
   match: FileMatch
+  projectId: string
   index: number
   active: boolean
   absolutePath: string
@@ -152,7 +154,9 @@ interface RowProps {
   onContextMenu(menu: { x: number; y: number; entry: DirEntry }): void
 }
 
-function ResultRow({ match, index, active, absolutePath, onHover, onOpen, onContextMenu }: RowProps) {
+function ResultRow({ match, projectId, index, active, absolutePath, onHover, onOpen, onContextMenu }: RowProps) {
+  // Git-ignored files (.env…) are listed too, faded as in the tree.
+  const ignored = useExplorer((s) => fileStatus(s.git[projectId], match.path) === 'ignored')
   const nameStart = match.path.lastIndexOf('/') + 1
   const name = match.path.slice(nameStart)
   const folder = match.path.slice(0, Math.max(0, nameStart - 1))
@@ -175,7 +179,7 @@ function ResultRow({ match, index, active, absolutePath, onHover, onOpen, onCont
         onContextMenu({ x: e.clientX, y: e.clientY, entry })
       }}
       title={match.path}
-      className={`flex h-[22px] cursor-pointer items-center gap-1.5 px-3 text-ui ${active ? 'bg-panel-2 text-fg' : 'text-muted'}`}
+      className={`flex h-[22px] cursor-pointer items-center gap-1.5 px-3 text-ui ${active ? 'bg-panel-2 text-fg' : 'text-muted'} ${ignored ? 'opacity-45' : ''}`}
     >
       <EntryIcon entry={entry} />
       <span className="shrink-0 truncate">

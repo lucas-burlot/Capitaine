@@ -31,25 +31,35 @@ export async function listDirectory(root: string, dir: string): Promise<DirEntry
 
 // The search keeps this many files at most; past that the project is mostly generated content.
 const MAX_SEARCHED_FILES = 100_000
-// Outside git there's no .gitignore to go by: skip the usual heavy, generated folders.
+// Outside git, and inside git-ignored folders: skip the usual heavy, generated folders.
 const SKIPPED_DIRS = new Set(['.git', 'node_modules', '.hg', '.svn', '.next', '.nuxt', '.turbo', '.cache', '.venv', 'venv', '__pycache__', 'target', 'vendor'])
 
 /** Every file of the project, project-relative and `/`-separated, for the file search. */
 export async function listProjectFiles(root: string): Promise<string[]> {
-  // In a git repo: tracked and untracked files, minus the ignored ones (fast, and what you mean).
+  // In a git repo: tracked and untracked files (fast, and what you usually mean)…
   const listed = await run(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
-  if (listed !== null) {
-    // Tracked files deleted from the disk are still in the index.
-    const deleted = new Set(((await run(root, ['ls-files', '-z', '--deleted'])) ?? '').split('\0'))
-    return [...new Set(listed.split('\0'))].filter((path) => path && !deleted.has(path)).slice(0, MAX_SEARCHED_FILES)
+  if (listed === null) return walkFiles(root, root, MAX_SEARCHED_FILES)
+  // Tracked files deleted from the disk are still in the index.
+  const deleted = new Set(((await run(root, ['ls-files', '-z', '--deleted'])) ?? '').split('\0'))
+  // …and the ignored ones, as the tree shows them. Ignored folders come whole (`dir/`), loose files one by one.
+  const ignored = ((await run(root, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'])) ?? '').split('\0')
+  // Loose ignored files (.env, local config…) are few and often what is looked for: they go first, so a
+  // project past the cap still lists them.
+  const files = new Set(ignored.filter((path) => path && !path.endsWith('/')))
+  for (const path of listed.split('\0')) if (path && !deleted.has(path)) files.add(path)
+  // Ignored folders last, walked without the heavy generated ones: node_modules, vendor…
+  for (const dir of ignored) {
+    if (files.size >= MAX_SEARCHED_FILES) break
+    if (!dir.endsWith('/') || SKIPPED_DIRS.has(dir.slice(0, -1).split('/').pop()!)) continue
+    for (const file of await walkFiles(root, join(root, dir), MAX_SEARCHED_FILES - files.size)) files.add(file)
   }
-  return walkFiles(root)
+  return [...files].slice(0, MAX_SEARCHED_FILES)
 }
 
-async function walkFiles(root: string): Promise<string[]> {
+async function walkFiles(root: string, from: string, limit: number): Promise<string[]> {
   const files: string[] = []
-  const queue = [root]
-  while (queue.length > 0 && files.length < MAX_SEARCHED_FILES) {
+  const queue = [from]
+  while (queue.length > 0 && files.length < limit) {
     const dir = queue.shift()!
     const dirents = await readdir(dir, { withFileTypes: true }).catch(() => [])
     for (const d of dirents) {
@@ -62,7 +72,7 @@ async function walkFiles(root: string): Promise<string[]> {
       }
     }
   }
-  return files.slice(0, MAX_SEARCHED_FILES)
+  return files.slice(0, limit)
 }
 
 /** Beyond this the editor would crawl; the file opens in the OS app instead. */
