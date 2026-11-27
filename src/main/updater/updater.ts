@@ -1,5 +1,6 @@
+import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, autoUpdater as nativeAutoUpdater, shell } from 'electron'
 import electronUpdater, { type UpdateInfo } from 'electron-updater'
 import type { UpdateState } from '../../shared/types'
 
@@ -142,6 +143,25 @@ export function installUpdate(): void {
   setImmediate(() => autoUpdater.quitAndInstall(false, true))
 }
 
+/**
+ * The deb/rpm/pacman updaters relaunch with app.relaunch(), and Chromium launches that process with
+ * PR_SET_NO_NEW_PRIVS: the flag is inherited by every terminal, so sudo refuses to run until the app is
+ * restarted by hand. The AppImage updater spawns the new version through Node, which is fine.
+ */
+function relaunchesThroughElectron(): boolean {
+  return process.platform === 'linux' && !process.env.APPIMAGE
+}
+
+/** A detached shell, spawned through Node (no NNP flag), waits for this process to exit, then starts the app. */
+function relaunchWithoutNoNewPrivs(): void {
+  const waitThenStart = 'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; shift; exec "$@"'
+  const child = spawn('/bin/sh', ['-c', waitThenStart, 'relaunch', String(process.pid), process.execPath, ...process.argv.slice(1)], {
+    detached: true,
+    stdio: 'ignore'
+  })
+  child.unref()
+}
+
 export function openReleasesPage(version?: string): void {
   void shell.openExternal(version ? releaseUrl(version) : RELEASES_URL)
 }
@@ -162,6 +182,11 @@ export function setupUpdater(): void {
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.allowPrerelease = false
   autoUpdater.logger = null
+  if (relaunchesThroughElectron()) {
+    autoUpdater.autoRunAppAfterInstall = false
+    // Only emitted once the install succeeded (a cancelled pkexec does not quit, nor relaunch).
+    nativeAutoUpdater.once('before-quit-for-update', () => app.once('quit', relaunchWithoutNoNewPrivs))
+  }
 
   autoUpdater.on('update-not-available', () =>
     publish({ status: 'up-to-date', version: null, notes: [], releaseUrl: null, percent: null, checkedAt: Date.now() })
